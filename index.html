@@ -1383,8 +1383,12 @@ function goHeroSelect(){
         }
         document.getElementById('heroGrid').innerHTML = h;
         document.getElementById('selTitle').textContent = isNat ? '选择双将（同势力）' : '选择武将';
-        document.getElementById('selDesc').textContent = isNat ?
-            '请选择两张同势力的武将作为主将和副将' : '从以下武将中选择你的角色';
+        // selDesc元素可能不存在，添加容错处理
+        const selDesc = document.getElementById('selDesc');
+        if (selDesc) {
+            selDesc.textContent = isNat ?
+                '请选择两张同势力的武将作为主将和副将' : '从以下武将中选择你的角色';
+        }
 
         window._selMax=maxPick;
         updateSelBtn();

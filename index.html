@@ -232,7 +232,7 @@
         /* 上方对手区域 - 弧形凸型布局（中间在顶，两边逐渐降低） */
         .players-arc-area {
             display: flex;
-            justify-content: center;
+            justify-content: space-around;  /* 让卡牌均匀分布，拉伸到全宽 */
             align-items: flex-start;  /* 顶部对齐，中间卡牌保持在最上 */
             gap: 4px;
             padding: 4px 10px 2px;
@@ -1711,16 +1711,6 @@ function _updateBoardImpl(state){
 
     // 自己信息
     const hs=human;
-    // 设置自己的 data-pid 供光束定位
-    const myLeft=document.querySelector('.myinfo-left');
-    if(myLeft) myLeft.setAttribute('data-pid',hs.id);
-    document.getElementById('mhn').textContent=hs.hero.name;
-    const myHpShow=Math.max(0,hs.hp);
-    document.getElementById('mhp').innerHTML=`<span class="h-full">${'❤'.repeat(myHpShow)}</span><span class="h-empty">${'♡'.repeat(Math.max(0,hs.maxHp-myHpShow))}</span> <span style="font-size:10px;color:#a0a0b0">(${hs.hp}/${hs.maxHp})</span>`;
-    // 自己的小头像 - 由 SGS.UI.Board 渲染
-    // 身份标识 - 由 SGS.UI.Board 渲染
-    // 装备区 - 由 SGS.UI.Board 渲染
-
     // 手牌
     renderHand(hs, state);
 

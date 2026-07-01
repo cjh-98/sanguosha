@@ -2036,6 +2036,17 @@ function clickSkill(name){
                 case '鬼才':openGuicai();break;
                 case '鬼道':openGuidao();break;
                 case '青囊':openQingnang();break;
+                case '结姻':openJieyin();break;
+                case '离间':openLijian();break;
+                case '挑衅':openTiaoxian();break;
+                case '天义':openTianyi();break;
+                case '乱击':openLuanji();break;
+                case '英魂':openYinghun();break;
+                case '虚鲲':openXukun();break;
+                case '挥泪':openHuilei();break;
+                case '奇袭':openQixi();break;
+                case '断粮':openDuanliang();break;
+                case '国色':openGuose();break;
                 default:
                     Logger.warn('技能UI未实现: ' + name);
                     alert(`技能"${name}"的UI开发中，敬请期待！`);
@@ -2489,6 +2500,775 @@ function confirmRende(){
     engine.useSkill(human, '仁德', { targetId: _rdTargetId, cards: cards });
     updateBoard(engine.getState());
 }
+
+// ---- 结姻弹窗（大乔）----
+let _jyTargetId = null;
+let _jySelectedCards = [];
+function openJieyin(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targets = engine.getAlivePlayers().filter(p => p.hp < p.maxHp);
+    if(targets.length === 0){
+        alert('当前没有需要回复体力的玩家');
+        return;
+    }
+    _jyTargetId = null;
+    _jySelectedCards = [];
+    const ov=document.createElement('div');
+    ov.id='jyOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)ov.remove();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>结姻：选择要结姻的对象</h4>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px">
+            ${targets.map(p=>`<div class="player-card ${p.id===human.id?'self':''}" data-id="${p.id}" onclick="selectJyTarget(this)">
+                <div class="pinfo">${p.name}</div>
+                <div class="phpl">${p.hp}/${p.maxHp}</div>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('jyOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+}
+
+function selectJyTarget(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targetId = parseInt(el.dataset.id);
+    _jyTargetId = targetId;
+    
+    const ov=document.getElementById('jyOverlay');
+    if(ov)ov.remove();
+    
+    // 打开牌选择弹窗（需要弃2张牌）
+    const ov2=document.createElement('div');
+    ov2.id='jyCardOverlay';
+    ov2.className='overlay';
+    ov2.onclick=function(e){if(e.target===this)ov2.remove();};
+    ov2.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>结姻：选择要弃置的2张牌</h4>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px" id="jyCards">
+            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_jySelectedCards.includes(i)?'sel':''}"
+                data-i="${i}" onclick="toggleJyCard(this)">
+                <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+                <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('jyCardOverlay')?.remove()">取消</button>
+            <button class="btn-sm btn-primary" id="jyConfirmBtn" disabled onclick="confirmJieyin()">确认</button>
+        </div></div>`;
+    document.body.appendChild(ov2);
+    updateJyCardDisplay();
+}
+
+function toggleJyCard(el){
+    const idx = parseInt(el.dataset.i);
+    const pos = _jySelectedCards.indexOf(idx);
+    if(pos >= 0){
+        _jySelectedCards.splice(pos, 1);
+    } else if(_jySelectedCards.length < 2){
+        _jySelectedCards.push(idx);
+    }
+    updateJyCardDisplay();
+}
+
+function updateJyCardDisplay(){
+    const container = document.getElementById('jyCards');
+    const btn = document.getElementById('jyConfirmBtn');
+    if(!container) return;
+    container.innerHTML = engine.getHumanPlayer().handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_jySelectedCards.includes(i)?'sel':''}"
+        data-i="${i}" onclick="toggleJyCard(this)">
+        <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+        <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('');
+    if(btn) btn.disabled = _jySelectedCards.length !== 2;
+}
+
+function confirmJieyin(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    if(_jyTargetId === null || _jySelectedCards.length !== 2){return;}
+    const cards = _jySelectedCards.map(i => human.handCards[i]);
+    const ov=document.getElementById('jyCardOverlay');
+    if(ov)ov.remove();
+    engine.useSkill(human, '结姻', { targetId: _jyTargetId, cards: cards });
+    updateBoard(engine.getState());
+}
+
+// ---- 离间弹窗（大乔）----
+let _ljTarget1Id = null;
+let _ljTarget2Id = null;
+let _ljCardIdx = null;
+function openLijian(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const males = engine.getAlivePlayers().filter(p => p.gender === 'male');
+    if(males.length < 2){
+        alert('需要至少2名男性角色才能发动离间');
+        return;
+    }
+    _ljTarget1Id = null;
+    _ljTarget2Id = null;
+    _ljCardIdx = null;
+    const ov=document.createElement('div');
+    ov.id='ljOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)ov.remove();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>离间：选择2名男性角色进行决斗</h4>
+        <p style="color:#a0a0b0;font-size:12px;margin-bottom:10px;">请先选择第1名男性角色</p>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px" id="ljTargets1">
+            ${males.map(p=>`<div class="player-card ${p.id===human.id?'self':''}" data-id="${p.id}" onclick="selectLjTarget1(this)">
+                <div class="pinfo">${p.name}</div>
+                <div class="phpl">${p.hp}/${p.maxHp}</div>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('ljOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+}
+
+function selectLjTarget1(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targetId = parseInt(el.dataset.id);
+    _ljTarget1Id = targetId;
+    
+    const ov=document.getElementById('ljOverlay');
+    if(ov)ov.remove();
+    
+    // 选择第二名男性
+    const males = engine.getAlivePlayers().filter(p => p.gender === 'male' && p.id !== _ljTarget1Id);
+    const ov2=document.createElement('div');
+    ov2.id='ljOverlay2';
+    ov2.className='overlay';
+    ov2.onclick=function(e){if(e.target===this)ov2.remove();};
+    ov2.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>离间：选择第2名男性角色</h4>
+        <p style="color:#c41e3a;font-size:12px;margin-bottom:10px;">已选: ${engine.getAlivePlayers().find(p=>p.id===_ljTarget1Id).name}</p>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px">
+            ${males.map(p=>`<div class="player-card ${p.id===human.id?'self':''}" data-id="${p.id}" onclick="selectLjTarget2(this)">
+                <div class="pinfo">${p.name}</div>
+                <div class="phpl">${p.hp}/${p.maxHp}</div>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('ljOverlay2')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov2);
+}
+
+function selectLjTarget2(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targetId = parseInt(el.dataset.id);
+    _ljTarget2Id = targetId;
+    
+    const ov=document.getElementById('ljOverlay2');
+    if(ov)ov.remove();
+    
+    // 打开牌选择弹窗
+    const ov3=document.createElement('div');
+    ov3.id='ljCardOverlay';
+    ov3.className='overlay';
+    ov3.onclick=function(e){if(e.target===this)ov3.remove();};
+    ov3.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>离间：选择要弃置的牌</h4>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px" id="ljCards">
+            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
+                data-i="${i}" onclick="selectLjCard(this)">
+                <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+                <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('ljCardOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov3);
+}
+
+function selectLjCard(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    if(_ljTarget1Id === null || _ljTarget2Id === null){return;}
+    const idx = parseInt(el.dataset.i);
+    const card = human.handCards[idx];
+    const ov=document.getElementById('ljCardOverlay');
+    if(ov)ov.remove();
+    engine.useSkill(human, '离间', { targetId: _ljTarget1Id, targetId2: _ljTarget2Id, card: card });
+    updateBoard(engine.getState());
+}
+
+// ---- 挑衅弹窗（界于禁）----
+function openTiaoxian(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targets = engine.getAlivePlayers().filter(p => p.id !== human.id && p.isAlive);
+    if(targets.length === 0){
+        alert('没有可以挑衅的目标');
+        return;
+    }
+    const ov=document.createElement('div');
+    ov.id='txOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)ov.remove();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>挑衅：选择要挑衅的目标</h4>
+        <p style="color:#a0a0b0;font-size:12px;margin-bottom:10px;">目标必须对你使用【杀】，否则弃1张牌</p>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px">
+            ${targets.map(p=>`<div class="player-card ${p.id===human.id?'self':''}" data-id="${p.id}" onclick="selectTxTarget(this)">
+                <div class="pinfo">${p.name}</div>
+                <div class="phpl">${p.hp}/${p.maxHp}</div>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('txOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+}
+
+function selectTxTarget(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targetId = parseInt(el.dataset.id);
+    const ov=document.getElementById('txOverlay');
+    if(ov)ov.remove();
+    engine.useSkill(human, '挑衅', { targetId: targetId });
+    updateBoard(engine.getState());
+}
+
+// ---- 天义弹窗（孙权）----
+let _tyTargetId = null;
+let _tySelectedCards = [];
+function openTianyi(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targets = engine.getAlivePlayers().filter(p => p.id !== human.id && p.isAlive);
+    if(targets.length === 0){
+        alert('没有可以天义的目标');
+        return;
+    }
+    _tyTargetId = null;
+    _tySelectedCards = [];
+    const ov=document.createElement('div');
+    ov.id='tyOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)ov.remove();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>天义：选择天义的目标</h4>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px">
+            ${targets.map(p=>`<div class="player-card ${p.id===human.id?'self':''}" data-id="${p.id}" onclick="selectTyTarget(this)">
+                <div class="pinfo">${p.name}</div>
+                <div class="phpl">${p.hp}/${p.maxHp}</div>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('tyOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+}
+
+function selectTyTarget(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targetId = parseInt(el.dataset.id);
+    _tyTargetId = targetId;
+    
+    const ov=document.getElementById('tyOverlay');
+    if(ov)ov.remove();
+    
+    // 打开牌选择弹窗（需要弃2张牌）
+    const ov2=document.createElement('div');
+    ov2.id='tyCardOverlay';
+    ov2.className='overlay';
+    ov2.onclick=function(e){if(e.target===this)ov2.remove();};
+    ov2.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>天义：选择要弃置的2张牌</h4>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px" id="tyCards">
+            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_tySelectedCards.includes(i)?'sel':''}"
+                data-i="${i}" onclick="toggleTyCard(this)">
+                <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+                <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('tyCardOverlay')?.remove()">取消</button>
+            <button class="btn-sm btn-primary" id="tyConfirmBtn" disabled onclick="confirmTianyi()">确认</button>
+        </div></div>`;
+    document.body.appendChild(ov2);
+    updateTyCardDisplay();
+}
+
+function toggleTyCard(el){
+    const idx = parseInt(el.dataset.i);
+    const pos = _tySelectedCards.indexOf(idx);
+    if(pos >= 0){
+        _tySelectedCards.splice(pos, 1);
+    } else if(_tySelectedCards.length < 2){
+        _tySelectedCards.push(idx);
+    }
+    updateTyCardDisplay();
+}
+
+function updateTyCardDisplay(){
+    const container = document.getElementById('tyCards');
+    const btn = document.getElementById('tyConfirmBtn');
+    if(!container) return;
+    container.innerHTML = engine.getHumanPlayer().handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_tySelectedCards.includes(i)?'sel':''}"
+        data-i="${i}" onclick="toggleTyCard(this)">
+        <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+        <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('');
+    if(btn) btn.disabled = _tySelectedCards.length !== 2;
+}
+
+function confirmTianyi(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    if(_tyTargetId === null || _tySelectedCards.length !== 2){return;}
+    const cards = _tySelectedCards.map(i => human.handCards[i]);
+    const ov=document.getElementById('tyCardOverlay');
+    if(ov)ov.remove();
+    engine.useSkill(human, '天义', { targetId: _tyTargetId, cards: cards });
+    updateBoard(engine.getState());
+}
+
+// ---- 乱击弹窗（孙权）----
+let _ljSelectedCards = [];
+function openLuanji(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    _ljSelectedCards = [];
+    const ov=document.createElement('div');
+    ov.id='ljOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)ov.remove();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>乱击：选择2张同花色的牌</h4>
+        <p style="color:#a0a0b0;font-size:12px;margin-bottom:10px;">选择2张相同花色的牌，对目标造成等同于牌数的伤害</p>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px" id="ljSelectCards">
+            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_ljSelectedCards.includes(i)?'sel':''}"
+                data-i="${i}" onclick="toggleLjCard(this)">
+                <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+                <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('ljOverlay')?.remove()">取消</button>
+            <button class="btn-sm btn-primary" id="ljConfirmBtn" disabled onclick="confirmLuanji()">确认</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+    updateLjCardDisplay();
+}
+
+function toggleLjCard(el){
+    const idx = parseInt(el.dataset.i);
+    const pos = _ljSelectedCards.indexOf(idx);
+    if(pos >= 0){
+        _ljSelectedCards.splice(pos, 1);
+    } else if(_ljSelectedCards.length < 2){
+        _ljSelectedCards.push(idx);
+    }
+    updateLjCardDisplay();
+}
+
+function updateLjCardDisplay(){
+    const container = document.getElementById('ljSelectCards');
+    const btn = document.getElementById('ljConfirmBtn');
+    if(!container) return;
+    container.innerHTML = engine.getHumanPlayer().handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_ljSelectedCards.includes(i)?'sel':''}"
+        data-i="${i}" onclick="toggleLjCard(this)">
+        <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+        <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('');
+    if(btn){
+        const selectedCards = _ljSelectedCards.map(i => engine.getHumanPlayer().handCards[i]);
+        btn.disabled = selectedCards.length !== 2 || selectedCards[0].suit !== selectedCards[1].suit;
+    }
+}
+
+function confirmLuanji(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    if(_ljSelectedCards.length !== 2){return;}
+    const cards = _ljSelectedCards.map(i => human.handCards[i]);
+    if(cards[0].suit !== cards[1].suit){return;}
+    const ov=document.getElementById('ljOverlay');
+    if(ov)ov.remove();
+    // 乱击选择目标
+    const targets = engine.getAlivePlayers().filter(p => p.id !== human.id && p.isAlive);
+    if(targets.length === 0){return;}
+    const ov2=document.createElement('div');
+    ov2.id='ljTargetOverlay';
+    ov2.className='overlay';
+    ov2.onclick=function(e){if(e.target===this)ov2.remove();};
+    ov2.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>乱击：选择伤害目标</h4>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px">
+            ${targets.map(p=>`<div class="player-card ${p.id===human.id?'self':''}" data-id="${p.id}" onclick="selectLjTarget(this)">
+                <div class="pinfo">${p.name}</div>
+                <div class="phpl">${p.hp}/${p.maxHp}</div>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('ljTargetOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov2);
+}
+
+function selectLjTarget(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targetId = parseInt(el.dataset.id);
+    const cards = _ljSelectedCards.map(i => human.handCards[i]);
+    const ov=document.getElementById('ljTargetOverlay');
+    if(ov)ov.remove();
+    engine.useSkill(human, '乱击', { targetId: targetId, cards: cards });
+    updateBoard(engine.getState());
+}
+
+// ---- 英魂弹窗（孙坚）----
+function openYinghun(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targets = engine.getAlivePlayers().filter(p => p.id !== human.id && p.isAlive);
+    if(targets.length === 0){return;}
+    const ov=document.createElement('div');
+    ov.id='yhOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)ov.remove();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>英魂：选择英魂的目标</h4>
+        <p style="color:#a0a0b0;font-size:12px;margin-bottom:10px;">弃置一张红色牌，对目标造成1点伤害</p>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px">
+            ${targets.map(p=>`<div class="player-card ${p.id===human.id?'self':''}" data-id="${p.id}" onclick="selectYhTarget(this)">
+                <div class="pinfo">${p.name}</div>
+                <div class="phpl">${p.hp}/${p.maxHp}</div>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('yhOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+}
+
+function selectYhTarget(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targetId = parseInt(el.dataset.id);
+    const ov=document.getElementById('yhOverlay');
+    if(ov)ov.remove();
+    // 打开牌选择
+    const redCards = human.handCards.filter(c => c.suit === 'heart' || c.suit === 'diamond');
+    if(redCards.length === 0){
+        alert('没有红色牌可以使用英魂');
+        return;
+    }
+    const ov2=document.createElement('div');
+    ov2.id='yhCardOverlay';
+    ov2.className='overlay';
+    ov2.onclick=function(e){if(e.target===this)ov2.remove();};
+    ov2.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>英魂：选择一张红色牌</h4>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px">
+            ${redCards.map((c,i)=>`<div class="card red"
+                data-i="${i}" onclick="selectYhCard(this)">
+                <span class="cs red">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+                <span class="cname r">${c.name}</span></div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('yhCardOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov2);
+}
+
+function selectYhCard(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const idx = parseInt(el.dataset.i);
+    const redCards = human.handCards.filter(c => c.suit === 'heart' || c.suit === 'diamond');
+    const card = redCards[idx];
+    const ov=document.getElementById('yhCardOverlay');
+    if(ov)ov.remove();
+    // 需要找到原始牌索引
+    const originalIdx = human.handCards.indexOf(card);
+    engine.useSkill(human, '英魂', { targetId: _yhTargetId, card: human.handCards[originalIdx] });
+    updateBoard(engine.getState());
+}
+
+// ---- 虚鲲弹窗（左慈）----
+function openXukun(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    if(human.handCards.length === 0){
+        alert('没有手牌可以使用虚鲲');
+        return;
+    }
+    const ov=document.createElement('div');
+    ov.id='xkOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)ov.remove();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>虚鲲：选择要展示的牌</h4>
+        <p style="color:#a0a0b0;font-size:12px;margin-bottom:10px;">选择一张牌展示给所有玩家看</p>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px">
+            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
+                data-i="${i}" onclick="selectXkCard(this)">
+                <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+                <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('xkOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+}
+
+function selectXkCard(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const idx = parseInt(el.dataset.i);
+    const card = human.handCards[idx];
+    const ov=document.getElementById('xkOverlay');
+    if(ov)ov.remove();
+    engine.useSkill(human, '虚鲲', { card: card });
+    updateBoard(engine.getState());
+}
+
+// ---- 挥泪弹窗（刘禅）----
+function openHuilei(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targets = engine.getAlivePlayers().filter(p => p.hp < p.maxHp);
+    if(targets.length === 0){
+        alert('当前没有需要回复体力的玩家');
+        return;
+    }
+    _hlTargetId = null;
+    const ov=document.createElement('div');
+    ov.id='hlOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)ov.remove();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>挥泪：选择要回复的玩家</h4>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px">
+            ${targets.map(p=>`<div class="player-card ${p.id===human.id?'self':''}" data-id="${p.id}" onclick="selectHlTarget(this)">
+                <div class="pinfo">${p.name}</div>
+                <div class="phpl">${p.hp}/${p.maxHp}</div>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('hlOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+}
+
+let _hlTargetId = null;
+function selectHlTarget(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targetId = parseInt(el.dataset.id);
+    _hlTargetId = targetId;
+    const ov=document.getElementById('hlOverlay');
+    if(ov)ov.remove();
+    // 打开牌选择
+    const ov2=document.createElement('div');
+    ov2.id='hlCardOverlay';
+    ov2.className='overlay';
+    ov2.onclick=function(e){if(e.target===this)ov2.remove();};
+    ov2.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>挥泪：选择要弃置的牌</h4>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px" id="hlCards">
+            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
+                data-i="${i}" onclick="selectHlCard(this)">
+                <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+                <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('hlCardOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov2);
+}
+
+function selectHlCard(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    if(_hlTargetId === null){return;}
+    const idx = parseInt(el.dataset.i);
+    const card = human.handCards[idx];
+    const ov=document.getElementById('hlCardOverlay');
+    if(ov)ov.remove();
+    engine.useSkill(human, '挥泪', { targetId: _hlTargetId, card: card });
+    updateBoard(engine.getState());
+}
+
+// ---- 奇袭弹窗（徐晃）----
+function openQixi(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targets = engine.getAlivePlayers().filter(p => p.id !== human.id && p.isAlive);
+    if(targets.length === 0){return;}
+    const ov=document.createElement('div');
+    ov.id='qxOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)ov.remove();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>奇袭：选择奇袭的目标</h4>
+        <p style="color:#a0a0b0;font-size:12px;margin-bottom:10px;">弃一张黑色牌，过河拆桥目标</p>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px">
+            ${targets.map(p=>`<div class="player-card ${p.id===human.id?'self':''}" data-id="${p.id}" onclick="selectQxTarget(this)">
+                <div class="pinfo">${p.name}</div>
+                <div class="phpl">${p.hp}/${p.maxHp}</div>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('qxOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+}
+
+function selectQxTarget(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targetId = parseInt(el.dataset.id);
+    const ov=document.getElementById('qxOverlay');
+    if(ov)ov.remove();
+    // 选择黑色牌
+    const blackCards = human.handCards.filter(c => c.suit === 'spade' || c.suit === 'club');
+    if(blackCards.length === 0){
+        alert('没有黑色牌可以使用奇袭');
+        return;
+    }
+    const ov2=document.createElement('div');
+    ov2.id='qxCardOverlay';
+    ov2.className='overlay';
+    ov2.onclick=function(e){if(e.target===this)ov2.remove();};
+    ov2.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>奇袭：选择一张黑色牌</h4>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px">
+            ${blackCards.map((c,i)=>`<div class="card blk"
+                data-i="${i}" onclick="selectQxCard(this)">
+                <span class="cs blk">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+                <span class="cname">${c.name}</span></div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('qxCardOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov2);
+}
+
+function selectQxCard(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const idx = parseInt(el.dataset.i);
+    const blackCards = human.handCards.filter(c => c.suit === 'spade' || c.suit === 'club');
+    const card = blackCards[idx];
+    const ov=document.getElementById('qxCardOverlay');
+    if(ov)ov.remove();
+    const originalIdx = human.handCards.indexOf(card);
+    engine.useSkill(human, '奇袭', { targetId: _qxTargetId, card: human.handCards[originalIdx] });
+    updateBoard(engine.getState());
+}
+
+let _qxTargetId = null;
+
+// ---- 断粮弹窗（张角）----
+function openDuanliang(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targets = engine.getAlivePlayers().filter(p => p.id !== human.id && p.isAlive);
+    if(targets.length === 0){return;}
+    const ov=document.createElement('div');
+    ov.id='dlOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)ov.remove();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>断粮：选择断粮的目标</h4>
+        <p style="color:#a0a0b0;font-size:12px;margin-bottom:10px;">弃一张牌，给目标放一张乐不思蜀</p>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px">
+            ${targets.map(p=>`<div class="player-card ${p.id===human.id?'self':''}" data-id="${p.id}" onclick="selectDlTarget(this)">
+                <div class="pinfo">${p.name}</div>
+                <div class="phpl">${p.hp}/${p.maxHp}</div>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('dlOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+}
+
+function selectDlTarget(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targetId = parseInt(el.dataset.id);
+    const ov=document.getElementById('dlOverlay');
+    if(ov)ov.remove();
+    if(human.handCards.length === 0){
+        alert('没有手牌可以使用断粮');
+        return;
+    }
+    const ov2=document.createElement('div');
+    ov2.id='dlCardOverlay';
+    ov2.className='overlay';
+    ov2.onclick=function(e){if(e.target===this)ov2.remove();};
+    ov2.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>断粮：选择要弃置的牌</h4>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px">
+            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
+                data-i="${i}" onclick="selectDlCard(this)">
+                <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+                <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('dlCardOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov2);
+}
+
+function selectDlCard(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const idx = parseInt(el.dataset.i);
+    const card = human.handCards[idx];
+    const ov=document.getElementById('dlCardOverlay');
+    if(ov)ov.remove();
+    engine.useSkill(human, '断粮', { targetId: _dlTargetId, card: card });
+    updateBoard(engine.getState());
+}
+
+let _dlTargetId = null;
+
+// ---- 国色弹窗（甄姬）----
+function openGuose(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targets = engine.getAlivePlayers().filter(p => p.id !== human.id && p.isAlive);
+    if(targets.length === 0){return;}
+    const ov=document.createElement('div');
+    ov.id='gsOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)ov.remove();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>国色：选择国色的目标</h4>
+        <p style="color:#a0a0b0;font-size:12px;margin-bottom:10px;">弃一张红色牌，给目标放一张乐不思蜀</p>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px">
+            ${targets.map(p=>`<div class="player-card ${p.id===human.id?'self':''}" data-id="${p.id}" onclick="selectGsTarget(this)">
+                <div class="pinfo">${p.name}</div>
+                <div class="phpl">${p.hp}/${p.maxHp}</div>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('gsOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+}
+
+function selectGsTarget(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targetId = parseInt(el.dataset.id);
+    const ov=document.getElementById('gsOverlay');
+    if(ov)ov.remove();
+    const redCards = human.handCards.filter(c => c.suit === 'heart' || c.suit === 'diamond');
+    if(redCards.length === 0){
+        alert('没有红色牌可以使用国色');
+        return;
+    }
+    const ov2=document.createElement('div');
+    ov2.id='gsCardOverlay';
+    ov2.className='overlay';
+    ov2.onclick=function(e){if(e.target===this)ov2.remove();};
+    ov2.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>国色：选择一张红色牌</h4>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px">
+            ${redCards.map((c,i)=>`<div class="card red"
+                data-i="${i}" onclick="selectGsCard(this)">
+                <span class="cs red">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+                <span class="cname r">${c.name}</span></div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('gsCardOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov2);
+}
+
+function selectGsCard(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const idx = parseInt(el.dataset.i);
+    const redCards = human.handCards.filter(c => c.suit === 'heart' || c.suit === 'diamond');
+    const card = redCards[idx];
+    const ov=document.getElementById('gsCardOverlay');
+    if(ov)ov.remove();
+    const originalIdx = human.handCards.indexOf(card);
+    engine.useSkill(human, '国色', { targetId: _gsTargetId, card: human.handCards[originalIdx] });
+    updateBoard(engine.getState());
+}
+
+let _gsTargetId = null;
 
 // ---- 洛神弹窗 ----
 // 供引擎自动调用

@@ -126,11 +126,11 @@
             width: 100%;
             height: 100%;
             flex-shrink: 0;
-            /* 纵向布局：topbar + table-area + player-bottom */
+            /* 纵向布局：topbar + arc-area + players-area */
             display: flex;
             flex-direction: column;
             align-items: stretch;
-            justify-content: space-between;
+            justify-content: flex-start;  /* 改为 flex-start 让子元素按顺序排列 */
             gap: 0;
         }
         #gameScreen::before {
@@ -229,16 +229,16 @@
             display:flex; justify-content:center; gap:8px;
             flex-wrap: wrap;
         }
-        /* 上方对手区域 - 弧形凸型布局（中间高两边低，像桥拱一样） */
+        /* 上方对手区域 - 弧形凸型布局（中间在顶，两边逐渐降低） */
         .players-arc-area {
             display: flex;
             justify-content: center;
-            align-items: flex-end;  /* 底部对齐 */
-            gap: 6px;
-            padding: 10px 10px 4px;
+            align-items: flex-start;  /* 顶部对齐，中间卡牌保持在最上 */
+            gap: 4px;
+            padding: 4px 10px 2px;
             flex-wrap: nowrap;  /* 不换行，保持一行排列 */
             z-index: 2;
-            min-height: 160px;  /* 必须有足够高度才能显示弧形 (hero-card 100px + 弧形偏移 50px + 间距) */
+            min-height: 110px;  /* 足够空间让弧形效果显示 */
             overflow: visible;
         }
         .players-arc-area .hero-card {
@@ -1640,32 +1640,28 @@ function _updateBoardImpl(state){
             // 只创建一次
         })();
 
-    // 对手列表 - 弧形凸型布局（中间高两边低）带立绘
+    // 对手列表 - 弧形凸型布局（中间在顶，两边逐渐降低）带立绘
     const oppList=state.players.filter(p=>p.id!==human.id);
     const nOpp=oppList.length;
     const arcArea = document.getElementById('playersArcArea');
     if (arcArea) {
-        // 计算弧形偏移：中间最高，两边降低（使用margin-bottom）
+        // 计算弧形偏移：中间0，两边逐渐增加（使用margin-top）
+        // 配合 align-items: flex-start，中间卡牌在顶，两边卡牌被推下来
         const getArcOffset = (idx, total) => {
             if (total <= 1) return 0;
             const centerIdx = (total - 1) / 2;
             const distanceFromCenter = Math.abs(idx - centerIdx);
-            const maxOffset = total <= 3 ? 50 : total <= 5 ? 50 : total <= 7 ? 50 : 45;
+            const maxOffset = total <= 3 ? 25 : total <= 5 ? 30 : total <= 7 ? 35 : 40;
             const normalizedDist = distanceFromCenter / centerIdx;
-            return Math.round(maxOffset * (1 - normalizedDist * normalizedDist));
+            // 距离中心越远，偏移越大（推下来越多）
+            return Math.round(maxOffset * normalizedDist * normalizedDist);
         };
-        const getArcScale = (idx, total) => {
-            if (total <= 1) return 1;
-            const centerIdx = (total - 1) / 2;
-            const distanceFromCenter = Math.abs(idx - centerIdx);
-            const normalizedDist = distanceFromCenter / centerIdx;
-            return (1 - normalizedDist * 0.15).toFixed(2);
-        };
+        // 移除缩放效果，保持卡牌大小一致
+        const getArcScale = () => 1;
         let arcHtml = '';
         for (let i = 0; i < nOpp; i++) {
             const p = oppList[i];
             const arcOffset = getArcOffset(i, nOpp);
-            const arcScale = getArcScale(i, nOpp);
             const isCur = cp && p.id === cp.id;
             const fc = p.heroFaction || 'unknown';
             const fn = p.heroRevealed || Cfg.mode !== 'national' ? (SGS.HeroData.factionName[p.heroFaction] || '?') : '?';
@@ -1693,7 +1689,7 @@ function _updateBoardImpl(state){
             arcHtml += `<div class="hero-card${isCur ? ' cur' : ''}${isDead ? ' dead' : ''}${p.isChained ? ' chained' : ''}${p.isFlipped ? ' flipped' : ''}"
                               data-pid="${p.id}"
                               onclick="clickP(${p.id})"
-                              style="margin-bottom: ${arcOffset}px; transform: scale(${arcScale});">
+                              style="margin-top: ${arcOffset}px;">
                 <div class="hc-faction ${fctCls}">${fn}</div>
                 ${p.judgmentCards && p.judgmentCards.length ? `<div class="hc-judge-badges">${p.judgmentCards.map(c=>{
                     const cls=c.subtype==='lebusi'?'lebu':c.subtype==='bingliang'?'bing':c.subtype==='shandian'?'shandian':'';

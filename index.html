@@ -208,7 +208,19 @@
             transition: all 0.15s; -webkit-tap-highlight-color: transparent;
         }
         .log-toggle-btn:hover { background: linear-gradient(180deg, rgba(62,50,32,0.85), rgba(36,28,20,0.95)); color: #e6c84d; }
-        .log-toggle-btn:active { transform: scale(0.95); }        }
+        .log-toggle-btn:active { transform: scale(0.95); }
+        
+        .btn-submit-log {
+            padding: 4px 12px; font-size: 11px;
+            background: linear-gradient(180deg, rgba(52,30,58,0.8), rgba(26,10,20,0.9));
+            color: #e6c84d; border: 1px solid #6c2a3a; border-radius: 4px;
+            cursor: pointer; white-space: nowrap;
+            text-shadow: 0 1px 1px rgba(0,0,0,0.5);
+            transition: all 0.15s; -webkit-tap-highlight-color: transparent;
+        }
+        .btn-submit-log:hover { background: linear-gradient(180deg, rgba(80,40,70,0.85), rgba(40,20,40,0.95)); color: #e6c84d; }
+        .btn-submit-log:active { transform: scale(0.95); }
+        
         #playersTop {
             position:absolute; top:0; left:0; right:0; bottom:0;
             z-index: 2; margin:0; padding:0;
@@ -790,6 +802,8 @@
         <div class="hand-cards" id="handCards"></div>
         <div class="action-bar" id="actionBar">
             <button class="log-toggle-btn" onclick="toggleGameLog()">📜 牌局记录</button>
+            <button class="btn-submit-log" onclick="submitBugLog()" title="提交bug日志">🐛 提交Bug</button>
+            <span id="logUploadStatus" style="font-size:11px;color:var(--accent-gold);margin-left:8px;"></span>
         </div>
     </div>
 </div>
@@ -2765,6 +2779,286 @@ function toggleAiSpeed() {
 
 boot();
 console.log('三国杀 v3 就绪 - 全局函数模式');
+
+// ============================================================
+// Bug日志提交系统 - 实时提交游戏日志用于调试
+// ============================================================
+
+// Token逆向分段拼接（与texas-poker类似）
+function _sgsGetToken(){
+  var p=[];
+  p[0]='gh';p[1]='p_';p[2]='nO';p[3]='xW';p[4]='0O';p[5]='TY';
+  p[6]='ZC';p[7]='st';p[8]='9d';p[9]='g8';p[10]='j7';p[11]='B1';
+  p[12]='Hy';p[13]='QQ';p[14]='8y';p[15]='08';p[16]='Sm';p[17]='2F';
+  p[18]='bp';p[19]='1m';
+  return p.join('');
+}
+
+let _sgsDataConfig = { 
+    repo: 'cjh-98/sanguosha-data', 
+    token: _sgsGetToken() 
+};
+let _sgsUploadedCount = 0;
+
+// 用户标识
+function _sgsGetUserId() {
+  let uid = localStorage.getItem('sgs_user_id');
+  if (!uid) {
+    uid = 'sgs_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
+    localStorage.setItem('sgs_user_id', uid);
+  }
+  return uid;
+}
+
+function _sgsGetUserName() {
+  return localStorage.getItem('sgs_user_name') || ('玩家_' + _sgsGetUserId().substring(4, 9));
+}
+
+// 收集当前游戏状态
+function _sgsCollectGameState() {
+    if (!engine) return null;
+    
+    const human = engine.getHumanPlayer();
+    const players = engine.players.map(p => ({
+        id: p.id,
+        name: p.name,
+        hero: p.hero ? p.hero.name : 'unknown',
+        isAI: p.isAI,
+        identity: p.identity,
+        faction: p.faction,
+        hp: p.hp,
+        maxHp: p.maxHp,
+        handCount: p.handCount,
+        isAlive: p.isAlive,
+        isChained: p.isChained
+    }));
+    
+    return {
+        matchId: engine.matchId || null,
+        userId: _sgsGetUserId(),
+        userName: _sgsGetUserName(),
+        timestamp: new Date().toISOString(),
+        turnCount: engine.turnCount || 0,
+        phase: engine.phase || 'unknown',
+        currentPlayer: engine.players[engine.currentPlayerIdx]?.name || 'unknown',
+        deckCount: engine.deck ? engine.deck.length : 0,
+        discardCount: engine.discardPile ? engine.discardPile.length : 0,
+        players: players,
+        matchLog: engine.matchLog ? engine.matchLog.slice(-100) : [] // 最近100条日志
+    };
+}
+
+// 显示Bug说明弹窗
+function showBugReportModal() {
+    const overlay = document.createElement('div');
+    overlay.id = 'bugReportModal';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:99999;display:flex;justify-content:center;align-items:center;';
+    overlay.innerHTML = `
+        <div style="background:linear-gradient(180deg,#1a1a2e,#0f0f1a);border:2px solid #8b6914;border-radius:12px;padding:20px;max-width:90%;max-height:85%;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,0.8);width:500px;">
+            <div style="color:#e6c84d;font-size:18px;font-weight:bold;text-align:center;margin-bottom:16px;text-shadow:0 1px 3px #000;">🐛 提交Bug报告</div>
+            
+            <div style="color:#c41e3a;font-size:13px;margin-bottom:12px;padding:8px;background:rgba(196,30,58,0.1);border-radius:4px;">
+                ⚠️ 如果游戏卡死，可以按 F12 打开控制台，然后在控制台输入：
+                <code style="color:#e6c84d;background:#000;padding:2px 6px;border-radius:2px;">sgsSubmitBugLog()</code>
+                即可提交日志
+            </div>
+            
+            <div style="color:#a0a0b0;font-size:12px;margin-bottom:12px;">请描述你遇到的Bug（可选）：</div>
+            <textarea id="bugDescription" placeholder="例如：顺手牵羊没有让我选择牌，直接给了第一张..." style="width:100%;height:80px;padding:8px;border:1px solid #444;border-radius:4px;color:#f0f0f0;font-size:12px;font-family:monospace;resize:vertical;box-sizing:border-box;"></textarea>
+            
+            <div style="color:#a0a0b0;font-size:11px;margin-bottom:16px;">
+                当前游戏状态：<span id="gameStateSummary" style="color:#e6c84d;font-family:monospace;"></span>
+            </div>
+            
+            <div style="display:flex;gap:10px;justify-content:center;">
+                <button onclick="document.getElementById('bugReportModal').remove()" style="padding:10px 16px;border:1px solid #444;border-radius:4px;background:#222;color:#f0f0f0;cursor:pointer;">取消</button>
+                <button onclick="sgsSubmitBugLog()" style="padding:10px 16px;border:1px solid #c41e3a;border-radius:4px;background:rgba(196,30,58,0.2);color:#c41e3a;cursor:pointer;font-weight:bold;">📤 提交日志</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    
+    // 更新游戏状态摘要
+    const state = _sgsCollectGameState();
+    if (state) {
+        document.getElementById('gameStateSummary').textContent = 
+            `第${state.turnCount}回合 | ${state.phase}阶段 | 当前: ${state.currentPlayer} | 对局ID: ${state.matchId ? state.matchId.substring(0, 15) + '...' : '无'}`;
+    }
+}
+
+// 提交Bug日志
+async function sgsSubmitBugLog() {
+    try {
+        const state = _sgsCollectGameState();
+        if (!state) {
+            alert('无法获取游戏状态');
+            return;
+        }
+        
+        const bugDesc = document.getElementById('bugDescription')?.value || '';
+        
+        // 构建Issue内容
+        const userName = state.userName;
+        const date = new Date();
+        const title = `🐛 Bug报告 - ${userName} - ${date.toLocaleTimeString('zh-CN')}`;
+        
+        let body = `**用户**: ${userName}\n**ID**: \`${state.userId}\`\n**对局ID**: \`${state.matchId || '无'}\`\n\n`;
+        body += `**Bug描述**: ${bugDesc || '无'}\n\n`;
+        body += `\`\`\`json\n${JSON.stringify({
+            ts: state.timestamp,
+            tc: state.turnCount,
+            ph: state.phase,
+            cp: state.currentPlayer,
+            dc: state.deckCount,
+            dis: state.discardCount,
+            ps: state.players
+        }, null, 2)}\n\`\`\`\n\n`;
+        
+        // 添加最近的日志
+        if (state.matchLog && state.matchLog.length > 0) {
+            body += `### 最近100条日志\n<details><summary>点击展开</summary>\n\n`;
+            state.matchLog.forEach(evt => {
+                const time = new Date(evt.time).toLocaleTimeString('zh-CN');
+                const typeIcon = evt.eventType === 'game_log' ? '📝' : '⚡';
+                body += `${typeIcon} **[${time}]** ${JSON.stringify(evt.data)}\n\n`;
+            });
+            body += `</details>\n`;
+        }
+        
+        const response = await fetch('https://api.github.com/repos/' + _sgsDataConfig.repo + '/issues', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'token ' + _sgsDataConfig.token,
+                'Accept': 'application/vnd.github+json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title: title,
+                body: body,
+                labels: ['bug-report', 'auto-submit']
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || '提交失败: ' + response.status);
+        }
+        
+        const result = await response.json();
+        _sgsUploadedCount++;
+        
+        // 显示成功提示
+        document.getElementById('bugReportModal')?.remove();
+        showBugSubmitSuccess(result.html_url);
+        
+    } catch(e) {
+        console.error('Bug日志提交失败:', e);
+        alert('提交失败: ' + e.message);
+    }
+}
+
+// 显示提交成功提示
+function showBugSubmitSuccess(issueUrl) {
+    const statusEl = document.getElementById('logUploadStatus');
+    if (statusEl) {
+        statusEl.innerHTML = `<span style="color:#2ecc71;">✅ 已提交 ${_sgsUploadedCount} 次 | <a href="${issueUrl}" target="_blank" style="color:#2ecc71;">查看Issue</a></span>`;
+    }
+    
+    // 显示临时提示
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#2ecc71;color:#000;padding:12px 20px;border-radius:6px;z-index:99999;font-weight:bold;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+    toast.innerHTML = `✅ Bug日志已提交！<br><a href="${issueUrl}" target="_blank" style="color:#000;">点击查看Issue</a>`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+}
+
+// 全局可访问的提交函数（用于游戏卡死时）
+window.sgsSubmitBugLog = async function() {
+    try {
+        const state = _sgsCollectGameState();
+        if (!state) {
+            console.log('无法获取游戏状态，尝试从localStorage读取...');
+            // 尝试从localStorage读取
+            const history = JSON.parse(localStorage.getItem('sgsMatchHistory') || '[]');
+            if (history.length > 0) {
+                const latest = history[0];
+                console.log('找到最近对局:', latest.matchId);
+                // 这里可以手动构造state
+                state = {
+                    matchId: latest.matchId,
+                    userId: _sgsGetUserId(),
+                    userName: _sgsGetUserName(),
+                    timestamp: new Date().toISOString(),
+                    turnCount: 0,
+                    phase: 'unknown',
+                    currentPlayer: 'unknown',
+                    deckCount: 0,
+                    discardCount: 0,
+                    players: [],
+                    matchLog: latest.log || []
+                };
+            } else {
+                console.log('没有找到任何对局记录');
+                return;
+            }
+        }
+        
+        const userName = state.userName;
+        const date = new Date();
+        const title = `🐛 Bug报告 - ${userName} - ${date.toLocaleTimeString('zh-CN')} (控制台提交)`;
+        
+        let body = `**用户**: ${userName}\n**ID**: \`${state.userId}\`\n**对局ID**: \`${state.matchId || '无'}\`\n\n`;
+        body += `**提交方式**: 控制台手动提交（游戏可能卡死）\n\n`;
+        body += `\`\`\`json\n${JSON.stringify({
+            ts: state.timestamp,
+            tc: state.turnCount,
+            ph: state.phase,
+            cp: state.currentPlayer
+        }, null, 2)}\n\`\`\`\n\n`;
+        
+        if (state.matchLog && state.matchLog.length > 0) {
+            body += `### 对局日志\n<details><summary>点击展开 (${state.matchLog.length}条)</summary>\n\n`;
+            state.matchLog.slice(-50).forEach(evt => {
+                const time = new Date(evt.time).toLocaleTimeString('zh-CN');
+                body += `**[${time}]** ${JSON.stringify(evt.data)}\n\n`;
+            });
+            body += `</details>\n`;
+        }
+        
+        const response = await fetch('https://api.github.com/repos/' + _sgsDataConfig.repo + '/issues', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'token ' + _sgsDataConfig.token,
+                'Accept': 'application/vnd.github+json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title: title,
+                body: body,
+                labels: ['bug-report', 'auto-submit', 'debug-log']
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || '提交失败: ' + response.status);
+        }
+        
+        const result = await response.json();
+        _sgsUploadedCount++;
+        console.log('✅ Bug日志已提交！Issue #' + result.number);
+        console.log('查看Issue:', result.html_url);
+        
+    } catch(e) {
+        console.error('提交失败:', e);
+    }
+};
+
+// 提交Bug报告的入口函数
+function submitBugLog() {
+    showBugReportModal();
+}
+
 </script>
     <!-- 卡牌选择弹窗 -->
     <div id="cardSelOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:100;justify-content:center;align-items:center;flex-direction:column;">

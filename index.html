@@ -1121,11 +1121,17 @@ let selectedTargets = [];
 
 // ---- 屏幕切换 ----
 function showScreen(id){
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
+    document.querySelectorAll('.screen').forEach(s => { s.classList.remove('active'); s.style.display=''; });
+    const target = document.getElementById(id);
+    if(!target){ console.error('showScreen: 找不到元素 #' + id); return; }
+    target.classList.add('active');
+    // 非游戏屏幕时，确保 gameScreen 完全隐藏
+    if(id !== 'gameScreen') {
+        const gs = document.getElementById('gameScreen');
+        if(gs) { gs.classList.remove('active'); gs.style.display = 'none'; }
+    }
     Logger.currentScreen = id;
     Logger.action('切换屏幕 → ' + id);
-    // 游戏屏幕强制横屏比例
     if(id==='gameScreen') enforceGameAspect();
 }
 
@@ -1248,29 +1254,22 @@ function goLogPanel(){
 function goLogPanelAsync(){
     try {
         Logger.action('查看操作日志');
+        // 先强制隐藏游戏画面
+        const gs = document.getElementById('gameScreen');
+        if(gs) { gs.classList.remove('active'); gs.style.display = 'none'; }
+        // 切换到日志屏幕
+        showScreen('logScreen');
+        // 同步加载日志内容（不用 setTimeout，避免被 quitToMenu 的 clearTimeout 误杀）
         const el = document.getElementById('logContent');
         if(el) {
-            // 先显示空内容，让用户知道页面在加载
-            el.textContent = '正在加载日志...\n\n请稍候，如果长时间无响应请按F12查看控制台错误信息';
-            window._returnScreen = 'mainMenu';
-            showScreen('logScreen');
-            
-            // 使用setTimeout避免阻塞UI
-            setTimeout(() => {
-                try {
-                    const logText = Logger.exportText();
-                    console.log('[goLogPanel] 日志条数:', Logger.entries.length);
-                    console.log('[goLogPanel] Logger.entries:', JSON.stringify(Logger.entries.slice(0, 3)));
-                    el.textContent = logText;
-                } catch(e2) {
-                    console.error('[goLogPanel] 加载日志失败:', e2);
-                    el.textContent = '加载日志失败: ' + e2.message + '\n\n请按F12查看控制台';
-                }
-            }, 50);
-        } else {
-            console.error('[goLogPanel] 找不到 logContent 元素');
-            alert('打开操作日志失败: 找不到日志容器');
+            try {
+                const logText = Logger.exportText();
+                el.textContent = logText;
+            } catch(e2) {
+                el.textContent = '加载日志失败: ' + e2.message + '\n\n请按F12查看控制台';
+            }
         }
+        window._returnScreen = 'mainMenu';
     } catch(e) {
         console.error('[goLogPanel] 错误:', e);
         alert('打开操作日志失败: ' + e.message);

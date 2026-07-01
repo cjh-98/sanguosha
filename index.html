@@ -223,14 +223,16 @@
         /* 上方对手区域 - 弧形凸型布局（中间在顶，两边逐渐降低） */
         .players-arc-area {
             display: flex;
-            justify-content: center;  /* 居中排列 */
+            justify-content: space-evenly;  /* 均匀分布铺满整行，两边不留大空白 */
             align-items: flex-start;  /* 顶部对齐，中间卡牌保持在最上 */
-            gap: 8px;
-            padding: 6px 12px 4px;
+            gap: 0.6vw;
+            padding: 6px 1.2vw 4px;
             flex-wrap: nowrap;  /* 不换行，保持一行排列 */
             z-index: 2;
-            min-height: 155px;  /* 足够空间让弧形效果显示 */
+            flex-shrink: 0;  /* 顶部对手区不被压缩 */
             overflow: visible;
+            width: 100%;
+            box-sizing: border-box;
         }
         .players-arc-area .hero-card {
             /* 弧形布局中的玩家卡片基础样式 */
@@ -241,11 +243,12 @@
         }
         /* 武将牌（正版风格）- 带立绘的卡片 */
         .hero-card {
-            width:100px; height:142px; cursor:pointer;
+            width:clamp(72px, 8.5vw, 104px); aspect-ratio: 5 / 7; cursor:pointer;
             border-radius:6px; overflow:hidden;
             box-shadow:0 4px 16px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(212,184,106,0.25), 0 0 0 1.5px rgba(230,200,77,0.3);
-            transition:all 0.22s; flex-shrink:0;
+            transition:all 0.22s; flex-shrink:1; min-width:0;
             background:#2a2018;
+            display:flex; flex-direction:column;
         }
         .hero-card:hover { box-shadow:0 6px 22px rgba(230,200,77,0.25),0 4px 16px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(212,184,106,0.25), 0 0 0 1.5px rgba(230,200,77,0.3); }
         .hero-card:active { transform:scale(0.95); }
@@ -342,13 +345,13 @@
         }
         .hc-status-badge.drunk { background:rgba(155,89,182,0.9); }  /* 酒 - 紫色 */
 
-        /* 立绘区域 */
+        /* 立绘区域 - flex:1 自适应撑满卡片剩余高度 */
         .hc-portrait {
-            width:100%; height:110px; object-fit:cover; object-position:top center;
+            width:100%; flex:1; min-height:0; object-fit:cover; object-position:top center;
             display:block; background:#1a140e;
         }
         .hc-portrait-placeholder {
-            width:100%;height:110px;display:flex;align-items:center;justify-content:center;
+            width:100%;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;
             font-size:40px;color:rgba(212,184,106,0.3);
             background:linear-gradient(135deg,#2a2420 0%,#1a1612 100%);
         }
@@ -356,7 +359,7 @@
         /* 武将牌底部信息区 */
         .hc-info {
             padding:4px 5px; background:linear-gradient(180deg,#2a2218 0%,#1a1410 100%);
-            border-top:1.5px solid #8b6914;
+            border-top:1.5px solid #8b6914; flex-shrink:0;
         }
         .hc-name {
             font-size:12px;font-weight:bold;color:#f0d890;text-align:center;
@@ -418,9 +421,9 @@
         /* 已禁用竖屏提示 - 手机上直接显示横屏布局 */
 
         .player-bottom { flex-shrink:0; width:100%; box-sizing:border-box; background:linear-gradient(180deg,rgba(0,0,0,0.7),rgba(0,0,0,0.5)); border-top:2px solid #8b6914; padding:5px 8px; }
-        .my-avatar { width:48px; height:48px; border-radius:6px; overflow:hidden; border:2px solid #8b6914; flex-shrink:0; box-shadow:0 2px 8px rgba(0,0,0,0.6),0 0 4px rgba(230,200,77,0.15); }
+        .my-avatar { width:72px; height:98px; border-radius:6px; overflow:hidden; border:2px solid #8b6914; flex-shrink:0; box-shadow:0 2px 8px rgba(0,0,0,0.6),0 0 4px rgba(230,200,77,0.15); }
         .my-avatar img { width:100%; height:100%; object-fit:cover; object-position:top center; }
-        .myinfo { display:flex; align-items:center; justify-content:space-between; padding:0 6px 4px; gap:8px; }
+        .myinfo { display:flex; align-items:center; justify-content:space-between; padding:0 6px; gap:8px; }
         .myinfo-left { display:flex; align-items:center; gap:9px; font-size:12px; white-space: nowrap; cursor:pointer; }
         .mhn { color:#e6c84d; font-weight:bold; font-size:15px; text-shadow:0 1px 3px #000; }
         .mhp { font-size:14px; letter-spacing:1.5px; }
@@ -449,7 +452,6 @@
         /* 中央信息区 - 日志靠底，减少空白 */
         .players-area { flex:1; display:flex; flex-direction:column; overflow:hidden; position:relative; }
         .center-area { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding:1vh; gap:1vh; overflow:hidden; }
-        .game-log { width:100%; max-width:40vw; max-height:12vh; overflow-y:auto; background:rgba(0,0,0,0.5); border:1px solid #8b6914; border-radius:8px; padding:1vh; font-size:13px; line-height:1.6; color:rgba(255,255,255,0.7); }
         .action-prompt { font-size:15px; color:#e6c84d; text-align:center; padding:6px; }
         /* 底部手牌区域 - 水平布局：玩家信息-技能-手牌 */        
         .hand-area {
@@ -699,6 +701,62 @@
                  cursor:pointer;margin-bottom:5px; }
         .titem.sel { border-color:var(--accent-red);background:rgba(196,30,58,0.18); }
         .titem:active { transform:scale(0.97); }
+
+        /* ============ 移动端 / 小屏适配 ============ */
+        /* 用 dvh 避免移动端浏览器地址栏遮挡内容 */
+        @supports (height: 100dvh) {
+            html, body, #app, .screen, #gameScreen { height: 100dvh; }
+        }
+
+        @media (max-width: 900px) {
+            /* 顶部栏更紧凑 */
+            .topbar { height: 30px; padding: 3px 6px; font-size: 10px; }
+            .topbar .btn-sm { font-size: 10px; padding: 2px 6px; }
+
+            /* 对手武将牌区：进一步缩小，保证一行放下所有对手 */
+            .players-arc-area { gap: 0.4vw; padding: 4px 0.5vw 2px; }
+            .hero-card { width: clamp(48px, 12vw, 84px); }
+            .hc-name { font-size: 10px; }
+            .hc-hp-icon { font-size: 8px; }
+            .hc-hand { font-size: 8px; }
+            .hc-info { padding: 2px 3px; }
+
+            /* 中央提示区压缩，把空间让给上下两区 */
+            .center-area { padding: 0.5vh; gap: 0.5vh; }
+            .action-prompt { font-size: 12px; padding: 3px; }
+
+            /* 底部手牌区：固定不被压缩，始终可见可操作 */
+            .hand-area { padding: 4px 4px; gap: 4px; }
+            .my-avatar { width: 52px; height: 72px; }
+            .mhn { font-size: 12px; }
+            .mhp { font-size: 11px; }
+            .card { width: 60px; height: 84px; }
+            .hand-cards { min-height: 88px; gap: 1px; padding: 2px; }
+            .skb { padding: 3px 8px; font-size: 10px; }
+        }
+
+        /* 竖屏专项：横屏圆桌游戏在竖屏下极窄，需要极致压缩 */
+        @media (orientation: portrait) and (max-width: 640px) {
+            .hero-card { width: clamp(40px, 13vw, 66px); }
+            .hc-faction { width: 13px; height: 13px; font-size: 7px; }
+            .my-avatar { width: 44px; height: 62px; }
+            .card { width: 52px; height: 74px; }
+            .hand-cards { min-height: 78px; }
+            .action-bar .log-toggle-btn, .action-bar .btn-submit-log { font-size: 10px; padding: 3px 6px; }
+            /* 竖屏提示：建议横屏获得更佳体验 */
+            #rotateHint { display: flex !important; }
+        }
+
+        /* 横屏提示浮层（默认隐藏，仅竖屏小屏显示） */
+        #rotateHint {
+            display: none; position: fixed; top: 6px; left: 50%;
+            transform: translateX(-50%); z-index: 9999;
+            background: rgba(20,15,10,0.92); border: 1px solid #8b6914;
+            color: #e6c84d; font-size: 11px; padding: 4px 12px;
+            border-radius: 14px; align-items: center; gap: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5); pointer-events: none;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -821,6 +879,7 @@
 
 <!-- ===== 游戏桌面（横屏圆桌风格） ===== -->
 <div id="gameScreen" class="screen">
+    <div id="rotateHint">📱 建议横屏游玩，体验更佳</div>
     <div class="topbar">
         <div class="topbar-info">
             <button class="btn-sm" onclick="if(confirm('确定退出当前对局？'))quitToMenu()" style="margin-right:6px">←返回</button>
@@ -837,7 +896,6 @@
     <div class="players-arc-area" id="playersArcArea"></div>
     <div class="players-area">
         <div class="center-area">
-            <div class="game-log" id="gameLog"></div>
             <div class="action-prompt" id="actionPrompt">游戏开始...</div>
         </div>
         <div class="hand-area">
@@ -2170,7 +2228,7 @@ function quitToMenu(){
     const gs = document.getElementById('gameScreen');
     if(gs) { gs.classList.remove('active'); gs.style.display = 'none'; }
     // 清空手牌区、技能栏等动态内容，防止残留元素被点击
-    ['handCards','playersArcArea','skillBar','equipZone','actionPrompt','gameLog','glog'].forEach(id => {
+    ['handCards','playersArcArea','skillBar','equipZone','actionPrompt','glog'].forEach(id => {
         const el = document.getElementById(id);
         if(el) el.innerHTML = '';
     });

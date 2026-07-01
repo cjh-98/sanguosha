@@ -98,6 +98,11 @@ SGS.GameEngine = (function() {
             this.waitingForHuman = false;
             this._pendingCardChoice = null; // 卡牌选择Promise解析器
             this.aiSpeed = 1; // AI速度倍率：0.5(慢) - 3(快)，默认1
+            // 对局日志系统
+            this.matchId = null;
+            this.matchLog = [];
+            this.matchStartTime = null;
+            this.matchEndTime = null;
         }
 
         setAdapter(adapter) {
@@ -128,6 +133,80 @@ SGS.GameEngine = (function() {
             try {
                 this.adapter && this.adapter.notifyEvent({ type: 'log', msg, _type: type });
             } catch(e) { console.error('log通知失败:', e); }
+        }
+
+        // ========== 对局日志系统 ==========
+        // 开始记录对局
+        startMatchLog() {
+            this.matchId = 'match_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            this.matchStartTime = Date.now();
+            this.matchLog = [];
+            this.addMatchEvent('match_start', {
+                players: this.players.map(p => ({
+                    name: p.name,
+                    hero: p.hero.name,
+                    isAI: p.isAI
+                }))
+            });
+        }
+
+        // 添加对局事件
+        addMatchEvent(eventType, data) {
+            if (!this.matchId) return;
+            this.matchLog.push({
+                eventType,
+                data,
+                time: Date.now(),
+                phase: this.phase,
+                currentPlayer: this.players[this.currentPlayerIdx]?.name
+            });
+        }
+
+        // 保存对局记录到localStorage
+        saveMatchLog(result) {
+            if (!this.matchId) return;
+            this.matchEndTime = Date.now();
+            
+            const matchRecord = {
+                matchId: this.matchId,
+                startTime: this.matchStartTime,
+                endTime: this.matchEndTime,
+                duration: this.matchEndTime - this.matchStartTime,
+                players: this.players.map(p => ({
+                    name: p.name,
+                    hero: p.hero.name,
+                    isAI: p.isAI,
+                    identity: p.identity
+                })),
+                result: result, // 'win' or 'lose'
+                log: this.matchLog
+            };
+
+            // 保存到localStorage
+            try {
+                let history = JSON.parse(localStorage.getItem('sgsMatchHistory') || '[]');
+                history.unshift(matchRecord); // 最新的在前面
+                // 只保留最近50场对局
+                if (history.length > 50) history = history.slice(0, 50);
+                localStorage.setItem('sgsMatchHistory', JSON.stringify(history));
+                console.log('对局记录已保存:', this.matchId);
+            } catch(e) {
+                console.error('保存对局记录失败:', e);
+            }
+        }
+
+        // 获取历史对局记录
+        static getMatchHistory() {
+            try {
+                return JSON.parse(localStorage.getItem('sgsMatchHistory') || '[]');
+            } catch(e) {
+                return [];
+            }
+        }
+
+        // 清除历史记录
+        static clearMatchHistory() {
+            localStorage.removeItem('sgsMatchHistory');
         }
 
         // ========== 事件系统 ==========
@@ -247,6 +326,7 @@ SGS.GameEngine = (function() {
 
                 this.turnCount = 1;
                 this.log('游戏开始！', 'highlight');
+                this.startMatchLog(); // 开始记录对局
                 this.notifyState();
                 this.startTurn();
             } catch(e) {
@@ -1153,6 +1233,14 @@ SGS.GameEngine = (function() {
         }
 
         async resolveCard(player, card, targetIds = []) {
+            // 记录对局事件
+            this.addMatchEvent('use_card', {
+                player: player.name,
+                card: card.name,
+                cardType: card.type,
+                targets: targetIds.map(id => this.players[id]?.name).filter(Boolean)
+            });
+
             // 触发使用卡牌事件
             this.emit('onUseCard', { player, card, targetIds, engine: this });
 
@@ -2057,6 +2145,13 @@ SGS.GameEngine = (function() {
             player.hp = 0;
             this.log(`【${player.name}(${player.hero.name})阵亡！】`, 'danger');
 
+            // 记录对局事件
+            this.addMatchEvent('player_death', {
+                player: player.name,
+                hero: player.hero.name,
+                killer: killer?.name
+            });
+
             // 归心 (神曹操): 其他角色死亡时获得其所有牌
             const shenCaoCao = this.players.find(p => p.isAlive && p.skills.some(s => s.name === '归心'));
             if (shenCaoCao && shenCaoCao.id !== player.id) {
@@ -2210,6 +2305,15 @@ SGS.GameEngine = (function() {
 
         endGame() {
             this.gameOver = true;
+            
+            // 判断人类玩家胜负
+            const humanPlayer = this.players.find(p => !p.isAI);
+            const isWin = humanPlayer && this.winner && this.winner.includes(humanPlayer.id);
+            const result = isWin ? 'win' : 'lose';
+            
+            // 保存对局记录
+            this.saveMatchLog(result);
+            
             this.adapter && this.adapter.notifyGameOver({
                 winner: this.winner,
                 players: this.players.map(p => ({
@@ -2220,6 +2324,7 @@ SGS.GameEngine = (function() {
                     faction: p.faction,
                     isAlive: p.isAlive,
                 })),
+                result: result,
             });
             this.notifyState();
         }
@@ -2228,6 +2333,13 @@ SGS.GameEngine = (function() {
         async useSkill(player, skillName, params = {}) {
             const skill = player.skills.find(s => s.name === skillName);
             if (!skill) return false;
+
+            // 记录对局事件
+            this.addMatchEvent('use_skill', {
+                player: player.name,
+                skill: skillName,
+                params: params
+            });
 
             switch (skillName) {
                 case '制衡':

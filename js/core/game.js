@@ -677,8 +677,8 @@ SGS.GameEngine = (function() {
                     this.notifyState();
                     // 弹出UI询问
                     this._setTimer(() => {
-                        if (window.openGuanxingUI) {
-                            window.openGuanxingUI();
+                        if (window.openGuanxing) {
+                            window.openGuanxing();
                         }
                     }, 100);
                     // 不调用advancePhase，等待UI调用finishGuanxing

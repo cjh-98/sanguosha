@@ -2371,9 +2371,90 @@ function openGuanxing(){
     }).join('');
 }
 
+// 拖动状态
+let _guanxingDragState = null;
+
 function startGuanxingDrag(e){
     const card = e.currentTarget;
+    const idx = parseInt(card.dataset.idx);
+    
+    // 创建拖动元素
+    const dragImg = card.cloneNode(true);
+    dragImg.style.position = 'fixed';
+    dragImg.style.zIndex = '9999';
+    dragImg.style.opacity = '0.8';
+    dragImg.style.pointerEvents = 'none';
+    dragImg.style.transform = 'scale(1.1)';
+    
+    const rect = card.getBoundingClientRect();
+    dragImg.style.left = rect.left + 'px';
+    dragImg.style.top = rect.top + 'px';
+    document.body.appendChild(dragImg);
+    
+    _guanxingDragState = {
+        dragImg: dragImg,
+        sourceIdx: idx,
+        offsetX: e.clientX - rect.left,
+        offsetY: e.clientY - rect.top,
+        cardsDiv: document.getElementById('guanxingCards'),
+        draggedCard: card
+    };
+    
+    card.style.opacity = '0.4';
     card.style.cursor = 'grabbing';
+    
+    // 鼠标移动事件
+    document.addEventListener('mousemove', onGuanxingDragMove);
+    document.addEventListener('mouseup', onGuanxingDragEnd);
+    
+    e.preventDefault();
+}
+
+function onGuanxingDragMove(e){
+    if(!_guanxingDragState) return;
+    const state = _guanxingDragState;
+    state.dragImg.style.left = (e.clientX - state.offsetX) + 'px';
+    state.dragImg.style.top = (e.clientY - state.offsetY) + 'px';
+    
+    // 检测目标位置
+    const cards = state.cardsDiv.children;
+    for(let i = 0; i < cards.length; i++){
+        const cardRect = cards[i].getBoundingClientRect();
+        if(e.clientY > cardRect.top + cardRect.height/2 && e.clientY < cardRect.bottom){
+            // 插入到该卡片之后
+            if(i < cards.length - 1 && cards[i+1] !== state.draggedCard){
+                state.cardsDiv.insertBefore(state.draggedCard, cards[i+1]);
+            }
+        } else if(e.clientY < cardRect.top + cardRect.height/2 && e.clientY > cardRect.top){
+            // 插入到该卡片之前
+            if(cards[i] !== state.draggedCard){
+                state.cardsDiv.insertBefore(state.draggedCard, cards[i]);
+            }
+        }
+    }
+}
+
+function onGuanxingDragEnd(e){
+    if(!_guanxingDragState) return;
+    const state = _guanxingDragState;
+    
+    // 移除拖动图像
+    if(state.dragImg) state.dragImg.remove();
+    
+    // 恢复卡片样式
+    state.draggedCard.style.opacity = '1';
+    state.draggedCard.style.cursor = 'grab';
+    
+    // 更新显示顺序
+    const cards = state.cardsDiv.children;
+    window._guanxingDisplayOrder = [...Array(cards.length).keys()].map((_, i) => {
+        return parseInt(cards[i].dataset.idx);
+    });
+    
+    // 清理
+    _guanxingDragState = null;
+    document.removeEventListener('mousemove', onGuanxingDragMove);
+    document.removeEventListener('mouseup', onGuanxingDragEnd);
 }
 
 function skipGuanxing(){

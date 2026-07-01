@@ -75,7 +75,7 @@
 .player-mini.current {
     border-color: var(--accent-gold);
     box-shadow: 0 0 10px rgba(230,200,77,0.6);
-    transform: scale(1.05);
+    /* 不再使用transform:scale，因为弧形布局已用inline style控制缩放 */
 }
 
 .player-mini.target {

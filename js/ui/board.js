@@ -259,10 +259,9 @@ SGS.UI.Board = (function() {
                     <button class="topbar-btn" onclick="SGS.UI.Board.confirmQuit()">退出</button>
                 </div>
             </div>
-            <!-- 上方对手区域（凸型布局的一部分） -->
-            <div class="players-top-area" id="playersTopArea"></div>
+            <!-- 上方对手区域 - 弧形凸型布局 -->
+            <div class="players-arc-area" id="playersArcArea"></div>
             <div class="players-area">
-                <div class="players-bottom-area" id="playersBottomArea"></div>
                 <div class="center-area">
                     <div class="game-log" id="gameLog"></div>
                     <div class="action-prompt" id="actionPrompt">游戏开始...</div>
@@ -290,10 +289,10 @@ SGS.UI.Board = (function() {
         if (!human) return;
         
         // 确保DOM元素存在（防止在renderGameScreen之前调用）
-        if (!document.getElementById('playersTopArea') || !document.getElementById('playersBottomArea')) {
+        if (!document.getElementById('playersArcArea')) {
             return; // DOM还没准备好，跳过这次更新
         }
-        
+
         // 检查是否有待处理的卡牌选择（顺手牵羊/过河拆桥等）
         if (engine && engine._pendingCardChoice) {
             const pc = engine._pendingCardChoice;
@@ -320,23 +319,42 @@ SGS.UI.Board = (function() {
         document.getElementById('deckInfo').textContent = `牌堆:${state.deckCount}`;
 
 
-        // 玩家列表 - 凸型布局：上方和下方各放一些对手
+        // 玩家列表 - 弧形凸型布局：中间高，两边低
         const opponents = state.players.filter((p) => p.id !== human.id);
-        const topArea = document.getElementById("playersTopArea");
-        const bottomArea = document.getElementById("playersBottomArea");
+        const arcArea = document.getElementById("playersArcArea");
+
+        // 计算弧形高度偏移：中间的玩家位置最高，两边逐渐变矮
+        // arcOffset: 返回根据位置索引和总数计算的向上偏移量（vh单位）
+        const getArcOffset = (idx, total) => {
+            if (total <= 1) return 0;
+            const centerIdx = (total - 1) / 2;  // 中心位置（可能是小数）
+            const distanceFromCenter = Math.abs(idx - centerIdx);  // 距中心的距离
+            const maxOffset = Math.min(4, total * 0.6);  // 最大偏移量（中间最高）
+            // 距离中心越远，偏移越小（使用二次曲线让弧线更平滑）
+            const normalizedDist = distanceFromCenter / centerIdx;  // 0~1
+            return maxOffset * (1 - normalizedDist * normalizedDist);  // 二次衰减
+        };
+
+        // 计算弧形缩放：中间的玩家稍大，两边稍小
+        const getArcScale = (idx, total) => {
+            if (total <= 1) return 1;
+            const centerIdx = (total - 1) / 2;
+            const distanceFromCenter = Math.abs(idx - centerIdx);
+            const normalizedDist = distanceFromCenter / centerIdx;
+            return 1 - normalizedDist * 0.12;  // 两边缩小最多12%
+        };
         
-        // 根据玩家数量分配：上方放前一半，下方放后一半
-        const midPoint = Math.ceil(opponents.length / 2);
-        const topOpponents = opponents.slice(0, midPoint);
-        const bottomOpponents = opponents.slice(midPoint);
-        
-        const renderOpponent = (p, idx) => {
+        const renderOpponent = (p, idx, total) => {
             const factionClass = p.heroRevealed || config.mode !== "national" ? `faction-${p.heroFaction}` : "faction-unknown";
-            const factionText = p.heroRevealed || config.mode !== "national" 
+            const factionText = p.heroRevealed || config.mode !== "national"
                 ? SGS.HeroData.factionName[p.heroFaction] || "?" : "?";
+            // 计算弧形偏移和缩放
+            const arcOffset = getArcOffset(idx, total);
+            const arcScale = getArcScale(idx, total);
             return `
                 <div class="player-mini ${idx === state.currentPlayerIdx ? "current" : ""} ${!p.isAlive ? "dead" : ""} ${p.isChained ? "chained" : ""} ${p.isFlipped ? "flipped" : ""}"
-                     data-player-id="${p.id}" onclick="SGS.UI.Board.clickPlayer(${p.id})">
+                     data-player-id="${p.id}" onclick="SGS.UI.Board.clickPlayer(${p.id})"
+                     style="margin-top: ${arcOffset}vh; transform: scale(${arcScale});">
                     <div class="pm-name">${p.name}</div>
                     <div class="pm-hero">${p.heroRevealed || config.mode !== "national" ? p.heroName : "???" }
                         ${p.isAmbitious ? "(野心家)" : ""}
@@ -354,9 +372,9 @@ SGS.UI.Board = (function() {
                 </div>
             `;
         };
-        
-        topArea.innerHTML = topOpponents.map((p, idx) => renderOpponent(p, idx)).join("");
-        bottomArea.innerHTML = bottomOpponents.map((p, idx) => renderOpponent(p, idx)).join("");
+
+        // 所有对手都在弧形区域中一行排布
+        arcArea.innerHTML = opponents.map((p, idx) => renderOpponent(p, idx, opponents.length)).join("");
         const humanState = state.players[human.id];
         document.getElementById('myHeroName').textContent = `${human.hero.name}`;
         document.getElementById('myHp').textContent = `${'❤'.repeat(Math.max(0, human.hp))} (${human.hp}/${human.maxHp})`;

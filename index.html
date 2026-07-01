@@ -229,25 +229,22 @@
             display:flex; justify-content:center; gap:8px;
             flex-wrap: wrap;
         }
-        /* 上方对手区域（凸型布局 - 牌桌上方） */
-        .players-top-area {
+        /* 上方对手区域 - 弧形凸型布局（中间高两边低） */
+        .players-arc-area {
             display: flex;
             justify-content: center;
-            gap: 8px;
-            padding: 4px 10px;
+            align-items: flex-end;  /* 底部对齐，让margin-top产生高度差 */
+            gap: 0.5vw;
+            padding: 6px 10px 2px;
             flex-wrap: wrap;
             z-index: 2;
             min-height: 0;
+            /* 留出顶部按钮的空间，不要遮挡topbar */
+            margin-top: 4px;
         }
-        /* 下方对手区域（凸型布局 - 牌桌下方） */
-        .players-bottom-area {
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-            padding: 4px 10px;
-            flex-wrap: wrap;
-            z-index: 2;
-            min-height: 0;
+        .players-arc-area .player-mini {
+            /* 弧形布局中的玩家卡片基础样式 */
+            transform-origin: bottom center;
         }
         /* 圆桌上的武将牌 - 绝对定位（位置由 inline style 控制） */
         #playersTop .hero-card {

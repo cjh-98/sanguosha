@@ -1887,7 +1887,7 @@ function isSkillOk(player,skill,isTurn){
     // 主动技能的通用条件检查
     switch(skill.name){
         case '制衡': return player.handCards.length>0;
-        case '苦肉': return player.hp>1;
+        case '苦肉': return true;
         case '反间': return player.handCards.length>0;
         case '青囊': return player.handCards.length>0;
         case '仁德': return player.handCards.length>=2;

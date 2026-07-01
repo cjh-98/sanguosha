@@ -486,6 +486,33 @@
             box-shadow:inset 0 0 8px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.4);
             margin:0 auto; width:fit-content; max-width:100%;
         }
+        
+        /* 弹窗相关 */
+        .overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:98; }
+        .skill-modal {
+            position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+            background:#16213e; border:2px solid #8b6914; border-radius:12px;
+            padding:1.6vh; max-width:90%; width:32vw; z-index:200;
+            box-shadow:0 4px 12px rgba(0,0,0,0.4);
+        }
+        .skill-modal h4 { color:#e6c84d; font-size:1.6vw; margin-bottom:.8vh; }
+        .skill-modal p { font-size:1.3vw; color:#f0f0f0; margin-bottom:1.2vh; }
+        .target-selector { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:99; display:flex; align-items:center; justify-content:center; }
+        .target-selector-content { background:#16213e; border:2px solid #8b6914; border-radius:12px; padding:1.6vh; max-width:90%; width:34vw; max-height:80vh; overflow-y:auto; }
+        .target-selector-title { font-size:1.6vw; color:#e6c84d; text-align:center; margin-bottom:1.2vh; }
+        .target-list { display:flex; flex-direction:column; gap:.8vh; }
+        .target-item { display:flex; align-items:center; justify-content:space-between; padding:1vh 1.4vw; background:#0f3460; border:2px solid transparent; border-radius:8px; cursor:pointer; }
+        .target-item.selected { border-color:#c41e3a; background:rgba(196,30,58,0.2); }
+        
+        /* 身份牌 + 阶段指示 */
+        .identity-badge { display:inline-block; padding:.2vh .8vw; border-radius:8px; font-size:1.1vw; font-weight:bold; }
+        .identity-badge.lord { background:#f39c12; color:#fff; }
+        .identity-badge.loyal { background:#3498db; color:#fff; }
+        .identity-badge.rebel { background:#e74c3c; color:#fff; }
+        .identity-badge.spy { background:#9b59b6; color:#fff; }
+        .phase-dot { width:.6vw; height:.6vw; border-radius:50%; background:rgba(255,255,255,0.2); display:inline-block; margin:0 1px; }
+        .phase-dot.active { background:#e6c84d; box-shadow:0 0 6px #e6c84d; }
+        .phase-indicator { display:flex; gap:.2vw; align-items:center; }
         .card {
             flex-shrink:0; width:68px;height:96px;border-radius:6px;
             border:2px solid #8b6914;

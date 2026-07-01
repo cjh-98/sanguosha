@@ -1,7 +1,7 @@
 /**
  * 三国杀UI - 游戏桌面与交互
  */
-const SGS = window.SGS || (window.SGS = {});
+var SGS = window.SGS = window.SGS || {};
 
 SGS.UI = SGS.UI || {};
 

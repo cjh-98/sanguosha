@@ -1,7 +1,7 @@
 /**
  * 三国杀UI - 菜单与设置界面
  */
-const SGS = window.SGS || (window.SGS = {});
+var SGS = window.SGS = window.SGS || {};
 
 SGS.UI = SGS.UI || {};
 

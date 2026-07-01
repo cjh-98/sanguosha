@@ -4054,19 +4054,11 @@ function showBugReportModal() {
             
             <div style="display:flex;gap:10px;justify-content:center;">
                 <button onclick="this.closest('div').parentElement.remove(); document.getElementById('cardSelOverlay').style.display='none';" style="padding:10px 16px;border:1px solid #444;border-radius:4px;background:#222;color:#f0f0f0;cursor:pointer;">取消</button>
-                <button id="submitBugBtn" style="padding:10px 16px;border:1px solid #c41e3a;border-radius:4px;background:rgba(196,30,58,0.2);color:#c41e3a;cursor:pointer;font-weight:bold;">📤 提交日志</button>
+                <button onclick="document.getElementById('bugReportModal').remove(); window.sgsSubmitBugLog().then(() => showBugSubmitSuccess('')).catch(e => alert('提交失败: ' + e.message));" style="padding:10px 16px;border:1px solid #c41e3a;border-radius:4px;background:rgba(196,30,58,0.2);color:#c41e3a;cursor:pointer;font-weight:bold;">📤 提交日志</button>
             </div>
         </div>
     `;
     document.body.appendChild(overlay);
-    
-    // 给提交按钮绑定事件（确保在window.sgsSubmitBugLog定义后绑定）
-    setTimeout(() => {
-        const btn = document.getElementById('submitBugBtn');
-        if (btn) {
-            btn.onclick = () => window.sgsSubmitBugLog();
-        }
-    }, 0);
     
     // 更新游戏状态摘要
     const state = _sgsCollectGameState();

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>设备检测测试</title>
+    <style>
+        body { background: #1a1a2e; padding: 20px; font-family: sans-serif; }
+        .info { background: #2a2a3e; padding: 15px; margin: 10px 0; border-radius: 8px; color: #f0f0f0; }
+        .field { margin: 8px 0; }
+        .label { color: #e6c84d; font-weight: bold; }
+        .value { color: #a0a0b0; }
+    </style>
+</head>
+<body>
+    <h1 style="color: #e6c84d;">设备检测结果</h1>
+    <div id="info"></div>
+    <script>
+        function getDeviceInfo() {
+            const ua = navigator.userAgent;
+            const innerWidth = window.innerWidth;
+            const innerHeight = window.innerHeight;
+            
+            // 检测移动设备
+            const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+            const isMobileByUA = mobileRegex.test(ua);
+            
+            // 检测触摸设备
+            const hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+            
+            // 检测鼠标悬停
+            const canHover = window.matchMedia('(hover: hover)').matches;
+            
+            // 综合判断
+            const isMobile = isMobileByUA || (innerWidth <= 768 && !canHover);
+            
+            return {
+                userAgent: ua,
+                innerWidth: innerWidth,
+                innerHeight: innerHeight,
+                isMobileByUA: isMobileByUA,
+                hasTouch: hasTouch,
+                canHover: canHover,
+                isMobile: isMobile,
+                aspectRatio: innerWidth / innerHeight
+            };
+        }
+        
+        const info = getDeviceInfo();
+        const div = document.getElementById('info');
+        
+        let html = `<div class="info"><div class="field"><span class="label">是否为移动设备:</span> <span class="value" style="color: ${info.isMobile ? '#2ecc71' : '#e74c3c'}">${info.isMobile ? '✅ 是' : '❌ 否'}</span></div>`;
+        
+        html += `<div class="field"><span class="label">User-Agent:</span></div><div class="field"><span class="value">${info.userAgent}</span></div>`;
+        
+        html += `<div class="field"><span class="label">屏幕宽度:</span> <span class="value">${info.innerWidth}px</span></div>`;
+        html += `<div class="field"><span class="label">屏幕高度:</span> <span class="value">${info.innerHeight}px</span></div>`;
+        html += `<div class="field"><span class="label">宽高比:</span> <span class="value">${info.aspectRatio.toFixed(2)}</span></div>`;
+        
+        html += `<div class="field"><span class="label">UA检测结果:</span> <span class="value">${info.isMobileByUA ? '移动设备' : '非移动设备'}</span></div>`;
+        html += `<div class="field"><span class="label">支持触摸:</span> <span class="value">${info.hasTouch ? '是' : '否'}</span></div>`;
+        html += `<div class="field"><span class="label">可悬停:</span> <span class="value">${info.canHover ? '是' : '否'}</span></div>`;
+        
+        div.innerHTML = html;
+        
+        console.log('Device info:', info);
+    </script>
+</body>
+</html>

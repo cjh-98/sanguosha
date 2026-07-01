@@ -1084,25 +1084,19 @@ function enforceGameAspect(){
     if(!gs) return;
     
     // 检测是否为手机设备
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
-                    || (window.innerWidth <= 768 && !window.matchMedia('(hover: hover)').matches);
+    const ua = navigator.userAgent;
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    
+    console.log('enforceGameAspect called, isMobile:', isMobile, 'UA:', ua.substring(0, 50));
     
     if (isMobile) {
-        // 手机上：整个游戏区域旋转90度，实现真正的横屏
-        const screenWidth = window.innerWidth;
-        const screenHeight = window.innerHeight;
-        
-        // 旋转90度后，游戏画面会超出屏幕
-        // 游戏画面尺寸：宽=screenHeight, 高=screenWidth
-        // 旋转后，画面的左边缘会超出屏幕右边缘
-        // 需要把画面向左移动 (screenHeight - screenWidth) 让它显示在屏幕内
-        const translateX = screenWidth - screenHeight;
-        
-        gs.style.width = screenHeight + 'px';
-        gs.style.height = screenWidth + 'px';
-        gs.style.transform = `rotate(90deg) translateX(-${translateX}px)`;
+        // 手机上：不旋转，直接填满屏幕
+        // 手机竖屏时，游戏区域正常显示，玩家可以竖着玩
+        gs.style.width = '100%';
+        gs.style.height = '100%';
+        gs.style.transform = 'none';
         gs.style.transformOrigin = 'top left';
-        gs.style.position = 'absolute';
+        gs.style.position = 'relative';
         gs.style.left = '0';
         gs.style.top = '0';
         gs.style.margin = '0';

@@ -711,7 +711,7 @@
         <button class="btn btn-large btn-primary" onclick="goSetup()">开始游戏</button>
         <button class="btn btn-large" onclick="goRules()">规则说明</button>
         <button class="btn btn-large" onclick="goAbout()">关于</button>
-        <button class="btn btn-large" onclick="goLogPanel()">📋 操作日志</button>
+        <button class="btn btn-large" onclick="goLogPanelAsync()">📋 操作日志</button>
     </div>
     <div style="display:flex;gap:10px;margin-top:10px;">
         <button class="btn-submit-log" onclick="submitBugLog()" style="padding:8px 16px;font-size:13px;">🐛 提交Bug</button>
@@ -890,6 +890,7 @@
         <button class="btn-sm" onclick="copyLog()">📋 复制全部日志</button>
         <button class="btn-sm" onclick="downloadLog()">💾 下载日志文件</button>
         <button class="btn-sm danger" onclick="clearLog()">🗑 清空日志</button>
+        <button class="btn-sm" onclick="debugLogger()" style="background:rgba(230,200,77,0.1);border:1px solid #8b6914;color:#e6c84d;">🔧 调试日志</button>
     </div>
     <div id="logContent" style="background:#0a0a1e;border:1px solid var(--border-gold);border-radius:8px;padding:10px;font-size:11px;font-family:monospace;line-height:1.6;white-space:pre-wrap;word-break:break-all;max-height:70vh;overflow-y:auto;flex:1"></div>
 </div>
@@ -1225,11 +1226,55 @@ function goAbout(){
     showScreen('rulesScreen');
 }
 function goLogPanel(){
-    Logger.action('查看操作日志');
-    const el = document.getElementById('logContent');
-    if(el) el.textContent = Logger.exportText();
-    window._returnScreen = 'mainMenu';
-    showScreen('logScreen');
+    try {
+        Logger.action('查看操作日志');
+        const el = document.getElementById('logContent');
+        if(el) {
+            const logText = Logger.exportText();
+            console.log('[goLogPanel] 日志条数:', Logger.entries.length);
+            el.textContent = logText;
+        } else {
+            console.error('[goLogPanel] 找不到 logContent 元素');
+        }
+        window._returnScreen = 'mainMenu';
+        showScreen('logScreen');
+    } catch(e) {
+        console.error('[goLogPanel] 错误:', e);
+        alert('打开操作日志失败: ' + e.message);
+    }
+}
+
+// 打开操作日志面板（异步版本，避免阻塞）
+function goLogPanelAsync(){
+    try {
+        Logger.action('查看操作日志');
+        const el = document.getElementById('logContent');
+        if(el) {
+            // 先显示空内容，让用户知道页面在加载
+            el.textContent = '正在加载日志...\n\n请稍候，如果长时间无响应请按F12查看控制台错误信息';
+            window._returnScreen = 'mainMenu';
+            showScreen('logScreen');
+            
+            // 使用setTimeout避免阻塞UI
+            setTimeout(() => {
+                try {
+                    const logText = Logger.exportText();
+                    console.log('[goLogPanel] 日志条数:', Logger.entries.length);
+                    console.log('[goLogPanel] Logger.entries:', JSON.stringify(Logger.entries.slice(0, 3)));
+                    el.textContent = logText;
+                } catch(e2) {
+                    console.error('[goLogPanel] 加载日志失败:', e2);
+                    el.textContent = '加载日志失败: ' + e2.message + '\n\n请按F12查看控制台';
+                }
+            }, 50);
+        } else {
+            console.error('[goLogPanel] 找不到 logContent 元素');
+            alert('打开操作日志失败: 找不到日志容器');
+        }
+    } catch(e) {
+        console.error('[goLogPanel] 错误:', e);
+        alert('打开操作日志失败: ' + e.message);
+    }
 }
 function copyLog(){
     const text = Logger.exportText();
@@ -1280,6 +1325,25 @@ function clearLog(){
         if(el) el.textContent = '（日志已清空）';
         Logger.info('日志已手动清空');
     }
+}
+// 调试Logger状态
+function debugLogger(){
+    const info = {
+        entriesCount: Logger.entries.length,
+        entriesSample: Logger.entries.slice(0, 5),
+        currentScreen: Logger.currentScreen,
+        localStorageKey: Logger.STORAGE_KEY,
+        localStorageData: localStorage.getItem(Logger.STORAGE_KEY),
+        hasLogger: typeof Logger !== 'undefined'
+    };
+    console.log('[debugLogger]', JSON.stringify(info, null, 2));
+    alert(
+        'Logger状态:\n' +
+        '- entries数量: ' + info.entriesCount + '\n' +
+        '- 当前屏幕: ' + info.currentScreen + '\n' +
+        '- localStorage数据长度: ' + (info.localStorageData ? info.localStorageData.length : 0) + '字符\n\n' +
+        '请按F12查看控制台获取详细信息'
+    );
 }
 function goBan(){ Logger.action('点击「Ban选」'); initBan(); showScreen('banScreen'); }
 
@@ -2077,7 +2141,32 @@ function showLogFromGame(){
     showScreen('logScreen');
 }
 function quitToMenu(){
-    gameStarted=false;engine=null;aiPlayer=null;showScreen('mainMenu');
+    // 1. 安全销毁引擎（try-catch 防止缓存旧版 game.js 导致 destroy 抛错）
+    if(engine) {
+        try {
+            if(typeof engine.destroy === 'function') {
+                engine.destroy();
+            }
+        } catch(e) {
+            console.warn('engine.destroy() 失败（可能是缓存旧版game.js）:', e);
+        }
+        // fallback：暴力清除所有可能残留的定时器
+        for(let i = 1; i < 10000; i++) { clearTimeout(i); clearInterval(i); }
+    }
+    // 2. 强制隐藏游戏画面
+    const gs = document.getElementById('gameScreen');
+    if(gs) { gs.classList.remove('active'); gs.style.display = 'none'; }
+    // 3. 清理所有 overlay/弹窗
+    document.querySelectorAll('.overlay, [id$="Overlay"], [id$="Modal"]').forEach(el => el.remove());
+    // 清除 cardSelOverlay（id选择器兜底）
+    const cardSel = document.getElementById('cardSelOverlay');
+    if(cardSel) { cardSel.style.display = 'none'; cardSel.remove(); }
+    // 4. 重置状态
+    gameStarted = false; engine = null; aiPlayer = null;
+    _pendingCard = null; selectedCardIdx = -1; selectedTargets = [];
+    _waitingForLuoshen = false; _waitingForGuicai = false; _waitingForGuidao = false;
+    // 5. 切回主菜单
+    showScreen('mainMenu');
 }
 function confirmQuit(){
     if(confirm('确定退出当前对局吗？')) {
@@ -2086,6 +2175,16 @@ function confirmQuit(){
     }
 }
 function restartGame(){
+    if(engine) {
+        try {
+            if(typeof engine.destroy === 'function') {
+                engine.destroy();
+            }
+        } catch(e) {
+            console.warn('engine.destroy() 失败:', e);
+        }
+        for(let i = 1; i < 10000; i++) { clearTimeout(i); clearInterval(i); }
+    }
     gameStarted=false;engine=null;aiPlayer=null;goHeroSelect();
 }
 
@@ -3984,33 +4083,41 @@ function _sgsCollectGameState() {
         deckCount: 0,
         discardCount: 0,
         players: [],
-        matchLog: []
+        matchLog: [],
+        loggerEntries: []  // 添加Logger条目
     };
     
-    // 如果游戏引擎存在，收集更多信息
-    if (engine) {
-        state.matchId = engine.matchId || null;
-        state.turnCount = engine.turnCount || 0;
-        state.phase = engine.phase || 'unknown';
-        state.currentPlayer = engine.players[engine.currentPlayerIdx]?.name || 'unknown';
-        state.deckCount = engine.deck ? engine.deck.length : 0;
-        state.discardCount = engine.discardPile ? engine.discardPile.length : 0;
-        state.matchLog = engine.matchLog ? engine.matchLog.slice(-100) : [];
-        
-        // 收集玩家信息（只用武将名，避免混淆）
-        state.players = engine.players.map(p => ({
-            id: p.id,
-            name: p.hero ? p.hero.name : 'unknown',  // 统一用武将名
-            isAI: p.isAI,
-            identity: p.identity,
-            faction: p.faction,
-            hp: p.hp,
-            maxHp: p.maxHp,
-            handCount: p.handCount,
-            isAlive: p.isAlive,
-            isChained: p.isChained
-        }));
+    // 收集Logger条目（用户操作日志）
+    if (Logger && Logger.entries) {
+        state.loggerEntries = Logger.entries.slice(-100);  // 最多100条
     }
+    
+    // 如果游戏引擎存在，收集更多信息
+    try {
+        if (engine && !engine._destroyed) {
+            state.matchId = engine.matchId || null;
+            state.turnCount = engine.turnCount || 0;
+            state.phase = engine.phase || 'unknown';
+            state.currentPlayer = engine.players[engine.currentPlayerIdx]?.name || 'unknown';
+            state.deckCount = engine.deck ? engine.deck.length : 0;
+            state.discardCount = engine.discardPile ? engine.discardPile.length : 0;
+            state.matchLog = engine.matchLog ? engine.matchLog.slice(-100) : [];
+            
+            // 收集玩家信息（只用武将名，避免混淆）
+            state.players = engine.players.map(p => ({
+                id: p.id,
+                name: p.hero ? p.hero.name : 'unknown',  // 统一用武将名
+                isAI: p.isAI,
+                identity: p.identity,
+                faction: p.faction,
+                hp: p.hp,
+                maxHp: p.maxHp,
+                handCount: p.handCount,
+                isAlive: p.isAlive,
+                isChained: p.isChained
+            }));
+        }
+    } catch(e) { console.warn('收集游戏状态失败:', e); }
     
     // 收集localStorage中的对局历史
     try {
@@ -4109,13 +4216,25 @@ async function sgsSubmitBugLog(bugDesc = '') {
             ps: state.players
         }, null, 2)}\n\`\`\`\n\n`;
         
-        // 添加最近的日志
+        // 添加最近的对局日志
         if (state.matchLog && state.matchLog.length > 0) {
             body += `### 最近${state.matchLog.length}条对局日志\n<details><summary>点击展开</summary>\n\n`;
             state.matchLog.forEach(evt => {
                 const time = new Date(evt.time).toLocaleTimeString('zh-CN');
                 const typeIcon = evt.eventType === 'game_log' ? '📝' : '⚡';
                 body += `${typeIcon} **[${time}]** ${JSON.stringify(evt.data)}\n\n`;
+            });
+            body += `</details>\n`;
+        }
+        
+        // 添加用户操作日志
+        if (state.loggerEntries && state.loggerEntries.length > 0) {
+            body += `### 最近${state.loggerEntries.length}条用户操作日志\n<details><summary>点击展开</summary>\n\n`;
+            state.loggerEntries.forEach(entry => {
+                const icon = entry.type==='error'?'❌':entry.type==='action'?'👉':entry.type==='warn'?'⚠️':'ℹ️';
+                body += `${icon} **[${entry.t}]** [${entry.screen}] ${entry.msg}`;
+                if (entry.detail) body += `\n    详情: ${entry.detail}`;
+                body += `\n\n`;
             });
             body += `</details>\n`;
         }
@@ -4196,7 +4315,8 @@ window.sgsSubmitBugLog = async function() {
                     deckCount: 0,
                     discardCount: 0,
                     players: [],
-                    matchLog: latest.log || []
+                    matchLog: latest.log || [],
+                    loggerEntries: Logger.entries ? Logger.entries.slice(-100) : []  // 添加用户操作日志
                 };
             } else {
                 console.log('没有找到任何对局记录');
@@ -4222,6 +4342,18 @@ window.sgsSubmitBugLog = async function() {
             state.matchLog.slice(-50).forEach(evt => {
                 const time = new Date(evt.time).toLocaleTimeString('zh-CN');
                 body += `**[${time}]** ${JSON.stringify(evt.data)}\n\n`;
+            });
+            body += `</details>\n`;
+        }
+        
+        // 添加用户操作日志
+        if (state.loggerEntries && state.loggerEntries.length > 0) {
+            body += `### 用户操作日志\n<details><summary>点击展开 (${state.loggerEntries.length}条)</summary>\n\n`;
+            state.loggerEntries.forEach(entry => {
+                const icon = entry.type==='error'?'❌':entry.type==='action'?'👉':entry.type==='warn'?'⚠️':'ℹ️';
+                body += `${icon} **[${entry.t}]** [${entry.screen}] ${entry.msg}`;
+                if (entry.detail) body += `\n    详情: ${entry.detail}`;
+                body += `\n\n`;
             });
             body += `</details>\n`;
         }

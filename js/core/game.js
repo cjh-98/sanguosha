@@ -103,6 +103,9 @@ SGS.GameEngine = (function() {
             this.matchLog = [];
             this.matchStartTime = null;
             this.matchEndTime = null;
+            // 定时器追踪系统
+            this._timers = [];
+            this._destroyed = false;
         }
 
         setAdapter(adapter) {
@@ -121,8 +124,29 @@ SGS.GameEngine = (function() {
 
         // 延迟函数（考虑AI速度）
         delay(ms) {
+            if (this._destroyed) return Promise.reject(new Error('Game destroyed'));
             const actualMs = ms / this.aiSpeed;
-            return new Promise(resolve => setTimeout(resolve, actualMs));
+            return new Promise(resolve => {
+                const id = setTimeout(() => {
+                    const idx = this._timers.indexOf(id);
+                    if (idx >= 0) this._timers.splice(idx, 1);
+                    resolve();
+                }, actualMs);
+                this._timers.push(id);
+            });
+        }
+
+        // 统一的定时器管理——所有setTimeout都必须通过此方法
+        _setTimer(fn, ms) {
+            if (this._destroyed) return null;
+            const id = setTimeout(() => {
+                const idx = this._timers.indexOf(id);
+                if (idx >= 0) this._timers.splice(idx, 1);
+                if (this._destroyed) return;
+                fn();
+            }, ms);
+            this._timers.push(id);
+            return id;
         }
 
         // ========== 日志 ==========
@@ -280,6 +304,26 @@ SGS.GameEngine = (function() {
             if (this._logUploadTimer) {
                 clearInterval(this._logUploadTimer);
                 this._logUploadTimer = null;
+            }
+        }
+
+        // 销毁引擎——清理所有异步定时器和资源
+        destroy() {
+            this._destroyed = true;
+            // 清除实时上传定时器
+            this.stopRealtimeLogUpload();
+            // 清除所有通过 _setTimer 注册的 setTimeout
+            this._timers.forEach(t => clearTimeout(t));
+            this._timers = [];
+            // 清理等待中的卡牌选择 Promise
+            if (this._pendingCardChoice) {
+                this._pendingCardChoice = null;
+            }
+            // 清除事件订阅者
+            this.eventSubscribers = {};
+            // 保存未结束的对局
+            if (this.matchId && !this.gameOver) {
+                this.matchEndTime = Date.now();
             }
         }
 
@@ -529,6 +573,7 @@ SGS.GameEngine = (function() {
 
         // ========== 回合管理 (状态机模式 - 彻底告别async链) ==========
         startTurn() {
+            if (this._destroyed) return;
             if (this.gameOver) return;
             const player = this.players[this.currentPlayerIdx];
             if (!player) { this.nextTurn(); return; }
@@ -556,6 +601,7 @@ SGS.GameEngine = (function() {
 
         // 状态机核心：根据当前phase执行对应函数
         stepTurn() {
+            if (this._destroyed) return;
             if (this.gameOver) return;
             // 检查是否在等待人类玩家操作
             if (this._waitingForLuoshen || this._waitingForGuicai || this._waitingForGuidao) {
@@ -585,6 +631,7 @@ SGS.GameEngine = (function() {
 
         // 推进到下一阶段
         advancePhase() {
+            if (this._destroyed) return;
             const order = ['begin','judge','draw','play','discard','end'];
             const idx = order.indexOf(this.phase);
             if (idx < 0 || idx >= order.length - 1) {
@@ -595,7 +642,7 @@ SGS.GameEngine = (function() {
                 this.notifyState();
                 // 添加延迟让玩家看清阶段变化（使用aiSpeed倍率）
                 const delayMs = 300 / this.aiSpeed;
-                setTimeout(() => {
+                this._setTimer(() => {
                     this.stepTurn();
                 }, delayMs);
             }
@@ -671,7 +718,7 @@ SGS.GameEngine = (function() {
                     this._luoshenPlayer = player;
                     this.notifyState();
                     // 弹出UI询问
-                    setTimeout(() => {
+                    this._setTimer(() => {
                         if (window.openLuoshenUI) {
                             window.openLuoshenUI();
                         }
@@ -987,6 +1034,7 @@ SGS.GameEngine = (function() {
         }
 
         async nextTurn() {
+            if (this._destroyed) return;
             if (this.gameOver) return;
             const alive = this.getAlivePlayers();
             if (alive.length <= 1) {
@@ -1027,7 +1075,7 @@ SGS.GameEngine = (function() {
                     if (this.phase === SGS.Config.PHASE.PLAY) {
                         this.phase = SGS.Config.PHASE.DISCARD;
                         this.notifyState();
-                        setTimeout(() => this.doDiscard(player), 100);
+                        this._setTimer(() => this.doDiscard(player), 100);
                     }
                     break;
                 case 'discard':
@@ -1201,10 +1249,10 @@ SGS.GameEngine = (function() {
 
             // 继续处理剩余的判定牌
             if (player.judgmentCards.length > 0) {
-                setTimeout(() => this.doJudge(player), 100);
+                this._setTimer(() => this.doJudge(player), 100);
             } else {
                 // 所有判定完成，推进到下一个阶段
-                setTimeout(() => this.advancePhase(), 100);
+                this._setTimer(() => this.advancePhase(), 100);
             }
         }
 
@@ -3063,6 +3111,7 @@ SGS.GameEngine = (function() {
 
         // ========== 通知状态 ==========
         notifyState() {
+            if (this._destroyed) return;
             if (!this.adapter) return;
             const state = this.getState();
             this.adapter.notifyState(state);

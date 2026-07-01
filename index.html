@@ -1092,10 +1092,15 @@ function enforceGameAspect(){
         const screenWidth = window.innerWidth;
         const screenHeight = window.innerHeight;
         
-        // 设置游戏区域尺寸和旋转
+        // 旋转90度后，游戏画面会超出屏幕
+        // 游戏画面尺寸：宽=screenHeight, 高=screenWidth
+        // 旋转后，画面的左边缘会超出屏幕右边缘
+        // 需要把画面向左移动 (screenHeight - screenWidth) 让它显示在屏幕内
+        const translateX = screenWidth - screenHeight;
+        
         gs.style.width = screenHeight + 'px';
         gs.style.height = screenWidth + 'px';
-        gs.style.transform = 'rotate(90deg)';
+        gs.style.transform = `rotate(90deg) translateX(-${translateX}px)`;
         gs.style.transformOrigin = 'top left';
         gs.style.position = 'absolute';
         gs.style.left = '0';

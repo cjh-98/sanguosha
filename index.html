@@ -2013,7 +2013,7 @@ function updatePrompt(human,state){
 
 // ---- 交互事件 ----
 function clickCard(idx){
-    if(!engine) return;
+    if(!engine || !engine.getHumanPlayer) return;
     const human=engine.getHumanPlayer(); if(!human){Logger.warn('clickCard失败: 无人类玩家');return;}
     const st=engine.getState();
 

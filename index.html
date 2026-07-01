@@ -848,8 +848,19 @@
             </div>
             <div class="skill-bar" id="skillBar"></div>
             <div class="hand-cards" id="handCards"></div>
-            <div class="action-bar" id="actionBar"></div>
+            <div class="action-bar" id="actionBar">
+                <button class="log-toggle-btn" onclick="toggleGameLog()">📜 牌局记录</button>
+                <button class="btn-submit-log" onclick="submitBugLog()">🐛 提交Bug</button>
+            </div>
         </div>
+    </div>
+    <!-- 日志面板：桌面右上角悬浮 -->
+    <div class="log-panel-wrap" id="logPanelWrap" style="display:none">
+        <div class="log-panel-header" onclick="toggleGameLog()">
+            <span>📜 牌局记录</span>
+            <span class="log-panel-close">✕</span>
+        </div>
+        <div class="game-log-panel" id="glog"></div>
     </div>
 </div>
 
@@ -1897,24 +1908,25 @@ function renderActions(human,state){
     const isMy=state.currentPlayerIdx===human.id;
     // 日志按钮始终显示
     let logBtn='<button class="log-toggle-btn" onclick="toggleGameLog()">📜 牌局记录</button>';
+    let bugBtn='<button class="btn-submit-log" onclick="submitBugLog()">🐛</button>';
     if(isMy && state.phase==='play'){
-        ab.innerHTML=logBtn+'<button class="btn-sm end-turn" onclick="endTurn()">结束出牌</button>';
+        ab.innerHTML=logBtn+bugBtn+'<button class="btn-sm end-turn" onclick="endTurn()">结束出牌</button>';
     }else if(isMy && state.phase==='discard'){
         const need=human.handCards.length-human.hp;
-        ab.innerHTML=logBtn+`<button class="btn-sm danger" id="discardBtn" disabled onclick="doDiscard()">弃牌(${need})</button>`;
+        ab.innerHTML=logBtn+bugBtn+`<button class="btn-sm danger" id="discardBtn" disabled onclick="doDiscard()">弃牌(${need})</button>`;
         window._discarding=true; window._discSel=[]; selectedCardIdx=-1;
     }else if(!isMy){
         // 非自己的回合：显示等待提示 + 日志按钮
         const cp=engine.players[state.currentPlayerIdx];
-        ab.innerHTML=`<span style="color:var(--text-secondary);font-size:11px;flex:1">⏳ 等待 ${cp?cp.hero.name:''} 出牌...</span>`+logBtn;
-    }else{ab.innerHTML=logBtn;}
+        ab.innerHTML=`<span style="color:var(--text-secondary);font-size:11px;flex:1">⏳ 等待 ${cp?cp.hero.name:''} 出牌...</span>`+logBtn+bugBtn;
+    }else{ab.innerHTML=logBtn+bugBtn;}
 }
 window._discarding=false;
 window._discSel=[];
 
 function updatePrompt(human,state){
-    const pt=document.getElementById('prompt');
-    if(state.gameOver){pt.textContent='游戏结束';return;}
+    const pt=document.getElementById('actionPrompt')||document.getElementById('prompt');
+    if(!pt) return;
     const isMy=state.currentPlayerIdx===human.id;
     if(isMy){
         const ph={

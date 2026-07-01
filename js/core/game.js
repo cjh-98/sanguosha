@@ -671,10 +671,18 @@ SGS.GameEngine = (function() {
                         this.log(`${player.name}发动【观星】，观看了牌堆顶的${n}张牌并调整顺序`, 'highlight');
                     }
                 } else {
-                    // 人类玩家：等待UI交互
-                    this.log(`${player.name}可以发动【观星】`, 'normal');
-                    // 不阻塞流程，人类玩家可以随时点击技能按钮发动
-                    // TODO: 添加UI交互
+                    // 人类玩家：设置等待状态，让UI可以响应
+                    this._waitingForGuanxing = true;
+                    this._guanxingPlayer = player;
+                    this.notifyState();
+                    // 弹出UI询问
+                    this._setTimer(() => {
+                        if (window.openGuanxingUI) {
+                            window.openGuanxingUI();
+                        }
+                    }, 100);
+                    // 不调用advancePhase，等待UI调用finishGuanxing
+                    return;
                 }
             }
             // 洛神 (甄姬) - 主动技，人类玩家可以控制是否继续

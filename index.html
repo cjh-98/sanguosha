@@ -2025,7 +2025,7 @@ function clickSkill(name){
     Logger.action('点击技能: ' + name);
     try{
         // 需要特殊UI的技能
-        const specialUI = ['制衡','仁德','反间','结姻','离间','挑衅','天义','乱击','英魂','反馈','刚烈','遗计','观星','虚鲲','挥泪'];
+        const specialUI = ['制衡','仁德','反间','结姻','离间','挑衅','天义','乱击','英魂','反馈','刚烈','遗计','观星','虚鲲','挥泪','青囊','奇袭','断粮','国色'];
         if(specialUI.includes(name)){
             switch(name){
                 case '制衡':openZhiheng();break;
@@ -2035,6 +2035,7 @@ function clickSkill(name){
                 case '洛神':openLuoshen();break;
                 case '鬼才':openGuicai();break;
                 case '鬼道':openGuidao();break;
+                case '青囊':openQingnang();break;
                 default:
                     Logger.warn('技能UI未实现: ' + name);
                     alert(`技能"${name}"的UI开发中，敬请期待！`);
@@ -2100,14 +2101,16 @@ function openTargetPicker(card){
     const ov=document.createElement('div');
     ov.className='target-sel';
     ov.id='targetPicker';
+    // 铁索连环支持空选择（重铸），所以确认按钮不应该禁用
+    const isTiesuo = card.subtype === 'tiesuo';
     ov.innerHTML=`<div class="ts-box">
-        <div class="ts-title">选择目标 (${selectedTargets.length}/${mt})</div>
+        <div class="ts-title">选择目标 (${selectedTargets.length}/${mt})${isTiesuo ? '（不选则重铸）' : ''}</div>
         <div id="tList">${targets.map(t=>`<div class="titem" data-tid="${t.id}">
             <span>${t.hero.name}</span><span style="color:var(--accent-red)">${'❤'.repeat(t.hp)}</span>
         </div>`).join('')}</div>
         <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
             <button class="btn-sm" onclick="closeTarget()">取消</button>
-            <button class="btn-sm btn-primary" id="cfTgtBtn" disabled onclick="confirmTarget()">确认</button>
+            <button class="btn-sm btn-primary" id="cfTgtBtn"${isTiesuo ? '' : ' disabled'} onclick="confirmTarget()">确认</button>
         </div></div>`;
     document.body.appendChild(ov);
     ov.querySelectorAll('.titem').forEach(item=>{
@@ -2136,7 +2139,10 @@ function toggleTgt(tid){
     const title=document.querySelector('.ts-title');
     if(title)title.textContent=`选择目标 (${selectedTargets.length}/${mt})`;
     const btn=document.getElementById('cfTgtBtn');
-    if(btn)btn.disabled=selectedTargets.length===0;
+    // 铁索连环支持空选择（重铸），所以即使没有选择目标也能确认
+    const card = _pendingCard;
+    const isTiesuo = card && card.subtype === 'tiesuo';
+    if(btn)btn.disabled=!isTiesuo && selectedTargets.length===0;
 }
 function confirmTarget(){
     const card = _pendingCard;
@@ -2304,6 +2310,183 @@ function selectGuidaoCard(el){
     if(ov)ov.remove();
     
     engine.processAction({type:'finishGuidao', card});
+    updateBoard(engine.getState());
+}
+
+// ---- 青囊弹窗 ----
+let _qngTargetId = null;
+function openQingnang(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    // 先选择目标玩家
+    const targets = engine.getAlivePlayers().filter(p => p.hp < p.maxHp);
+    if(targets.length === 0){
+        alert('当前没有需要回复体力的玩家');
+        return;
+    }
+    _qngTargetId = null;
+    const ov=document.createElement('div');
+    ov.id='qngOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)ov.remove();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>青囊：选择要回复的玩家</h4>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px" id="qngTargets">
+            ${targets.map(p=>`<div class="player-card ${p.id===human.id?'self':''}" data-id="${p.id}" onclick="selectQngTarget(this)">
+                <div class="pinfo">${p.name}</div>
+                <div class="phpl">${p.hp}/${p.maxHp}</div>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('qngOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+}
+
+function selectQngTarget(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targetId = parseInt(el.dataset.id);
+    _qngTargetId = targetId;
+    
+    // 移除目标选择弹窗
+    const ov=document.getElementById('qngOverlay');
+    if(ov)ov.remove();
+    
+    // 打开牌选择弹窗
+    const ov2=document.createElement('div');
+    ov2.id='qngCardOverlay';
+    ov2.className='overlay';
+    ov2.onclick=function(e){if(e.target===this)ov2.remove();};
+    ov2.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>青囊：选择要弃置的牌</h4>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px" id="qngCards">
+            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
+                data-i="${i}" onclick="selectQngCard(this)">
+                <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+                <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('qngCardOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov2);
+}
+
+function selectQngCard(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    if(_qngTargetId === null){return;}
+    const idx = parseInt(el.dataset.i);
+    const card = human.handCards[idx];
+    if(!card)return;
+    
+    // 移除弹窗
+    const ov=document.getElementById('qngCardOverlay');
+    if(ov)ov.remove();
+    
+    // 调用技能
+    engine.useSkill(human, '青囊', { targetId: _qngTargetId, card: card });
+    updateBoard(engine.getState());
+}
+
+// ---- 仁德弹窗 ----
+let _rdTargetId = null;
+let _rdSelectedCards = [];
+function openRende(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    // 先选择目标玩家
+    const targets = engine.getAlivePlayers().filter(p => p.id !== human.id);
+    if(targets.length === 0){
+        alert('没有可以给牌的目标');
+        return;
+    }
+    _rdTargetId = null;
+    _rdSelectedCards = [];
+    const ov=document.createElement('div');
+    ov.id='rdOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)ov.remove();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>仁德：选择给牌目标</h4>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px" id="rdTargets">
+            ${targets.map(p=>`<div class="player-card ${p.id===human.id?'self':''}" data-id="${p.id}" onclick="selectRdTarget(this)">
+                <div class="pinfo">${p.name}</div>
+                <div class="phpl">手牌:${p.handCards.length}</div>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('rdOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+}
+
+function selectRdTarget(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targetId = parseInt(el.dataset.id);
+    _rdTargetId = targetId;
+    _rdSelectedCards = [];
+    
+    // 移除目标选择弹窗
+    const ov=document.getElementById('rdOverlay');
+    if(ov)ov.remove();
+    
+    // 打开牌选择弹窗
+    openRendeCardPicker();
+}
+
+function openRendeCardPicker(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const ov=document.createElement('div');
+    ov.id='rdCardOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)ov.remove();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>仁德：选择要给的牌（至少2张）</h4>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px" id="rdCards">
+            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_rdSelectedCards.includes(i)?'sel':''}"
+                data-i="${i}" onclick="toggleRdCard(this)">
+                <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+                <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('rdCardOverlay')?.remove()">取消</button>
+            <button class="btn-sm btn-primary" onclick="confirmRende()">确认</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+}
+
+function toggleRdCard(el){
+    const idx = parseInt(el.dataset.i);
+    const pos = _rdSelectedCards.indexOf(idx);
+    if(pos >= 0){
+        _rdSelectedCards.splice(pos, 1);
+    } else if(_rdSelectedCards.length < 4){ // 最多给4张
+        _rdSelectedCards.push(idx);
+    }
+    updateRdCardDisplay();
+}
+
+function updateRdCardDisplay(){
+    const container = document.getElementById('rdCards');
+    if(!container) return;
+    container.innerHTML = engine.getHumanPlayer().handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_rdSelectedCards.includes(i)?'sel':''}"
+        data-i="${i}" onclick="toggleRdCard(this)">
+        <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+        <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('');
+}
+
+function confirmRende(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    if(_rdTargetId === null){return;}
+    if(_rdSelectedCards.length < 2){
+        alert('仁德至少要给2张牌');
+        return;
+    }
+    const cards = _rdSelectedCards.map(i => human.handCards[i]);
+    
+    // 移除弹窗
+    const ov=document.getElementById('rdCardOverlay');
+    if(ov)ov.remove();
+    
+    // 调用技能
+    engine.useSkill(human, '仁德', { targetId: _rdTargetId, cards: cards });
     updateBoard(engine.getState());
 }
 
@@ -3285,8 +3468,8 @@ window.sgsSubmitBugLog = async function() {
 
 // 提交Bug报告的入口函数
 function submitBugLog() {
-    // 先上传对局日志，再弹窗
-    _sgsUploadMatchLog('bug-submit');
+    // 只显示弹窗，不上传任何东西
+    // 实际上传在用户点击"提交日志"按钮时进行
     showBugReportModal();
 }
 

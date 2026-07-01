@@ -143,6 +143,8 @@
             pointer-events: none; z-index: 0;
         }
         #gameScreen > * { position: relative; z-index: 1; }
+        /* 日志面板独立定位：用fixed浮在右下角手牌区上方，不占文档流 */
+        #gameScreen > #logPanelWrap { position: fixed; right: 8px; bottom: 220px; z-index: 200; }
 
         /* 顶部信息栏 */
         .topbar { display:flex; width:100%; box-sizing:border-box; align-items:center; justify-content:space-between; padding:4px 10px;
@@ -857,7 +859,7 @@
             </div>
         </div>
     </div>
-    <!-- 日志面板：桌面右上角悬浮 -->
+    <!-- 日志面板：fixed 浮在屏幕右下角手牌区上方（不占文档流） -->
     <div class="log-panel-wrap" id="logPanelWrap" style="display:none">
         <div class="log-panel-header" onclick="toggleGameLog()">
             <span>📜 牌局记录</span>

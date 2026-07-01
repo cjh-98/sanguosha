@@ -143,7 +143,7 @@
         /* 顶部信息栏 */
         .topbar { display:flex; width:100%; box-sizing:border-box; align-items:center; justify-content:space-between; padding:4px 10px;
             background:linear-gradient(180deg,#2a2218 0%,#1a1410 100%); border-bottom:2px solid #5c4a28;
-            height:34px; flex-shrink:0; font-size:11px; white-space: nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.5); }
+            height:34px; flex-shrink:0; font-size:11px; white-space: nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.5); z-index: 100; }
         .topbar span { color:#d4b86a; text-shadow:0 1px 2px rgba(0,0,0,0.9); }
         .topbar .btn-sm { background:linear-gradient(180deg,#3a3020,#251e12); color:#d4b86a; border-color:#5c4a28; font-size:11px; }
 
@@ -206,6 +206,7 @@
             cursor: pointer; white-space: nowrap;
             text-shadow: 0 1px 1px rgba(0,0,0,0.5);
             transition: all 0.15s; -webkit-tap-highlight-color: transparent;
+            position: relative; z-index: 100;
         }
         .log-toggle-btn:hover { background: linear-gradient(180deg, rgba(62,50,32,0.85), rgba(36,28,20,0.95)); color: #e6c84d; }
         .log-toggle-btn:active { transform: scale(0.95); }
@@ -217,13 +218,13 @@
             cursor: pointer; white-space: nowrap;
             text-shadow: 0 1px 1px rgba(0,0,0,0.5);
             transition: all 0.15s; -webkit-tap-highlight-color: transparent;
-            position: relative; z-index: 10;
+            position: relative; z-index: 100;
         }
         .btn-submit-log:hover { background: linear-gradient(180deg, rgba(80,40,70,0.85), rgba(40,20,40,0.95)); color: #e6c84d; }
         .btn-submit-log:active { transform: scale(0.95); }
         
         #playersTop {
-            position:absolute; top:0; left:0; right:0; bottom:0;
+            position:absolute; top:34px; left:0; right:0; bottom:0;
             z-index: 2; margin:0; padding:0;
         }
         /* 圆桌上的武将牌 - 绝对定位（位置由 inline style 控制） */

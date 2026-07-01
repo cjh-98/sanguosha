@@ -2191,10 +2191,12 @@ function restartGame(){
 // ---- 目标选择弹窗 ----
 let _pendingCard = null; // 缓存正在选目标的卡牌
 function openTargetPicker(card){
+    if(!engine) return;
     _pendingCard = card;
     selectedTargets=[];
     let targets=[];
     const human=engine.getHumanPlayer();
+    if(!human) return;
     switch(card.subtype){
         case 'sha':targets=engine.getAttackTargets(human);break;
         case'shunshou':case'bingliang':
@@ -2356,6 +2358,7 @@ function openGuicai(){
 }
 
 function selectGuicaiCard(el){
+    if(!engine) return;
     const card = engine.getHumanPlayer().handCards[parseInt(el.dataset.i)];
     if(!card)return;
     
@@ -2413,6 +2416,7 @@ function openGuidao(){
 }
 
 function selectGuidaoCard(el){
+    if(!engine) return;
     const card = engine.getHumanPlayer().handCards[parseInt(el.dataset.i)];
     if(!card)return;
     

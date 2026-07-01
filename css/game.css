@@ -152,7 +152,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-end;  /* 内容靠底，减少中间空白 */
     padding: 1vh;
     gap: 1vh;
     overflow: hidden;
@@ -239,9 +239,18 @@
     display: flex;
     gap: 0.5vw;
     overflow-x: auto;
-    padding: 0.4vh 0;
+    padding: 0.6vh 0.8vw;
     min-height: 11vh;
     align-items: center;
+    /* 手牌边框 - 金色边框框住所有手牌 */
+    background: rgba(10,8,6,0.6);
+    border: 2px solid var(--border-gold);
+    border-radius: 8px;
+    border-left: 2px solid rgba(230,200,77,0.15);
+    border-right: 2px solid rgba(230,200,77,0.15);
+    margin: 0 auto;
+    width: fit-content;
+    max-width: 100%;
 }
 
 /* 卡牌 */

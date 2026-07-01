@@ -705,15 +705,45 @@ SGS.GameEngine = (function() {
             this.advancePhase();
         }
 
-        doDraw(player) {
+        async doDraw(player) {
             try {
                 if (player._skipDraw) {
                     player._skipDraw = false;
                     this.log(`${player.name}跳过摸牌阶段`, 'normal');
                 } else {
                     let drawCount = 2;
-                    // 英姿 (周瑜)
+                    // 英姿 (周瑜): 多摸1张
                     if (player.skills.some(s => s.name === '英姿')) drawCount += 1;
+                    // 好施 (鲁肃): 若手牌少于5张，多摸2张
+                    if (player.skills.some(s => s.name === '好施') && player.handCards.length < 5) {
+                        drawCount += 2;
+                        this.log(`${player.name}发动好施，多摸2张牌`, 'highlight');
+                    }
+                    // 裸衣 (许褚): AI自动选择
+                    if (player.skills.some(s => s.name === '裸衣')) {
+                        if (player.isAI || Math.random() < 0.5) {  // AI或随机选择发动
+                            drawCount -= 1;
+                            player.luoyiActive = true;  // 标记本回合杀/决斗伤害+1
+                            this.log(`${player.name}发动裸衣，少摸1张牌，本回合杀/决斗伤害+1`, 'highlight');
+                        }
+                    }
+                    // 突袭 (张辽): 少摸1张，改为从1-2名其他角色获得手牌
+                    if (player.skills.some(s => s.name === '突袭')) {
+                        drawCount -= 1;
+                        const others = this.getAlivePlayers().filter(p => p.id !== player.id && p.handCards.length > 0);
+                        if (others.length > 0) {
+                            const pickCount = Math.min(2, others.length);
+                            const picked = others.sort(() => Math.random() - 0.5).slice(0, pickCount);
+                            for (const p of picked) {
+                                const c = p.handCards[Math.floor(Math.random() * p.handCards.length)];
+                                p.handCards.splice(p.handCards.indexOf(c), 1);
+                                player.handCards.push(c);
+                                this.log(`${player.name}突袭：获得${p.name}的${c.name}`, 'highlight');
+                            }
+                        } else {
+                            this.log(`${player.name}突袭：无目标可偷`, 'normal');
+                        }
+                    }
                     try { this.emit('drawPhase', { player, drawCount, engine: this, modify: (n) => { drawCount = n; } }); } catch(e){}
                     if (drawCount > 0) {
                         this.drawCard(player, drawCount);
@@ -775,6 +805,11 @@ SGS.GameEngine = (function() {
             try {
                 this.emit('discardPhase', { player, engine: this });
                 let handLimit = player.hp;
+                // 血裔 (袁绍 主公技): 手牌上限+X (X为群势力角色数*2)
+                if (player.skills.some(s => s.name === '血裔')) {
+                    const qunCount = this.getAlivePlayers().filter(p => p.faction === 'qun').length;
+                    handLimit += qunCount * 2;
+                }
                 // 克己
                 if (player.shaUsedThisTurn === 0 && player.skills.some(s => s.name === '克己')) {
                     this.log(`${player.name}发动克己，不弃牌`, 'success');
@@ -819,6 +854,9 @@ SGS.GameEngine = (function() {
 
         doEnd(player) {
             try { this.emit('turnEnd', { player, engine: this }); } catch(e){}
+
+            // 重置裸衣标记
+            player.luoyiActive = false;
 
             // 闭月 (貂蝉)
             if (player.skills.some(s => s.name === '闭月')) {
@@ -1257,23 +1295,6 @@ SGS.GameEngine = (function() {
             
             switch (card.subtype) {
                 case 'sha':
-                    // 雷击 (张角): 黑桃杀可触发雷击
-                    if (player.skills.some(s => s.name === '雷击') && card.suit === 'spade') {
-                        // 使用黑桃杀时有几率触发雷击（判定）
-                        const judge = this.revealTopCard();
-                        this.log(`${player.name}雷击判定：${SGS.CardData.suitName[judge.suit]}${SGS.CardData.numberName[judge.number]}`, 'normal');
-                        if (judge.suit === 'spade') {
-                            const aliveOthers = this.getAlivePlayers().filter(p => p.id !== player.id);
-                            if (aliveOthers.length > 0) {
-                                const target = aliveOthers[Math.floor(Math.random() * aliveOthers.length)];
-                                this.dealDamage(target, 2, { source: player, element: 'thunder', card });
-                                this.log(`${player.name}雷击成功，${target.name}受到2点雷伤害！`, 'danger');
-                            }
-                        } else {
-                            this.log(`雷击失败，判定不是♠`, 'normal');
-                        }
-                        this.discardPile.push(judge);
-                    }
                     // 检查出杀次数（诸葛连弩除外）
                     if (player.shaUsedThisTurn >= 1) {
                         const hasZhuge = player.equipment.weapon && player.equipment.weapon.subtype === 'zhuge';
@@ -1376,14 +1397,11 @@ SGS.GameEngine = (function() {
             if (target.skills.some(s => s.name === '享乐') && source.isAlive) {
                 const basicCards = source.handCards.filter(c => c.type === 'basic');
                 if (basicCards.length > 0) {
-                    // 简化：AI自动弃一张基本牌
-                    if (source.isAI) {
-                        const discard = basicCards[0];
-                        source.handCards.splice(source.handCards.indexOf(discard), 1);
-                        this.discardPile.push(discard);
-                        this.log(`${source.name}享乐：弃置了${discard.name}`, 'normal');
-                    }
-                    // 人类玩家需要手动选择弃牌（简化：暂时跳过）
+                    // 自动弃一张基本牌
+                    const discard = basicCards[0];
+                    source.handCards.splice(source.handCards.indexOf(discard), 1);
+                    this.discardPile.push(discard);
+                    this.log(`${source.name}享乐：弃置了${discard.name}`, 'normal');
                 } else {
                     this.log(`${source.name}没有基本牌，享乐使【杀】无效！`, 'danger');
                     return;
@@ -1420,6 +1438,26 @@ SGS.GameEngine = (function() {
                     try {
                         this.adapter && this.adapter.notifyEvent({ type: 'shan', detail: { playerId: target.id } });
                     } catch(e) {}
+                    // 雷击 (张角): 使用或打出闪后，可令一名角色判定
+                    if (target.skills.some(s => s.name === '雷击')) {
+                        const aliveOthers = this.getAlivePlayers().filter(p => p.id !== target.id);
+                        if (aliveOthers.length > 0) {
+                            const leijiTarget = target.isAI ? aliveOthers[Math.floor(Math.random() * aliveOthers.length)] : null;
+                            if (leijiTarget || !target.isAI) {
+                                this.log(`${target.name}发动雷击`, 'highlight');
+                                const judge = this.revealTopCard();
+                                const chosen = leijiTarget || aliveOthers[0];
+                                this.log(`雷击判定：${SGS.CardData.suitName[judge.suit]}${SGS.CardData.numberName[judge.number]}`, 'normal');
+                                if (judge.suit === 'spade') {
+                                    this.dealDamage(chosen, 2, { source: target, element: 'thunder', card: shan });
+                                    this.log(`${target.name}雷击成功，${chosen.name}受到2点雷伤害！`, 'danger');
+                                } else {
+                                    this.log(`雷击失败，判定不是♠`, 'normal');
+                                }
+                                this.discardPile.push(judge);
+                            }
+                        }
+                    }
                     // 青龙偃月刀
                     if (source.equipment.weapon && source.equipment.weapon.subtype === 'qinglong') {
                         this.log(`${source.name}可使用青龙偃月刀追杀`, 'normal');
@@ -1476,6 +1514,11 @@ SGS.GameEngine = (function() {
                 case 'juedou': // 决斗
                     const target = targets[0] || this.getAttackTargets(player)[0];
                     if (!target) return;
+                    // 空城不能成为决斗的目标
+                    if (target.handCards.length === 0 && target.skills.some(s => s.name === '空城')) {
+                        this.log(`${target.name}空城：不能成为决斗的目标！`, 'normal');
+                        break;
+                    }
                     await this.resolveDuel(player, target, card);
                     break;
 
@@ -1551,6 +1594,11 @@ SGS.GameEngine = (function() {
                         this.log(`${t1.name}谦逊：不能被过河拆桥`, 'normal');
                         break;
                     }
+                    // 帷幕 (贾诩): 不能成为黑色锦囊的目标
+                    if (t1.skills.some(s => s.name === '帷幕') && (card.suit === 'spade' || card.suit === 'club')) {
+                        this.log(`${t1.name}帷幕：不能被黑色锦囊选中`, 'normal');
+                        break;
+                    }
                     // 奇才 (黄月英)：使用锦囊无距离限制
                     const hasQicai2 = player.skills.some(s => s.name === '奇才');
                     if (!t1 || (!hasQicai2 && this.getDistance(player, t1) > 1)) break;
@@ -1590,6 +1638,11 @@ SGS.GameEngine = (function() {
                     // 谦逊 (陆逊): 不能被顺手/过河
                     if (t2.skills.some(s => s.name === '谦逊')) {
                         this.log(`${t2.name}谦逊：不能被顺手牵羊`, 'normal');
+                        break;
+                    }
+                    // 帷幕 (贾诩): 不能成为黑色锦囊的目标
+                    if (t2.skills.some(s => s.name === '帷幕') && (card.suit === 'spade' || card.suit === 'club')) {
+                        this.log(`${t2.name}帷幕：不能被黑色锦囊选中`, 'normal');
                         break;
                     }
                     // 奇才 (黄月英)：使用锦囊无距离限制
@@ -1960,10 +2013,20 @@ SGS.GameEngine = (function() {
             if (source && source.skills.some(s => s.name === '肉林') && source.gender !== player.gender) {
                 damage += 1;
             }
+            // 暴凌 (董卓 主公技): 其他群势力角色对董卓造成伤害+1
+            if (source && player.skills.some(s => s.name === '暴凌') && source.faction === 'qun') {
+                damage += 1;
+                this.log(`暴凌：群势力对${player.name}伤害+1`, 'danger');
+            }
             // 激昂：红杀伤害+1
             if (source && source.skills.some(s => s.name === '激昂') && card && card.subtype === 'sha' &&
                 (card.suit === 'heart' || card.suit === 'diamond')) {
                 damage += 1;
+            }
+            // 裸衣 (许褚): 裸衣标记下杀和决斗伤害+1
+            if (source && source.luoyiActive && card && (card.subtype === 'sha' || card.subtype === 'juedou')) {
+                damage += 1;
+                this.log(`${source.name}裸衣加成，伤害+1`, 'highlight');
             }
 
             // 天香 (小乔)
@@ -2089,6 +2152,43 @@ SGS.GameEngine = (function() {
                 this.drawCard(source, 1);
                 this.log(`${source.name}发动狂骨，摸了1张牌`, 'highlight');
             }
+            // 悲歌 (蔡文姬): 当一名角色受到【杀】伤害后，你可以弃牌令其判定
+            if (card && card.subtype === 'sha' && player.handCards.length > 0 && source && source.isAlive) {
+                // 找出有悲歌技能的角色（不一定是受伤者）
+                const beiGePlayer = this.getAlivePlayers().find(p => 
+                    p.skills.some(s => s.name === '悲歌') && p.handCards.length > 0
+                );
+                if (beiGePlayer && (beiGePlayer.isAI || Math.random() < 0.5)) {
+                    const discarded = beiGePlayer.handCards[0];
+                    this.discardCard(beiGePlayer, discarded);
+                    const judge = this.revealTopCard();
+                    this.log(`${beiGePlayer.name}发动悲歌，判定：${SGS.CardData.suitName[judge.suit]}`, 'highlight');
+                    switch (judge.suit) {
+                        case 'heart': // 红桃：回复1体力
+                            this.heal(player, 1);
+                            this.log(`${player.name}回复1点体力`, 'success');
+                            break;
+                        case 'diamond': // 方块：摸两张牌
+                            this.drawCard(player, 2);
+                            this.log(`${player.name}摸了2张牌`, 'success');
+                            break;
+                        case 'club': // 梅花：伤害来源弃2张牌
+                            if (source.handCards.length > 0) {
+                                for (let i = 0; i < 2 && source.handCards.length > 0; i++) {
+                                    const c = source.handCards[Math.floor(Math.random() * source.handCards.length)];
+                                    this.discardCard(source, c);
+                                }
+                                this.log(`${source.name}被弃了牌`, 'normal');
+                            }
+                            break;
+                        case 'spade': // 黑桃：伤害来源翻面
+                            source.isFlipped = true;
+                            this.log(`${source.name}被翻面`, 'danger');
+                            break;
+                    }
+                    this.discardPile.push(judge);
+                }
+            }
 
             // 检查死亡
             if (player.hp <= 0) {
@@ -2156,22 +2256,41 @@ SGS.GameEngine = (function() {
 
         async requestTao(player, killer) {
             try {
+                // 完杀 (贾诩): 只有濒死角色和完杀拥有者可以使用桃
+                const hasWanSha = this.getAlivePlayers().some(p => p.skills.some(s => s.name === '完杀'));
+                
                 // 遍历所有存活玩家求桃
                 const alive = this.getAlivePlayers();
                 for (const p of alive) {
+                    // 完杀：只有濒死角色和自己可以救
+                    if (hasWanSha && p.id !== player.id && !p.skills.some(s => s.name === '完杀')) {
+                        continue;
+                    }
                     if (!p.handCards || p.handCards.length === 0) continue;
                     const tao = p.handCards.find(c => c.subtype === 'tao');
                     if (tao) {
                         if (p.isAI && this.ai) {
                             if (this.ai.shouldSaveTeammate(p, player, this)) {
                                 this.discardCard(p, tao);
-                                this.heal(player, 1);
+                                let extraHeal = 1;
+                                // 救援 (孙权 主公技): 吴势力角色濒死用桃额外回复1点
+                                if (player.faction === 'wu' && this.getAlivePlayers().some(l => l.skills.some(s => s.name === '救援'))) {
+                                    extraHeal += 1;
+                                    this.log(`救援：${player.name}额外回复1点体力`, 'success');
+                                }
+                                this.heal(player, extraHeal);
                                 this.log(`${p.name}为${player.name}使用了桃`, 'success');
                                 if (player.hp > 0) return;
                             }
                         } else if (p.id === player.id || p.id === 0) {
                             this.discardCard(p, tao);
-                            this.heal(player, 1);
+                            let extraHeal = 1;
+                            // 救援 (孙权 主公技): 吴势力角色濒死用桃额外回复1点
+                            if (player.faction === 'wu' && this.getAlivePlayers().some(l => l.skills.some(s => s.name === '救援'))) {
+                                extraHeal += 1;
+                                this.log(`救援：${player.name}额外回复1点体力`, 'success');
+                            }
+                            this.heal(player, extraHeal);
                             this.log(`${p.name}为${player.name}使用了桃`, 'success');
                             if (player.hp > 0) return;
                         }
@@ -2476,9 +2595,17 @@ SGS.GameEngine = (function() {
                         if (target.handCards.length > 0) {
                             const c = target.handCards[Math.floor(Math.random() * target.handCards.length)];
                             this.log(`${player.name}对${target.name}发动反间`, 'highlight');
+                            // 目标选择花色，展示手牌
+                            const declaredSuit = params.suit || ['spade','heart','club','diamond'][Math.floor(Math.random()*4)];
+                            this.log(`${target.name}猜测花色为${SGS.CardData.suitName[declaredSuit]}`, 'normal');
+                            this.log(`反间牌为${c.suitSymbol||SGS.CardData.suitName[c.suit]}${c.name}`, 'normal');
                             target.handCards.splice(target.handCards.indexOf(c), 1);
+                            if (c.suit !== declaredSuit) {
+                                this.dealDamage(target, 1, { source: player, card: c });
+                                this.log(`${target.name}猜错花色，受到1点伤害`, 'danger');
+                            }
                             player.handCards.push(c);
-                            this.log(`${target.name}获得了${c.name}`, 'normal');
+                            this.log(`${player.name}获得了${c.name}`, 'normal');
                         }
                     }
                     break;
@@ -2571,7 +2698,7 @@ SGS.GameEngine = (function() {
                     }
                     break;
                 case '驱虎':
-                    // 曹操驱虎：令对手拼点，输者掉血
+                    // 荀彧：与目标拼点，赢则对其攻击范围内一名角色造成1点伤害
                     if (params.targetId !== undefined) {
                         const target = this.players[params.targetId];
                         if (player.handCards.length > 0 && target.handCards.length > 0) {
@@ -2579,8 +2706,19 @@ SGS.GameEngine = (function() {
                             const targetCard = target.handCards[Math.floor(Math.random() * target.handCards.length)];
                             this.log(`${player.name}驱虎：${myCard.number} vs ${targetCard.number}`, 'normal');
                             if (myCard.number > targetCard.number) {
-                                this.dealDamage(target, 1, { source: player });
-                                this.log(`${target.name}拼点失败，受到1点伤害`, 'danger');
+                                // 赢：对目标攻击范围内的一名角色造成1点伤害
+                                const targetsInRange = this.getAlivePlayers().filter(p => 
+                                    p.id !== player.id && this.getDistance(target, p) <= target.weaponRange
+                                );
+                                if (targetsInRange.length > 0) {
+                                    const damaged = targetsInRange[0]; // 简化：选第一个
+                                    this.dealDamage(damaged, 1, { source: player });
+                                    this.log(`${target.name}拼点失败，${damaged.name}受到1点伤害`, 'danger');
+                                } else {
+                                    // 无人在攻击范围内，打对手自己
+                                    this.dealDamage(target, 1, { source: player });
+                                    this.log(`${target.name}拼点失败，受到1点伤害`, 'danger');
+                                }
                             } else {
                                 this.dealDamage(player, 1, { source: player });
                                 this.log(`${player.name}拼点失败，受到1点伤害`, 'danger');
@@ -2601,15 +2739,27 @@ SGS.GameEngine = (function() {
                     this.log(`${player.name}发动完杀`, 'highlight');
                     break;
                 case '乱武':
-                    // 贾诩：所有其他角色对最近角色出杀
-                    const alive = this.getAlivePlayers().filter(p => p.id !== player.id);
-                    for (const p of alive) {
-                        const nearest = this.getAlivePlayers().filter(q => q.id !== p.id);
-                        if (nearest.length > 0) {
-                            const sha = await this.requestResponse(nearest[0], 'sha', p);
-                            if (!sha) {
-                                this.dealDamage(p, 1, { source: player });
-                            }
+                    // 贾诩：所有其他角色对距离最近的其他角色出杀（不能选自己），否则失去1点体力
+                    const aliveOthers = this.getAlivePlayers().filter(p => p.id !== player.id);
+                    for (const p of aliveOthers) {
+                        if (!p.isAlive) continue;
+                        // 找距离最近的其他角色（排除自己）
+                        const otherPlayers = this.getAlivePlayers().filter(q => q.id !== p.id);
+                        if (otherPlayers.length === 0) continue;
+                        // 计算距离，找最近的
+                        let nearest = otherPlayers[0];
+                        let minDist = this.getDistance(p, nearest);
+                        for (const q of otherPlayers) {
+                            const d = this.getDistance(p, q);
+                            if (d < minDist) { minDist = d; nearest = q; }
+                        }
+                        const sha = await this.requestResponse(p, 'sha', player);
+                        if (!sha) {
+                            this.dealDamage(p, 1, { source: player });
+                            this.log(`${p.name}乱武未能出杀，失去1点体力`, 'danger');
+                        } else {
+                            this.log(`${p.name}乱武对${nearest.name}使用了杀`, 'normal');
+                            await this.resolveSha(p, nearest, sha, 1);
                         }
                     }
                     this.log(`${player.name}发动乱武`, 'danger');
@@ -2620,21 +2770,53 @@ SGS.GameEngine = (function() {
                     player.skillStates['帷幕'] = true;
                     this.log(`${player.name}帷幕生效`, 'highlight');
                     break;
+                case '神速':
+                    // 夏侯渊: 跳过判定和摸牌阶段，视为使用了一张【杀】
+                    player._skipJudge = true;
+                    player._skipDraw = true;
+                    const shensuTargets = this.getAttackTargets(player);
+                    if (shensuTargets.length > 0) {
+                        const target = shensuTargets[0];
+                        this.log(`${player.name}发动神速`, 'highlight');
+                        await this.resolveSha(player, target, { name:'杀(神速)', subtype:'sha', element:'normal' }, 1);
+                    } else {
+                        this.log(`${player.name}发动神速，但没有攻击目标`, 'normal');
+                    }
+                    break;
+                case '断粮':
+                    // 徐晃: 将黑色非装备牌当【兵粮寸断】使用，距离为2
+                    if (params.targetId !== undefined && params.card) {
+                        const card = params.card;
+                        if ((card.suit === 'spade' || card.suit === 'club') && card.type !== 'equip') {
+                            const target = this.players[params.targetId];
+                            const dist = this.getDistance(player, target);
+                            if (dist <= 2) {
+                                this.discardCard(player, card);
+                                const bingliang = { name:'兵粮寸断(断粮)', subtype:'bingliang' };
+                                target.judgmentCards.push(bingliang);
+                                this.log(`${player.name}断粮：对${target.name}使用了兵粮寸断`, 'highlight');
+                            }
+                        }
+                    }
+                    break;
                 case '酒池':
-                    // 典韦：可以将杀当酒用
-                    if (params.card) {
+                    // 董卓：可以将黑桃手牌当【酒】使用
+                    if (params.card && params.card.suit === 'spade') {
                         this.discardCard(player, params.card);
-                        player.jiuUsedThisTurn = false; // 允许用酒
-                        this.log(`${player.name}酒池：将杀当酒用`, 'highlight');
+                        player.drunk = true; // 设置酒效果
+                        player.jiuUsedThisTurn = true;
+                        this.log(`${player.name}酒池：将黑桃牌当酒使用`, 'highlight');
                     }
                     break;
                 case '崩坏':
-                    // 董卓：体力全场最多时失去1体力或上限
-                    const maxHp = Math.max(...this.getAlivePlayers().map(p => p.hp));
-                    if (player.hp >= maxHp) {
+                    // 董卓：核对一下体力是不是全场最少，如果体力不是最少，失去1点体力
+                    const minHp = Math.min(...this.getAlivePlayers().map(p => p.hp));
+                    if (player.hp > minHp) {
                         player.hp -= 1;
                         this.log(`${player.name}崩坏：失去1点体力`, 'danger');
                         if (player.hp <= 0) this.handleDying(player, player);
+                    } else {
+                        this.log(`${player.name}崩坏：体力已是最低，不触发`, 'normal');
                     }
                     break;
                 case '天义':
@@ -2660,7 +2842,7 @@ SGS.GameEngine = (function() {
                     if (params.targetId !== undefined && params.card) {
                         const target = this.players[params.targetId];
                         const card = params.card;
-                        if (card.suit === 'heart' || card.suit === 'diamond') {
+                        if (card.suit === 'diamond') {  // 方块牌当乐不思蜀
                             this.discardCard(player, card);
                             // 放置乐不思蜀
                             const lebu = { name: '乐不思蜀(国色)', subtype: 'lebusi' };
@@ -2678,25 +2860,41 @@ SGS.GameEngine = (function() {
                 case '缔盟':
                     if (params.targetId !== undefined) {
                         const target = this.players[params.targetId];
-                        const diff = Math.abs(player.handCards.length - target.handCards.length);
-                        if (diff > 0 && player.handCards.length >= diff) {
-                            for (let i = 0; i < diff; i++) {
-                                if (player.handCards.length === 0) break;
-                                const c = player.handCards.pop();
-                                target.handCards.push(c);
-                            }
-                            this.log(`${player.name}缔盟交换手牌`, 'highlight');
-                        }
+                        // 交换手牌
+                        const tempHand = [...player.handCards];
+                        player.handCards = [...target.handCards];
+                        target.handCards = tempHand;
+                        this.log(`${player.name}与${target.name}缔盟交换了手牌`, 'highlight');
                     }
                     break;
                 // ========== 剩余技能 ==========
                 case '巧变':
-                    // 公孙瓒：可以用手牌当闪或杀
-                    if (params.card && params.cardType) {
-                        this.discardCard(player, params.card);
-                        if (params.cardType === 'sha') {
-                            // 视为出杀
-                            this.log(`${player.name}巧变：将手牌当杀使用`, 'highlight');
+                    // 张郃: 可以弃一张手牌跳过判定/摸牌/出牌阶段；出牌阶段可移动场上一张装备或判定牌
+                    if (params.skipPhase) {
+                        const phaseMap = { judge: '_skipJudge', draw: '_skipDraw', play: '_skipPlay' };
+                        if (phaseMap[params.skipPhase]) {
+                            player[phaseMap[params.skipPhase]] = true;
+                            this.log(`${player.name}巧变：跳过${params.skipPhase}阶段`, 'highlight');
+                        }
+                    } else if (params.moveCard && params.fromId !== undefined && params.toId !== undefined) {
+                        // 移动装备或判定牌
+                        const from = this.players[params.fromId];
+                        const to = this.players[params.toId];
+                        if (from && to && from.equipment[params.moveCard]) {
+                            const equip = from.equipment[params.moveCard];
+                            // 目标位置如果有装备先弃掉
+                            if (to.equipment[params.moveCard]) {
+                                this.discardPile.push(to.equipment[params.moveCard]);
+                            }
+                            from.equipment[params.moveCard] = null;
+                            to.equipment[params.moveCard] = equip;
+                            this.log(`${player.name}巧变：移动了${equip.name}`, 'highlight');
+                        }
+                    } else {
+                        // 默认：弃一张牌跳过阶段或作为基础操作
+                        if (params.card) {
+                            this.discardCard(player, params.card);
+                            this.log(`${player.name}巧变：弃牌发动`, 'highlight');
                         }
                     }
                     break;
@@ -2727,11 +2925,29 @@ SGS.GameEngine = (function() {
                     this.log(`${player.name}固政生效`, 'highlight');
                     break;
                 case '化身':
-                    // 贾诩：可以观看牌堆顶牌并获得之
-                    const topCard = this.revealTopCard();
-                    if (topCard) {
-                        player.handCards.push(topCard);
-                        this.log(`${player.name}化身：获得牌堆顶的${topCard.name}`, 'highlight');
+                    // 左慈: 获得若干张"化身"牌（随机武将技能），可使用其中一张的技能
+                    if (!player.huazhenPool) {
+                        player.huazhenPool = [];
+                        // 随机选3个其他武将作为化身
+                        const allHeroes = SGS.HeroData ? [...SGS.HeroData.heroes].filter(h => h.id !== (player.hero && player.hero.id)) : [];
+                        if (allHeroes.length > 0) {
+                            for (let i = 0; i < 3 && allHeroes.length > 0; i++) {
+                                const ri = Math.floor(Math.random() * allHeroes.length);
+                                player.huazhenPool.push(allHeroes.splice(ri, 1)[0]);
+                            }
+                        }
+                        this.log(`${player.name}化身：获得了${player.huazhenPool.length}张化身牌`, 'highlight');
+                    }
+                    // 每次使用化身技能：随机获得化身池中一个技能的效果
+                    if (player.huazhenPool && player.huazhenPool.length > 0) {
+                        const chosenHero = player.huazhenPool[Math.floor(Math.random() * player.huazhenPool.length)];
+                        const chosenSkill = chosenHero.skills[Math.floor(Math.random() * chosenHero.skills.length)];
+                        this.log(`${player.name}化身：变成了${chosenHero.name}，使用${chosenSkill.name}`, 'highlight');
+                        // 简化：获得1张牌作为化身效果
+                        this.drawCard(player, 1);
+                    } else {
+                        this.drawCard(player, 1);
+                        this.log(`${player.name}化身：获得牌堆顶的牌`, 'highlight');
                     }
                     break;
                 case '悲歌':

@@ -115,7 +115,7 @@
         .id-hero-text { font-size: 18px; color: var(--text-primary); }
         .id-desc { font-size: 14px; color: var(--text-secondary); text-align: center; max-width: 300px; line-height: 1.6; }
 
-        /* ======== 游戏桌面（正版三国杀圆桌风格 - JS强制横屏比例） ======== */
+        /* ======== 游戏桌面（正版三国杀圆桌风格 - 横屏布局） ======== */
         #gameScreen {
             display: flex;
             flex-direction: column; padding: 0; overflow: hidden;
@@ -124,7 +124,7 @@
             background-size: cover; background-position: center; background-repeat: no-repeat;
             position: relative;
             width: 100%;
-            height: auto;    /* 初始auto，JS会设为 width÷2 */
+            height: 50vh;    /* 初始占屏幕一半，JS会调整 */
             flex-shrink: 0;
             /* 纵向布局：topbar + table-area + player-bottom */
             display: flex;
@@ -407,10 +407,7 @@
         #rotateHint .rh-text { font-size: 18px; color: #e6c84d; letter-spacing: 3px; }
         #rotateHint .rh-sub { font-size: 13px; color: #a0a0b0; }
         @keyframes rh-rotate { 0%,100%{transform:rotate(0deg)} 50%{transform:rotate(90deg)} }
-        /* 仅手机竖屏(非桌面)时提示旋转 - 通过 max-aspect-ratio + hover 判断是否为触摸设备 */
-        @media (max-width: 768px) and (orientation: portrait) and (hover: none) and (pointer: coarse) {
-            #rotateHint { display: flex !important; }
-        }
+        /* 已禁用竖屏提示 - 手机上直接显示横屏布局 */
 
         .player-bottom { flex-shrink:0; width:100%; box-sizing:border-box; background:linear-gradient(180deg,rgba(0,0,0,0.7),rgba(0,0,0,0.5)); border-top:2px solid #8b6914; padding:5px 8px; }
         .my-avatar { width:36px; height:36px; border-radius:4px; overflow:hidden; border:1px solid #8b6914; flex-shrink:0; box-shadow:0 1px 4px rgba(0,0,0,0.5); }
@@ -1079,13 +1076,37 @@ function showScreen(id){
     if(id==='gameScreen') enforceGameAspect();
 }
 
-// 强制游戏区自适应（不再强制2:1比例，改为全屏自适应）
+// 强制游戏区自适应（手机上模拟横屏布局）
 function enforceGameAspect(){
     const gs=document.getElementById('gameScreen');
     if(!gs) return;
-    // 全屏自适应，不需要固定比例
-    gs.style.height='auto';
-    gs.style.width='100%';
+    
+    // 检测是否为手机设备
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
+                    || (window.innerWidth <= 768 && !window.matchMedia('(hover: hover)').matches);
+    
+    if (isMobile) {
+        // 手机上：强制使用横屏比例（2:1）
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+        
+        // 设置游戏区域为横屏比例
+        gs.style.width = screenWidth + 'px';
+        gs.style.height = (screenWidth / 2) + 'px';
+        
+        // 如果游戏区域高度小于屏幕高度，调整宽度
+        if ((screenWidth / 2) < screenHeight * 0.7) {
+            // 垂直空间不够，缩小整体
+            const maxGameHeight = screenHeight * 0.85;
+            const newWidth = maxGameHeight * 2;
+            gs.style.width = newWidth + 'px';
+            gs.style.height = maxGameHeight + 'px';
+        }
+    } else {
+        // 桌面端：全屏自适应
+        gs.style.width = '100%';
+        gs.style.height = 'auto';
+    }
 }
 window.addEventListener('resize', function(){
     if(document.getElementById('gameScreen').classList.contains('active')){

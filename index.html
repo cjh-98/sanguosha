@@ -1058,15 +1058,13 @@ function showScreen(id){
     if(id==='gameScreen') enforceGameAspect();
 }
 
-// 强制游戏区保持 2:1 横屏比例（用JS精确控制，比CSS aspect-ratio更可靠）
+// 强制游戏区自适应（不再强制2:1比例，改为全屏自适应）
 function enforceGameAspect(){
     const gs=document.getElementById('gameScreen');
     if(!gs) return;
-    // 先设auto让浏览器重新计算宽度
+    // 全屏自适应，不需要固定比例
     gs.style.height='auto';
-    // 根据实际宽度计算高度 = 宽度 ÷ 2
-    const w=gs.offsetWidth;
-    if(w>0) gs.style.height=(w/2)+'px';
+    gs.style.width='100%';
 }
 window.addEventListener('resize', function(){
     if(document.getElementById('gameScreen').classList.contains('active')){

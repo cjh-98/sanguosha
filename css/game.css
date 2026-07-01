@@ -11,17 +11,17 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 4px 10px;
+    padding: 0.5vh 1vw;
     background: rgba(0,0,0,0.4);
     border-bottom: 1px solid var(--border-gold);
-    height: 36px;
+    height: 4vh;
     flex-shrink: 0;
-    font-size: 12px;
+    font-size: 1.2vw;
 }
 
 .topbar-info {
     display: flex;
-    gap: 12px;
+    gap: 1.5vw;
     align-items: center;
 }
 
@@ -31,8 +31,8 @@
 }
 
 .topbar-btn {
-    padding: 4px 10px;
-    font-size: 12px;
+    padding: 0.4vh 1vw;
+    font-size: 1.2vw;
     border: 1px solid var(--border-gold);
     border-radius: 4px;
     background: transparent;
@@ -54,9 +54,9 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 6px;
-    padding: 6px;
-    min-height: 90px;
+    gap: 0.8vw;
+    padding: 0.7vh 1vw;
+    min-height: 10vh;
 }
 
 .player-mini {
@@ -66,8 +66,8 @@
     background: var(--bg-panel);
     border: 2px solid transparent;
     border-radius: 8px;
-    padding: 4px 8px;
-    min-width: 72px;
+    padding: 0.4vh 1vw;
+    min-width: 8vw;
     transition: all 0.3s;
     position: relative;
 }
@@ -98,43 +98,43 @@
 }
 
 .pm-name {
-    font-size: 12px;
+    font-size: 1.2vw;
     font-weight: bold;
     color: var(--text-primary);
     white-space: nowrap;
 }
 
 .pm-hero {
-    font-size: 11px;
+    font-size: 1.1vw;
     color: var(--accent-gold);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 72px;
+    max-width: 8vw;
 }
 
 .pm-hp {
-    font-size: 11px;
+    font-size: 1.1vw;
     color: var(--accent-red);
-    margin: 1px 0;
+    margin: 0.1vh 0;
 }
 
 .pm-cards {
-    font-size: 10px;
+    font-size: 1vw;
     color: var(--text-secondary);
 }
 
 .pm-faction {
-    width: 16px;
-    height: 16px;
+    width: 1.6vw;
+    height: 1.6vw;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 9px;
+    font-size: 0.9vw;
     color: #fff;
     font-weight: bold;
-    margin-top: 2px;
+    margin-top: 0.2vh;
 }
 
 .faction-wei { background: var(--wei-color); }
@@ -148,14 +148,14 @@
 .equip-zone {
     display: flex;
     justify-content: center;
-    gap: 4px;
-    padding: 2px 8px;
+    gap: 0.5vw;
+    padding: 0.2vh 1vw;
     flex-wrap: wrap;
 }
 
 .equip-item {
-    font-size: 9px;
-    padding: 1px 6px;
+    font-size: 0.9vw;
+    padding: 0.1vh 0.6vw;
     border-radius: 4px;
     background: rgba(0,0,0,0.4);
     border: 1px solid var(--border-gold);
@@ -170,27 +170,27 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 8px;
-    gap: 8px;
+    padding: 1vh;
+    gap: 1vh;
     overflow: hidden;
 }
 
 .game-log {
     width: 100%;
-    max-width: 420px;
-    max-height: 120px;
+    max-width: 40vw;
+    max-height: 12vh;
     overflow-y: auto;
     background: rgba(0,0,0,0.5);
     border: 1px solid var(--border-gold);
     border-radius: 8px;
-    padding: 8px;
-    font-size: 12px;
+    padding: 1vh;
+    font-size: 1.2vw;
     line-height: 1.6;
     color: var(--text-secondary);
 }
 
 .game-log .log-entry {
-    margin-bottom: 2px;
+    margin-bottom: 0.2vh;
 }
 
 .game-log .log-entry.highlight {
@@ -207,10 +207,10 @@
 
 /* 操作提示 */
 .action-prompt {
-    font-size: 14px;
+    font-size: 1.4vw;
     color: var(--accent-gold);
     text-align: center;
-    padding: 8px 16px;
+    padding: 0.8vh 1.6vw;
     background: rgba(0,0,0,0.5);
     border-radius: 20px;
     border: 1px solid var(--border-gold);
@@ -223,29 +223,29 @@
     flex-shrink: 0;
     background: rgba(0,0,0,0.5);
     border-top: 1px solid var(--border-gold);
-    padding: 6px;
-    min-height: 120px;
+    padding: 0.6vh;
+    min-height: 14vh;
 }
 
 .my-info {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 6px 4px;
-    gap: 8px;
+    padding: 0 1vw 0.4vh;
+    gap: 1vw;
 }
 
 .my-info-left {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 12px;
+    gap: 0.8vw;
+    font-size: 1.2vw;
 }
 
 .my-hero-name {
     color: var(--accent-gold);
     font-weight: bold;
-    font-size: 14px;
+    font-size: 1.4vw;
 }
 
 .my-hp {
@@ -254,18 +254,18 @@
 
 .hand-cards {
     display: flex;
-    gap: 4px;
+    gap: 0.5vw;
     overflow-x: auto;
-    padding: 4px 0;
-    min-height: 100px;
+    padding: 0.4vh 0;
+    min-height: 11vh;
     align-items: center;
 }
 
 /* 卡牌 */
 .card {
     flex-shrink: 0;
-    width: 62px;
-    height: 88px;
+    width: 6.2vw;
+    height: 8.8vh;
     border-radius: 6px;
     border: 2px solid var(--border-gold);
     background: linear-gradient(135deg, #f5f0e0, #e0d0a0);
@@ -285,7 +285,7 @@
 }
 
 .card.selected {
-    transform: translateY(-12px);
+    transform: translateY(-1.2vh);
     box-shadow: 0 0 15px rgba(230,200,77,0.8);
     border-color: var(--accent-gold);
 }
@@ -302,9 +302,9 @@
 
 .card-suit {
     position: absolute;
-    top: 3px;
-    left: 4px;
-    font-size: 14px;
+    top: 0.3vh;
+    left: 0.4vw;
+    font-size: 1.4vw;
     font-weight: bold;
 }
 
@@ -313,17 +313,17 @@
 
 .card-number {
     position: absolute;
-    top: 3px;
-    right: 4px;
-    font-size: 11px;
+    top: 0.3vh;
+    right: 0.4vw;
+    font-size: 1.1vw;
     font-weight: bold;
 }
 
 .card-name {
-    font-size: 16px;
+    font-size: 1.6vw;
     font-weight: bold;
     text-align: center;
-    margin-top: 6px;
+    margin-top: 0.6vh;
     writing-mode: vertical-rl;
     letter-spacing: 2px;
 }
@@ -332,49 +332,49 @@
 .card.black .card-name { color: #1a1a2e; }
 
 .card-type {
-    font-size: 8px;
+    font-size: 0.8vw;
     color: #555;
-    margin-top: 2px;
+    margin-top: 0.2vh;
 }
 
 /* 弹出菜单 */
 .popup-menu {
     position: fixed;
-    bottom: 130px;
+    bottom: 14vh;
     left: 50%;
     transform: translateX(-50%);
     background: var(--bg-panel);
     border: 2px solid var(--border-gold);
     border-radius: 12px;
-    padding: 12px;
+    padding: 1.2vh;
     z-index: 100;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0.8vh;
     max-width: 90%;
-    max-height: 300px;
+    max-height: 30vh;
     overflow-y: auto;
     box-shadow: var(--shadow);
 }
 
 .popup-title {
-    font-size: 14px;
+    font-size: 1.4vw;
     color: var(--accent-gold);
     text-align: center;
-    margin-bottom: 4px;
+    margin-bottom: 0.4vh;
     font-weight: bold;
 }
 
 .popup-option {
-    padding: 10px 20px;
+    padding: 1vh 2vw;
     background: var(--bg-card);
     border: 1px solid var(--border-gold);
     border-radius: 6px;
     color: var(--text-primary);
-    font-size: 14px;
+    font-size: 1.4vw;
     cursor: pointer;
     text-align: center;
-    min-width: 180px;
+    min-width: 18vw;
 }
 
 .popup-option:active {
@@ -404,31 +404,31 @@
     background: var(--bg-secondary);
     border: 2px solid var(--border-gold);
     border-radius: 12px;
-    padding: 16px;
+    padding: 1.6vh;
     max-width: 90%;
-    width: 340px;
-    max-height: 80%;
+    width: 34vw;
+    max-height: 80vh;
     overflow-y: auto;
 }
 
 .target-selector-title {
-    font-size: 16px;
+    font-size: 1.6vw;
     color: var(--accent-gold);
     text-align: center;
-    margin-bottom: 12px;
+    margin-bottom: 1.2vh;
 }
 
 .target-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0.8vh;
 }
 
 .target-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 14px;
+    padding: 1vh 1.4vw;
     background: var(--bg-card);
     border: 2px solid transparent;
     border-radius: 8px;
@@ -447,15 +447,15 @@
 /* 技能面板 */
 .skill-bar {
     display: flex;
-    gap: 6px;
-    padding: 4px;
+    gap: 0.6vw;
+    padding: 0.4vh;
     overflow-x: auto;
     flex-shrink: 0;
 }
 
 .skill-btn {
-    padding: 4px 12px;
-    font-size: 12px;
+    padding: 0.4vh 1.2vw;
+    font-size: 1.2vw;
     border: 1px solid var(--accent-gold);
     border-radius: 12px;
     background: transparent;
@@ -482,23 +482,23 @@
 /* 行动按钮 */
 .action-bar {
     display: flex;
-    gap: 8px;
+    gap: 0.8vw;
     justify-content: center;
-    padding: 4px;
+    padding: 0.4vh;
     flex-shrink: 0;
 }
 
 /* 判定牌显示 */
 .judge-display {
     display: flex;
-    gap: 4px;
-    padding: 2px;
+    gap: 0.5vw;
+    padding: 0.2vh;
     justify-content: center;
 }
 
 .judge-card-mini {
-    font-size: 9px;
-    padding: 1px 4px;
+    font-size: 0.9vw;
+    padding: 0.1vh 0.4vw;
     background: rgba(196,30,58,0.3);
     border: 1px solid var(--accent-red);
     border-radius: 3px;
@@ -508,13 +508,13 @@
 /* 回合阶段指示 */
 .phase-indicator {
     display: flex;
-    gap: 2px;
+    gap: 0.2vw;
     align-items: center;
 }
 
 .phase-dot {
-    width: 6px;
-    height: 6px;
+    width: 0.6vw;
+    height: 0.6vw;
     border-radius: 50%;
     background: rgba(255,255,255,0.2);
 }
@@ -532,9 +532,9 @@
 .chained::after {
     content: '⛓';
     position: absolute;
-    top: -8px;
-    right: -2px;
-    font-size: 12px;
+    top: -0.8vh;
+    right: -0.2vw;
+    font-size: 1.2vw;
     color: #f39c12;
 }
 
@@ -542,12 +542,12 @@
 .flipped::after {
     content: '翻';
     position: absolute;
-    top: -8px;
-    right: -2px;
-    font-size: 10px;
+    top: -0.8vh;
+    right: -0.2vw;
+    font-size: 1vw;
     color: #9b59b6;
     background: rgba(0,0,0,0.5);
-    padding: 1px 3px;
+    padding: 0.1vh 0.3vw;
     border-radius: 3px;
 }
 
@@ -560,24 +560,24 @@
     background: var(--bg-secondary);
     border: 2px solid var(--border-gold);
     border-radius: 12px;
-    padding: 16px;
+    padding: 1.6vh;
     max-width: 90%;
-    width: 320px;
+    width: 32vw;
     z-index: 200;
     box-shadow: var(--shadow);
 }
 
 .skill-modal h4 {
     color: var(--accent-gold);
-    font-size: 16px;
-    margin-bottom: 8px;
+    font-size: 1.6vw;
+    margin-bottom: 0.8vh;
 }
 
 .skill-modal p {
-    font-size: 13px;
+    font-size: 1.3vw;
     line-height: 1.6;
     color: var(--text-primary);
-    margin-bottom: 12px;
+    margin-bottom: 1.2vh;
 }
 
 /* 全屏遮罩 */
@@ -594,9 +594,9 @@
 /* 身份牌显示 */
 .identity-badge {
     display: inline-block;
-    padding: 2px 8px;
+    padding: 0.2vh 0.8vw;
     border-radius: 8px;
-    font-size: 11px;
+    font-size: 1.1vw;
     font-weight: bold;
 }
 
@@ -630,16 +630,34 @@
     animation: fadeIn 0.3s ease;
 }
 
-/* 响应式调整 */
-@media (max-width: 380px) {
-    .player-mini {
-        min-width: 62px;
-    }
+/* 响应式调整 - 移动端优化 */
+@media (max-width: 768px) {
     .card {
-        width: 54px;
-        height: 78px;
+        width: 7vw;
+        height: 10vh;
     }
     .card-name {
-        font-size: 14px;
+        font-size: 1.4vw;
+    }
+    .popup-option {
+        min-width: 16vw;
+    }
+}
+
+/* 小屏幕适配 */
+@media (max-width: 480px) {
+    .card {
+        width: 8vw;
+        height: 11vh;
+    }
+    .card-name {
+        font-size: 1.8vw;
+    }
+    .popup-option {
+        min-width: 18vw;
+        font-size: 1.6vw;
+    }
+    .player-mini {
+        min-width: 9vw;
     }
 }

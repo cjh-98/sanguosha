@@ -204,10 +204,35 @@
 /* 底部手牌区 */
 .hand-area {
     flex-shrink: 0;
-    background: rgba(0,0,0,0.5);
-    border-top: 1px solid var(--border-gold);
-    padding: 0.6vh;
-    min-height: 14vh;
+    width: 100%;
+    box-sizing: border-box;
+    background: linear-gradient(180deg, rgba(0,0,0,0.7), rgba(0,0,0,0.5));
+    border-top: 2px solid #8b6914;
+    padding: 5px 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.hand-area .myinfo {
+    flex-shrink: 0;
+}
+
+.hand-area .skill-bar {
+    flex-shrink: 0;
+}
+
+.hand-area .hand-cards {
+    flex: 1;
+    min-width: 200px;
+    margin: 0;
+    width: auto;
+    max-width: 100%;
+}
+
+.hand-area .action-bar {
+    flex-shrink: 0;
 }
 
 .my-info {
@@ -237,20 +262,19 @@
 
 .hand-cards {
     display: flex;
-    gap: 0.5vw;
+    gap: 0.3vw;
     overflow-x: auto;
-    padding: 0.6vh 0.8vw;
+    padding: 0.4vh 0.6vw;
     min-height: 11vh;
     align-items: center;
-    /* 手牌边框 - 金色边框框住所有手牌 */
-    background: rgba(10,8,6,0.6);
+    /* 手牌整体边框 - 模仿官方三国杀：所有手牌共用一个大边框 */
+    background: linear-gradient(180deg, rgba(0,0,0,0.6), rgba(20,15,10,0.7));
     border: 2px solid var(--border-gold);
-    border-radius: 8px;
-    border-left: 2px solid rgba(230,200,77,0.15);
-    border-right: 2px solid rgba(230,200,77,0.15);
+    border-radius: 6px;
     margin: 0 auto;
     width: fit-content;
     max-width: 100%;
+    box-shadow: inset 0 0 8px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.4);
 }
 
 /* 卡牌 */

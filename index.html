@@ -6,6 +6,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a2e">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>三国杀</title>
     <style>
         /* 内联基础样式 - 确保页面一定有内容可显示 */
@@ -932,17 +935,19 @@
 </div><!-- end app -->
 
 <!-- JS文件按顺序加载 -->
-<script src="js/data/cards.js"></script>
-<script src="js/data/heroes.js"></script>
-<script src="js/data/config.js"></script>
-<script src="js/core/game.js"></script>
-<script src="js/core/ai.js"></script>
+<script src="js/data/cards.js?v=20260701"></script>
+<script src="js/data/heroes.js?v=20260701"></script>
+<script src="js/data/config.js?v=20260701"></script>
+<script src="js/core/game.js?v=20260701"></script>
+<script src="js/core/ai.js?v=20260701"></script>
 
 <script>
 // ============================================================
 // 三国杀单机版 - 主控制器 (v3 全局函数模式)
 // 所有函数直接定义在全局作用域，确保 onclick="xxx()" 可调用
 // ============================================================
+const SGS_VERSION = '20260701b';
+console.log('%c[三国杀] 版本: ' + SGS_VERSION, 'color:#e6c84d;font-size:14px;font-weight:bold;');
 
 // 全局错误处理器 - 捕获所有未处理的JavaScript错误
 window.addEventListener('error', function(e) {
@@ -4311,12 +4316,22 @@ function showBugSubmitSuccess(issueUrl) {
         statusEl.innerHTML = `<span style="color:#2ecc71;">✅ 已提交 ${_sgsUploadedCount} 次 | <a href="${issueUrl}" target="_blank" style="color:#2ecc71;">查看Issue</a></span>`;
     }
     
-    // 显示临时提示
-    const toast = document.createElement('div');
-    toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#2ecc71;color:#000;padding:12px 20px;border-radius:6px;z-index:99999;font-weight:bold;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
-    toast.innerHTML = `✅ Bug日志已提交！<br><a href="${issueUrl}" target="_blank" style="color:#000;">点击查看Issue</a>`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 5000);
+    // 显示醒目的成功弹窗
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:999999;display:flex;justify-content:center;align-items:center;';
+    overlay.innerHTML = `
+        <div style="background:linear-gradient(180deg,#1a3a1a,#0f1f0f);border:2px solid #2ecc71;border-radius:12px;padding:24px 32px;text-align:center;box-shadow:0 0 40px rgba(46,204,113,0.3);">
+            <div style="font-size:48px;margin-bottom:12px;">✅</div>
+            <div style="color:#2ecc71;font-size:18px;font-weight:bold;margin-bottom:8px;">Bug日志已成功提交！</div>
+            <div style="color:#a0a0b0;font-size:13px;margin-bottom:16px;">感谢反馈，我们会尽快处理</div>
+            <a href="${issueUrl}" target="_blank" style="display:inline-block;color:#e6c84d;font-size:13px;margin-bottom:16px;text-decoration:underline;">📋 点击查看已提交的Issue</a>
+            <br>
+            <button onclick="this.closest('div').parentElement.remove();" style="padding:10px 24px;border:1px solid #2ecc71;border-radius:6px;background:rgba(46,204,113,0.2);color:#2ecc71;cursor:pointer;font-weight:bold;font-size:14px;">确定</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    // 10秒后自动关闭
+    setTimeout(() => { if (overlay.parentElement) overlay.remove(); }, 10000);
 }
 
 // 提交Bug报告的入口函数

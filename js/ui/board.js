@@ -259,8 +259,10 @@ SGS.UI.Board = (function() {
                     <button class="topbar-btn" onclick="SGS.UI.Board.confirmQuit()">退出</button>
                 </div>
             </div>
+            <!-- 上方对手区域（凸型布局的一部分） -->
+            <div class="players-top-area" id="playersTopArea"></div>
             <div class="players-area">
-                <div class="players-top" id="playersTop"></div>
+                <div class="players-bottom-area" id="playersBottomArea"></div>
                 <div class="center-area">
                     <div class="game-log" id="gameLog"></div>
                     <div class="action-prompt" id="actionPrompt">游戏开始...</div>
@@ -312,35 +314,44 @@ SGS.UI.Board = (function() {
 
         document.getElementById('deckInfo').textContent = `牌堆:${state.deckCount}`;
 
-        // 玩家列表
-        const playersTop = document.getElementById('playersTop');
-        playersTop.innerHTML = state.players.map((p, idx) => {
-            if (p.id === human.id) return ''; // 不显示自己
-            const factionClass = p.heroRevealed || config.mode !== 'national' ? `faction-${p.heroFaction}` : 'faction-unknown';
-            const factionText = p.heroRevealed || config.mode !== 'national' 
-                ? SGS.HeroData.factionName[p.heroFaction] || '?' : '?';
+
+        // 玩家列表 - 凸型布局：上方和下方各放一些对手
+        const opponents = state.players.filter((p) => p.id !== human.id);
+        const topArea = document.getElementById("playersTopArea");
+        const bottomArea = document.getElementById("playersBottomArea");
+        
+        // 根据玩家数量分配：上方放前一半，下方放后一半
+        const midPoint = Math.ceil(opponents.length / 2);
+        const topOpponents = opponents.slice(0, midPoint);
+        const bottomOpponents = opponents.slice(midPoint);
+        
+        const renderOpponent = (p, idx) => {
+            const factionClass = p.heroRevealed || config.mode !== "national" ? `faction-${p.heroFaction}` : "faction-unknown";
+            const factionText = p.heroRevealed || config.mode !== "national" 
+                ? SGS.HeroData.factionName[p.heroFaction] || "?" : "?";
             return `
-                <div class="player-mini ${idx === state.currentPlayerIdx ? 'current' : ''} ${!p.isAlive ? 'dead' : ''} ${p.isChained ? 'chained' : ''} ${p.isFlipped ? 'flipped' : ''}"
+                <div class="player-mini ${idx === state.currentPlayerIdx ? "current" : ""} ${!p.isAlive ? "dead" : ""} ${p.isChained ? "chained" : ""} ${p.isFlipped ? "flipped" : ""}"
                      data-player-id="${p.id}" onclick="SGS.UI.Board.clickPlayer(${p.id})">
                     <div class="pm-name">${p.name}</div>
-                    <div class="pm-hero">${p.heroRevealed || config.mode !== 'national' ? p.heroName : '???'}
-                        ${p.isAmbitious ? '(野心家)' : ''}
+                    <div class="pm-hero">${p.heroRevealed || config.mode !== "national" ? p.heroName : "???" }
+                        ${p.isAmbitious ? "(野心家)" : ""}
                     </div>
-                    <div class="pm-hp">${'❤'.repeat(Math.max(0, p.hp))}</div>
+                    <div class="pm-hp">${"❤".repeat(Math.max(0, p.hp))}</div>
                     <div class="pm-cards">手牌:${p.handCount}</div>
                     <div class="pm-faction ${factionClass}">${factionText}</div>
-                    ${p.judgmentCards.length > 0 ? `<div class="judge-display">${p.judgmentCards.map(c => `<span class="judge-card-mini">${c}</span>`).join('')}</div>` : ''}
+                    ${p.judgmentCards.length > 0 ? `<div class="judge-display">${p.judgmentCards.map(c => `<span class="judge-card-mini">${c}</span>`).join("")}</div>` : ""}
                     <div class="equip-zone">
-                        ${p.equipment.weapon ? `<span class="equip-item">${p.equipment.weapon.name}</span>` : ''}
-                        ${p.equipment.armor ? `<span class="equip-item">${p.equipment.armor.name}</span>` : ''}
-                        ${p.equipment.horseMinus ? `<span class="equip-item">-1马</span>` : ''}
-                        ${p.equipment.horsePlus ? `<span class="equip-item">+1马</span>` : ''}
+                        ${p.equipment.weapon ? `<span class="equip-item">${p.equipment.weapon.name}</span>` : ""}
+                        ${p.equipment.armor ? `<span class="equip-item">${p.equipment.armor.name}</span>` : ""}
+                        ${p.equipment.horseMinus ? `<span class="equip-item">-1马</span>` : ""}
+                        ${p.equipment.horsePlus ? `<span class="equip-item">+1马</span>` : ""}
                     </div>
                 </div>
             `;
-        }).join('');
-
-        // 自己的信息
+        };
+        
+        topArea.innerHTML = topOpponents.map((p, idx) => renderOpponent(p, idx)).join("");
+        bottomArea.innerHTML = bottomOpponents.map((p, idx) => renderOpponent(p, idx)).join("");
         const humanState = state.players[human.id];
         document.getElementById('myHeroName').textContent = `${human.hero.name}`;
         document.getElementById('myHp').textContent = `${'❤'.repeat(Math.max(0, human.hp))} (${human.hp}/${human.maxHp})`;

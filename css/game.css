@@ -1,23 +1,6 @@
 /* ===== 游戏桌面样式 ===== */
-#gameScreen {
-    flex-direction: column;
-    background: radial-gradient(ellipse at center, #2a3a5e 0%, #0a0a1e 100%);
-    overflow: hidden;
-    padding: 0;
-}
-
-/* 顶部信息栏 */
-.game-topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.5vh 1vw;
-    background: rgba(0,0,0,0.4);
-    border-bottom: 1px solid var(--border-gold);
-    height: 4vh;
-    flex-shrink: 0;
-    font-size: 1.2vw;
-}
+/* #gameScreen 主要样式在 index.html 中定义 */
+/* 顶部信息栏 - 使用 .topbar 类，主样式在 index.html */
 
 .topbar-info {
     display: flex;

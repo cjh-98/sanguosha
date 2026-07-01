@@ -247,7 +247,7 @@ SGS.UI.Board = (function() {
     function renderGameScreen() {
         const el = document.getElementById('gameScreen');
         el.innerHTML = `
-            <div class="game-topbar">
+            <div class="topbar">
                 <div class="topbar-info">
                     <span id="turnInfo"></span>
                     <span id="phaseInfo" class="topbar-phase"></span>
@@ -323,25 +323,25 @@ SGS.UI.Board = (function() {
         const opponents = state.players.filter((p) => p.id !== human.id);
         const arcArea = document.getElementById("playersArcArea");
 
-        // 计算弧形高度偏移：中间的玩家位置最高，两边逐渐变矮
-        // arcOffset: 返回根据位置索引和总数计算的向上偏移量（vh单位）
+        // 计算弧形高度偏移：中间最高，两边逐渐降低
+        // 使用 margin-bottom 让卡片底部对齐基线，通过 margin-bottom 控制高度
         const getArcOffset = (idx, total) => {
             if (total <= 1) return 0;
-            const centerIdx = (total - 1) / 2;  // 中心位置（可能是小数）
-            const distanceFromCenter = Math.abs(idx - centerIdx);  // 距中心的距离
-            const maxOffset = Math.min(4, total * 0.6);  // 最大偏移量（中间最高）
-            // 距离中心越远，偏移越小（使用二次曲线让弧线更平滑）
-            const normalizedDist = distanceFromCenter / centerIdx;  // 0~1
-            return maxOffset * (1 - normalizedDist * normalizedDist);  // 二次衰减
+            const centerIdx = (total - 1) / 2;  // 中心位置
+            const distanceFromCenter = Math.abs(idx - centerIdx);
+            const maxOffset = total <= 3 ? 60 : total <= 5 ? 55 : total <= 7 ? 50 : 45;
+            const normalizedDist = distanceFromCenter / centerIdx;
+            // 二次衰减，让弧线更平滑
+            return Math.round(maxOffset * (1 - normalizedDist * normalizedDist));
         };
 
-        // 计算弧形缩放：中间的玩家稍大，两边稍小
+        // 计算弧形缩放：中间稍大，两边稍小
         const getArcScale = (idx, total) => {
             if (total <= 1) return 1;
             const centerIdx = (total - 1) / 2;
             const distanceFromCenter = Math.abs(idx - centerIdx);
             const normalizedDist = distanceFromCenter / centerIdx;
-            return 1 - normalizedDist * 0.12;  // 两边缩小最多12%
+            return (1 - normalizedDist * 0.15).toFixed(2);  // 两边缩小最多15%
         };
         
         const renderOpponent = (p, idx, total) => {
@@ -354,7 +354,7 @@ SGS.UI.Board = (function() {
             return `
                 <div class="player-mini ${idx === state.currentPlayerIdx ? "current" : ""} ${!p.isAlive ? "dead" : ""} ${p.isChained ? "chained" : ""} ${p.isFlipped ? "flipped" : ""}"
                      data-player-id="${p.id}" onclick="SGS.UI.Board.clickPlayer(${p.id})"
-                     style="margin-top: ${arcOffset}vh; transform: scale(${arcScale});">
+                     style="margin-bottom: ${arcOffset}px; transform: scale(${arcScale});">
                     <div class="pm-name">${p.name}</div>
                     <div class="pm-hero">${p.heroRevealed || config.mode !== "national" ? p.heroName : "???" }
                         ${p.isAmbitious ? "(野心家)" : ""}

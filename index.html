@@ -229,27 +229,26 @@
             display:flex; justify-content:center; gap:8px;
             flex-wrap: wrap;
         }
-        /* 上方对手区域 - 弧形凸型布局（中间高两边低） */
+        /* 上方对手区域 - 弧形凸型布局（中间高两边低，像桥拱一样） */
         .players-arc-area {
             display: flex;
             justify-content: center;
-            align-items: flex-end;  /* 底部对齐，让margin-top产生高度差 */
-            gap: 0.5vw;
-            padding: 6px 10px 2px;
-            flex-wrap: wrap;
+            align-items: flex-end;  /* 底部对齐 */
+            gap: 6px;
+            padding: 10px 10px 4px;
+            flex-wrap: nowrap;  /* 不换行，保持一行排列 */
             z-index: 2;
-            min-height: 0;
-            /* 留出顶部按钮的空间，不要遮挡topbar */
-            margin-top: 4px;
-            /* 限制最大高度，避免挤压下方区域 */
-            max-height: 30vh;
+            min-height: 110px;  /* 必须有足够高度才能显示弧形 */
             overflow: visible;
         }
         .players-arc-area .player-mini {
             /* 弧形布局中的玩家卡片基础样式 */
             transform-origin: bottom center;
             transition: transform 0.3s ease;
+            flex-shrink: 0;
         }
+        /* 弧形偏移量：通过 inline style 设置 margin-bottom 来控制高度 */
+        /* 中间最高 (margin-bottom 最大)，两边逐渐降低 */
         /* 圆桌上的武将牌 - 绝对定位（位置由 inline style 控制） */
         #playersTop .hero-card {
             position: absolute;

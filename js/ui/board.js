@@ -289,6 +289,11 @@ SGS.UI.Board = (function() {
         const human = engine.getHumanPlayer();
         if (!human) return;
         
+        // 确保DOM元素存在（防止在renderGameScreen之前调用）
+        if (!document.getElementById('playersTopArea') || !document.getElementById('playersBottomArea')) {
+            return; // DOM还没准备好，跳过这次更新
+        }
+        
         // 检查是否有待处理的卡牌选择（顺手牵羊/过河拆桥等）
         if (engine && engine._pendingCardChoice) {
             const pc = engine._pendingCardChoice;

@@ -2157,7 +2157,7 @@ function quitToMenu(){
             console.warn('engine.destroy() 失败（可能是缓存旧版game.js）:', e);
         }
         // fallback：暴力清除所有可能残留的定时器
-        for(let i = 1; i < 10000; i++) { clearTimeout(i); clearInterval(i); }
+        for(let i = 1; i < 100000; i++) { clearTimeout(i); clearInterval(i); }
     }
     // 2. 强制隐藏游戏画面 + 清空动态生成的DOM内容
     const gs = document.getElementById('gameScreen');
@@ -2167,6 +2167,12 @@ function quitToMenu(){
         const el = document.getElementById(id);
         if(el) el.innerHTML = '';
     });
+    // 2b. 清理所有出牌动画残留元素（飞行的卡牌、光束、闪现等）
+    document.querySelectorAll('.attack-beam, .card-flash, .card-fly, .damage-number, .heal-effect, .shan-effect').forEach(el => el.remove());
+    // 清理所有 body 下直接挂载的 position:fixed 游戏动画元素
+    document.body.querySelectorAll(':scope > div[style*="position:fixed"][style*="pointer-events:none"]').forEach(el => el.remove());
+    // 2c. 清理所有 body 下直接挂载的 .card 元素（出牌动画残留）
+    document.body.querySelectorAll(':scope > .card').forEach(el => el.remove());
     // 3. 清理所有 overlay/弹窗
     document.querySelectorAll('.overlay, [id$="Overlay"], [id$="Modal"]').forEach(el => el.remove());
     // 清除 cardSelOverlay（id选择器兜底）

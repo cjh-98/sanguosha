@@ -241,10 +241,14 @@
             min-height: 0;
             /* 留出顶部按钮的空间，不要遮挡topbar */
             margin-top: 4px;
+            /* 限制最大高度，避免挤压下方区域 */
+            max-height: 30vh;
+            overflow: visible;
         }
         .players-arc-area .player-mini {
             /* 弧形布局中的玩家卡片基础样式 */
             transform-origin: bottom center;
+            transition: transform 0.3s ease;
         }
         /* 圆桌上的武将牌 - 绝对定位（位置由 inline style 控制） */
         #playersTop .hero-card {

@@ -775,74 +775,140 @@ SGS.UI.Board = (function() {
         const human = engine.getHumanPlayer();
         if (!human) return;
 
-        // 简化处理：各技能直接执行
+        // 检查是否是当前玩家的回合
+        const state = engine.getState();
+        if (state.currentPlayerIdx !== human.id) {
+            alert('请等待你的回合');
+            return;
+        }
+
+        // 检查是否在正确的阶段
+        if (!isSkillUsable(human, { name: skillName })) {
+            alert('当前无法使用此技能');
+            return;
+        }
+
         switch (skillName) {
             case '制衡':
                 // 选择要弃的牌
-                promptZhiheng(human);
+                promptDiscardForSkill(human, '制衡', 1, 5, (cards) => {
+                    engine.useSkill(human, '制衡', { cards });
+                });
                 break;
             case '苦肉':
-                engine.useSkill(human, '苦肉', {});
+                // 确认是否发动
+                if (confirm('发动【苦肉】将失去1点体力并摸2张牌，是否发动？')) {
+                    engine.useSkill(human, '苦肉', {});
+                }
                 break;
             case '反间':
+                // 先选目标，再选牌
                 promptSelectTarget(human, '反间', 1, (targetIds) => {
-                    engine.useSkill(human, '反间', { targetId: targetIds[0] });
+                    promptDiscardForSkill(human, '反间', 1, 1, (cards) => {
+                        engine.useSkill(human, '反间', { targetId: targetIds[0], card: cards[0] });
+                    });
                 });
                 break;
             case '青囊':
+                // 先选目标，再选要弃的牌
                 promptSelectTarget(human, '青囊', 1, (targetIds) => {
-                    engine.useSkill(human, '青囊', { targetId: targetIds[0], card: human.handCards[0] });
+                    promptDiscardForSkill(human, '青囊', 1, 1, (cards) => {
+                        engine.useSkill(human, '青囊', { targetId: targetIds[0], card: cards[0] });
+                    });
                 });
                 break;
             case '仁德':
+                // 先选目标，再选要给的牌（可以给1-2张）
                 promptSelectTarget(human, '仁德', 1, (targetIds) => {
-                    // 简化：给2张牌
-                    const cards = human.handCards.slice(0, 2);
-                    engine.useSkill(human, '仁德', { targetId: targetIds[0], cards });
+                    promptDiscardForSkill(human, '仁德', 1, 2, (cards) => {
+                        engine.useSkill(human, '仁德', { targetId: targetIds[0], cards });
+                    }, '选择要给出的牌（1-2张）');
                 });
                 break;
             case '结姻':
+                // 先选目标，再选要弃的两张牌
                 promptSelectTarget(human, '结姻', 1, (targetIds) => {
-                    const cards = human.handCards.slice(0, 2);
-                    engine.useSkill(human, '结姻', { targetId: targetIds[0], cards });
+                    promptDiscardForSkill(human, '结姻', 2, 2, (cards) => {
+                        engine.useSkill(human, '结姻', { targetId: targetIds[0], cards });
+                    }, '选择要弃置的2张牌');
                 });
                 break;
             case '离间':
+                // 先选目标（2名男性），再选要弃的牌
                 promptSelectTarget(human, '离间', 2, (targetIds) => {
-                    engine.useSkill(human, '离间', { targetId: targetIds[0], targetId2: targetIds[1], card: human.handCards[0] });
+                    promptDiscardForSkill(human, '离间', 1, 1, (cards) => {
+                        engine.useSkill(human, '离间', { targetId: targetIds[0], targetId2: targetIds[1], card: cards[0] });
+                    }, '选择要弃置的牌');
                 });
                 break;
             case '强袭':
-                promptSelectTarget(human, '强袭', 1, (targetIds) => {
-                    engine.useSkill(human, '强袭', { targetId: targetIds[0] });
-                });
+                // 如果有武器，可以不用弃牌；否则需要弃一张牌
+                if (human.equipment.weapon) {
+                    promptSelectTarget(human, '强袭', 1, (targetIds) => {
+                        engine.useSkill(human, '强袭', { targetId: targetIds[0] });
+                    });
+                } else {
+                    promptSelectTarget(human, '强袭', 1, (targetIds) => {
+                        promptDiscardForSkill(human, '强袭', 1, 1, (cards) => {
+                            engine.useSkill(human, '强袭', { targetId: targetIds[0], card: cards[0] });
+                        }, '选择要弃置的牌');
+                    });
+                }
                 break;
             case '据守':
-                engine.useSkill(human, '据守', {});
+                // 确认是否发动
+                if (confirm('发动【据守】将摸3张牌并翻面，是否发动？')) {
+                    engine.useSkill(human, '据守', {});
+                }
                 break;
             case '挑衅':
+                // 选目标
                 promptSelectTarget(human, '挑衅', 1, (targetIds) => {
                     engine.useSkill(human, '挑衅', { targetId: targetIds[0] });
                 });
                 break;
             case '天义':
+                // 先选目标，再选要弃的两张牌
                 promptSelectTarget(human, '天义', 1, (targetIds) => {
-                    engine.useSkill(human, '天义', { targetId: targetIds[0] });
+                    promptDiscardForSkill(human, '天义', 2, 2, (cards) => {
+                        engine.useSkill(human, '天义', { targetId: targetIds[0], cards });
+                    }, '选择要弃置的2张牌');
                 });
+                break;
+            case '乱击':
+                // 选两张同花色的牌
+                promptDiscardForSkill(human, '乱击', 2, 2, (cards) => {
+                    engine.useSkill(human, '乱击', { cards });
+                }, '选择2张同花色的牌发动万箭齐发');
+                break;
+            case '观星':
+                // 观星需要让用户选择牌的顺序
+                openGuixingUI(human);
+                break;
+            case '洛神':
+                // 洛神UI已在回合开始时处理
+                alert('洛神会在回合开始时自动弹出');
                 break;
         }
         updateGameBoard(engine.getState());
     }
 
-    function promptZhiheng(player) {
+    // 通用的弃牌选牌UI
+    function promptDiscardForSkill(player, skillName, minCount, maxCount, callback, title = '选择要弃置的牌') {
         const overlay = document.createElement('div');
         overlay.className = 'overlay';
+        overlay.id = 'skillDiscardOverlay';
+        
+        const titleText = title || `【${skillName}】选择要弃置的牌`;
+        
         overlay.innerHTML = `
             <div class="skill-modal" style="max-height:80%;overflow-y:auto">
-                <h4>制衡：选择要弃的牌</h4>
-                <div class="hand-cards" id="zhihengCards" style="flex-wrap:wrap;justify-content:center">
+                <h4>${titleText} (${minCount}-${maxCount}张)</h4>
+                <div class="hand-cards" id="skillDiscardCards" style="flex-wrap:wrap;justify-content:center;gap:8px">
                     ${player.handCards.map((c, i) => `
-                        <div class="card ${SGS.CardData.suitColor[c.suit]}" data-idx="${i}" onclick="this.classList.toggle('selected')">
+                        <div class="card ${SGS.CardData.suitColor[c.suit]} skill-card-select" 
+                             data-idx="${i}" 
+                             onclick="this.classList.toggle('selected')">
                             <span class="card-suit">${SGS.CardData.suitName[c.suit]}</span>
                             <span class="card-name">${c.name}</span>
                         </div>
@@ -850,11 +916,38 @@ SGS.UI.Board = (function() {
                 </div>
                 <div style="display:flex;gap:8px;margin-top:12px;justify-content:center">
                     <button class="btn btn-small" onclick="this.closest('.overlay').remove()">取消</button>
-                    <button class="btn btn-small btn-primary" id="zhihengConfirm" onclick="SGS.UI.Board.confirmZhiheng()">确认</button>
+                    <button class="btn btn-small btn-primary" id="skillDiscardConfirm" disabled>确认</button>
                 </div>
             </div>
         `;
         document.body.appendChild(overlay);
+        
+        // 更新确认按钮状态
+        function updateConfirmState() {
+            const selected = document.querySelectorAll('#skillDiscardOverlay .skill-card-select.selected');
+            const confirmBtn = document.getElementById('skillDiscardConfirm');
+            const count = selected.length;
+            confirmBtn.disabled = count < minCount || count > maxCount;
+            confirmBtn.textContent = count >= minCount && count <= maxCount ? '确认(' + count + ')' : '需要' + minCount + '-' + maxCount + '张';
+        }
+        
+        updateConfirmState();
+        
+        // 监听卡片选择变化
+        const cardsContainer = document.getElementById('skillDiscardCards');
+        cardsContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('skill-card-select')) {
+                updateConfirmState();
+            }
+        });
+        
+        // 确认按钮
+        document.getElementById('skillDiscardConfirm').onclick = () => {
+            const selected = document.querySelectorAll('#skillDiscardOverlay .skill-card-select.selected');
+            const cards = Array.from(selected).map(el => player.handCards[parseInt(el.dataset.idx)]);
+            overlay.remove();
+            callback(cards);
+        };
     }
 
     function confirmZhiheng() {

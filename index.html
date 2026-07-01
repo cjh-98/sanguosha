@@ -743,19 +743,6 @@
             .card { width: 52px; height: 74px; }
             .hand-cards { min-height: 78px; }
             .action-bar .log-toggle-btn, .action-bar .btn-submit-log { font-size: 10px; padding: 3px 6px; }
-            /* 竖屏提示：建议横屏获得更佳体验 */
-            #rotateHint { display: flex !important; }
-        }
-
-        /* 横屏提示浮层（默认隐藏，仅竖屏小屏显示） */
-        #rotateHint {
-            display: none; position: fixed; top: 6px; left: 50%;
-            transform: translateX(-50%); z-index: 9999;
-            background: rgba(20,15,10,0.92); border: 1px solid #8b6914;
-            color: #e6c84d; font-size: 11px; padding: 4px 12px;
-            border-radius: 14px; align-items: center; gap: 4px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.5); pointer-events: none;
-            white-space: nowrap;
         }
     </style>
 </head>
@@ -879,7 +866,6 @@
 
 <!-- ===== 游戏桌面（横屏圆桌风格） ===== -->
 <div id="gameScreen" class="screen">
-    <div id="rotateHint">📱 建议横屏游玩，体验更佳</div>
     <div class="topbar">
         <div class="topbar-info">
             <button class="btn-sm" onclick="if(confirm('确定退出当前对局？'))quitToMenu()" style="margin-right:6px">←返回</button>

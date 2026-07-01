@@ -666,6 +666,9 @@
         <button class="btn btn-large" onclick="goAbout()">关于</button>
         <button class="btn btn-large" onclick="goLogPanel()">📋 操作日志</button>
     </div>
+    <div style="display:flex;gap:10px;margin-top:10px;">
+        <button class="btn-submit-log" onclick="submitBugLog()" style="padding:8px 16px;font-size:13px;">🐛 提交Bug</button>
+    </div>
         <div class="version-tag">单机版 v1.0 · 预留联机接口</div>
     </div>
 
@@ -674,7 +677,7 @@
     <div class="setup-header">
         <button class="btn-sm" onclick="showScreen('mainMenu')">返回</button>
         <h2>创建对局</h2>
-        <div style="width:54px"></div>
+        <button class="btn-submit-log" onclick="submitBugLog()" style="width:54px;padding:6px 10px;font-size:11px;">🐛</button>
     </div>
 
     <div class="section">
@@ -740,12 +743,12 @@
 <!-- ===== 选将 ===== -->
 <div id="heroSelectScreen" class="screen">
     <div class="sel-header">
+        <button class="btn-sm" onclick="showScreen('setupScreen')">返回</button>
         <h2 id="selTitle">选择武将</h2>
-        <p id="selDesc">从以下武将中选择你的角色</p>
+        <button class="btn-submit-log" onclick="submitBugLog()" style="padding:6px 10px;font-size:11px;">🐛</button>
     </div>
     <div class="grid" id="heroGrid"></div>
     <div class="sel-footer">
-        <button class="btn-sm" onclick="showScreen('setupScreen')">返回</button>
         <span id="selPickInfo" style="color:var(--accent-gold);font-size:13px;align-self:center">请选择1个武将</span>
         <button class="btn btn-primary" id="confirmHeroBtn" disabled onclick="confirmHeroes()">确认</button>
     </div>
@@ -757,7 +760,10 @@
     <div class="id-big-text" id="idText">你的身份：主公</div>
     <div class="id-hero-text" id="idHeroText">你的武将：曹操</div>
     <div class="id-desc" id="idDesc">你是主公！消灭所有反贼和内奸。</div>
-    <button class="btn btn-primary btn-large" onclick="startPlayGame()">进入游戏</button>
+    <div style="display:flex;gap:12px; flex-wrap: wrap;">
+        <button class="btn-submit-log" onclick="submitBugLog()" style="padding:10px 16px;font-size:13px;">🐛 提交Bug</button>
+        <button class="btn btn-primary btn-large" onclick="startPlayGame()">进入游戏</button>
+    </div>
 </div>
 
 <!-- ===== 游戏桌面（横屏圆桌风格） ===== -->
@@ -815,6 +821,7 @@
     <div class="go-info" id="goIdTable"></div>
     <div style="display:flex;gap:12px; flex-wrap: wrap;">
         <button class="btn" onclick="quitToMenu()">返回主菜单</button>
+        <button class="btn-submit-log" onclick="submitBugLog()" style="padding:10px 16px;font-size:13px;">🐛 提交Bug</button>
         <button class="btn-sm" onclick="showScreen('logScreen');window._returnScreen='gameOverScreen';" style="margin-left:8px;background:rgba(230,200,77,0.15);border:1px solid #8b6914;color:#e6c84d">📜 查看牌局记录</button>
         <button class="btn-sm" onclick="window.open('history.html', '_blank')" style="background:rgba(0,123,255,0.15);border:1px solid #007bff;color:#007bff">📊 对局历史</button>
         <button class="btn-sm" onclick="window.open('submit-log.html', '_blank')" style="background:rgba(108,117,125,0.15);border:1px solid #6c757d;color:#6c757d">📤 提交对局记录</button>
@@ -827,7 +834,7 @@
     <div class="setup-header">
         <button class="btn-sm" onclick="showScreen(window._returnScreen||'mainMenu')">返回</button>
         <h2>操作日志</h2>
-        <div style="width:54px"></div>
+        <button class="btn-submit-log" onclick="submitBugLog()" style="padding:6px 10px;font-size:11px;">🐛</button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
         <button class="btn-sm" onclick="copyLog()">📋 复制全部日志</button>
@@ -2816,36 +2823,59 @@ function _sgsGetUserName() {
 
 // 收集当前游戏状态
 function _sgsCollectGameState() {
-    if (!engine) return null;
-    
-    const human = engine.getHumanPlayer();
-    const players = engine.players.map(p => ({
-        id: p.id,
-        name: p.name,
-        hero: p.hero ? p.hero.name : 'unknown',
-        isAI: p.isAI,
-        identity: p.identity,
-        faction: p.faction,
-        hp: p.hp,
-        maxHp: p.maxHp,
-        handCount: p.handCount,
-        isAlive: p.isAlive,
-        isChained: p.isChained
-    }));
-    
-    return {
-        matchId: engine.matchId || null,
+    const state = {
         userId: _sgsGetUserId(),
         userName: _sgsGetUserName(),
         timestamp: new Date().toISOString(),
-        turnCount: engine.turnCount || 0,
-        phase: engine.phase || 'unknown',
-        currentPlayer: engine.players[engine.currentPlayerIdx]?.name || 'unknown',
-        deckCount: engine.deck ? engine.deck.length : 0,
-        discardCount: engine.discardPile ? engine.discardPile.length : 0,
-        players: players,
-        matchLog: engine.matchLog ? engine.matchLog.slice(-100) : [] // 最近100条日志
+        currentScreen: document.querySelector('.screen.active')?.id || 'unknown',
+        matchId: null,
+        turnCount: 0,
+        phase: 'unknown',
+        currentPlayer: 'unknown',
+        deckCount: 0,
+        discardCount: 0,
+        players: [],
+        matchLog: []
     };
+    
+    // 如果游戏引擎存在，收集更多信息
+    if (engine) {
+        state.matchId = engine.matchId || null;
+        state.turnCount = engine.turnCount || 0;
+        state.phase = engine.phase || 'unknown';
+        state.currentPlayer = engine.players[engine.currentPlayerIdx]?.name || 'unknown';
+        state.deckCount = engine.deck ? engine.deck.length : 0;
+        state.discardCount = engine.discardPile ? engine.discardPile.length : 0;
+        state.matchLog = engine.matchLog ? engine.matchLog.slice(-100) : [];
+        
+        // 收集玩家信息
+        state.players = engine.players.map(p => ({
+            id: p.id,
+            name: p.name,
+            hero: p.hero ? p.hero.name : 'unknown',
+            isAI: p.isAI,
+            identity: p.identity,
+            faction: p.faction,
+            hp: p.hp,
+            maxHp: p.maxHp,
+            handCount: p.handCount,
+            isAlive: p.isAlive,
+            isChained: p.isChained
+        }));
+    }
+    
+    // 收集localStorage中的对局历史
+    try {
+        const history = JSON.parse(localStorage.getItem('sgsMatchHistory') || '[]');
+        state.matchHistoryCount = history.length;
+        if (history.length > 0) {
+            state.latestMatch = history[0];
+        }
+    } catch(e) {
+        state.matchHistoryCount = 0;
+    }
+    
+    return state;
 }
 
 // 显示Bug说明弹窗
@@ -2864,7 +2894,7 @@ function showBugReportModal() {
             </div>
             
             <div style="color:#a0a0b0;font-size:12px;margin-bottom:12px;">请描述你遇到的Bug（可选）：</div>
-            <textarea id="bugDescription" placeholder="例如：顺手牵羊没有让我选择牌，直接给了第一张..." style="width:100%;height:80px;padding:8px;border:1px solid #444;border-radius:4px;color:#f0f0f0;font-size:12px;font-family:monospace;resize:vertical;box-sizing:border-box;"></textarea>
+            <textarea id="bugDescription" placeholder="例如：顺手牵羊没有让我选择牌，直接给了第一张..." style="width:100%;height:80px;padding:8px;border:1px solid #444;border-radius:4px;color:#000;font-size:12px;font-family:monospace;resize:vertical;box-sizing:border-box;background:#1a1a2e;"></textarea>
             
             <div style="color:#a0a0b0;font-size:11px;margin-bottom:16px;">
                 当前游戏状态：<span id="gameStateSummary" style="color:#e6c84d;font-family:monospace;"></span>
@@ -2903,25 +2933,35 @@ async function sgsSubmitBugLog() {
         const title = `🐛 Bug报告 - ${userName} - ${date.toLocaleTimeString('zh-CN')}`;
         
         let body = `**用户**: ${userName}\n**ID**: \`${state.userId}\`\n**对局ID**: \`${state.matchId || '无'}\`\n\n`;
+        body += `**当前页面**: ${state.currentScreen}\n`;
         body += `**Bug描述**: ${bugDesc || '无'}\n\n`;
         body += `\`\`\`json\n${JSON.stringify({
             ts: state.timestamp,
+            screen: state.currentScreen,
             tc: state.turnCount,
             ph: state.phase,
             cp: state.currentPlayer,
             dc: state.deckCount,
             dis: state.discardCount,
+            mh: state.matchHistoryCount,
             ps: state.players
         }, null, 2)}\n\`\`\`\n\n`;
         
         // 添加最近的日志
         if (state.matchLog && state.matchLog.length > 0) {
-            body += `### 最近100条日志\n<details><summary>点击展开</summary>\n\n`;
+            body += `### 最近${state.matchLog.length}条对局日志\n<details><summary>点击展开</summary>\n\n`;
             state.matchLog.forEach(evt => {
                 const time = new Date(evt.time).toLocaleTimeString('zh-CN');
                 const typeIcon = evt.eventType === 'game_log' ? '📝' : '⚡';
                 body += `${typeIcon} **[${time}]** ${JSON.stringify(evt.data)}\n\n`;
             });
+            body += `</details>\n`;
+        }
+        
+        // 如果有最近的对局历史，也包含进去
+        if (state.latestMatch) {
+            body += `### 最近对局记录\n<details><summary>点击展开</summary>\n\n`;
+            body += `\`\`\`json\n${JSON.stringify(state.latestMatch, null, 2)}\n\`\`\`\n`;
             body += `</details>\n`;
         }
         

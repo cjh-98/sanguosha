@@ -26,12 +26,12 @@
             --border-gold: #8b6914;
         }
         html, body {
-            width: 100%; height: 100%; overflow: hidden;
+            width: 100%; height: 100vh; overflow: hidden;
             font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
             background: var(--bg-primary); color: var(--text-primary);
         }
-        #app { width: 100%; height: 100%; position: relative; overflow: hidden; }
-        .screen { display: none; width: 100%; height: 100%;
+        #app { width: 100%; height: 100vh; position: relative; overflow: hidden; }
+        .screen { display: none; width: 100%; height: 100vh;
                   flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 40px 20px;
                   position: relative; }  /* 为日志面板absolute定位提供上下文 */
         .screen.active { display: flex !important; }
@@ -128,7 +128,7 @@
             background-size: cover; background-position: center; background-repeat: no-repeat;
             position: relative;
             width: 100%;
-            height: 100%;
+            height: 100vh;
             flex-shrink: 0;
             /* 纵向布局：topbar + arc-area + players-area */
             display: flex;
@@ -406,19 +406,6 @@
         .game-log-panel .log-danger { color: #ff6b6b; }
         .game-log-panel .log-success { color: #51cf66; }
         .game-log-panel .log-highlight { color: #e6c84d; font-weight: bold; }
-
-        /* 竖屏提示 - 仅在手机竖屏时显示 */
-        #rotateHint {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #0d0a06; z-index: 9999;
-            flex-direction: column; align-items: center; justify-content: center;
-            gap: 20px; text-align: center; padding: 40px;
-        }
-        #rotateHint .rh-icon { font-size: 60px; animation: rh-rotate 2s ease-in-out infinite; }
-        #rotateHint .rh-text { font-size: 18px; color: #e6c84d; letter-spacing: 3px; }
-        #rotateHint .rh-sub { font-size: 13px; color: #a0a0b0; }
-        @keyframes rh-rotate { 0%,100%{transform:rotate(0deg)} 50%{transform:rotate(90deg)} }
-        /* 已禁用竖屏提示 - 手机上直接显示横屏布局 */
 
         .player-bottom { flex-shrink:0; width:100%; box-sizing:border-box; background:linear-gradient(180deg,rgba(0,0,0,0.7),rgba(0,0,0,0.5)); border-top:2px solid #8b6914; padding:5px 8px; }
         .my-avatar { width:72px; height:98px; border-radius:6px; overflow:hidden; border:2px solid #8b6914; flex-shrink:0; box-shadow:0 2px 8px rgba(0,0,0,0.6),0 0 4px rgba(230,200,77,0.15); }
@@ -705,7 +692,7 @@
         /* ============ 移动端 / 小屏适配 ============ */
         /* 用 dvh 避免移动端浏览器地址栏遮挡内容 */
         @supports (height: 100dvh) {
-            html, body, #app, .screen, #gameScreen { height: 100dvh; }
+            html, body, #app, .screen, #gameScreen { height: 100dvh !important; }
         }
 
         @media (max-width: 900px) {
@@ -747,11 +734,6 @@
     </style>
 </head>
 <body>
-<div id="rotateHint">
-    <div class="rh-icon">📱</div>
-    <div class="rh-text">请横屏使用</div>
-    <div class="rh-sub">三国杀为横屏游戏，请旋转您的设备</div>
-</div>
 <div id="app">
 
 <!-- ===== 主菜单（HTML内联，不依赖JS渲染） ===== -->

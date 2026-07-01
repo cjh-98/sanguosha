@@ -799,10 +799,11 @@
     <div class="go-title go-win" id="goTitle">胜利！</div>
     <div class="go-info" id="goInfo"></div>
     <div class="go-info" id="goIdTable"></div>
-    <div style="display:flex;gap:12px">
+    <div style="display:flex;gap:12px; flex-wrap: wrap;">
         <button class="btn" onclick="quitToMenu()">返回主菜单</button>
         <button class="btn-sm" onclick="showScreen('logScreen');window._returnScreen='gameOverScreen';" style="margin-left:8px;background:rgba(230,200,77,0.15);border:1px solid #8b6914;color:#e6c84d">📜 查看牌局记录</button>
         <button class="btn-sm" onclick="window.open('history.html', '_blank')" style="background:rgba(0,123,255,0.15);border:1px solid #007bff;color:#007bff">📊 对局历史</button>
+        <button class="btn-sm" onclick="window.open('submit-log.html', '_blank')" style="background:rgba(108,117,125,0.15);border:1px solid #6c757d;color:#6c757d">📤 提交对局记录</button>
         <button class="btn btn-primary" onclick="restartGame()">再来一局</button>
     </div>
 </div>

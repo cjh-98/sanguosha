@@ -2,13 +2,16 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:
+  issues:
+    types: [opened]
 
 permissions:
   contents: read
   pages: write
   id-token: write
+  issues: read
 
 jobs:
   deploy:

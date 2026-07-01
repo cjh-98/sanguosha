@@ -3034,11 +3034,10 @@ function _sgsCollectGameState() {
         state.discardCount = engine.discardPile ? engine.discardPile.length : 0;
         state.matchLog = engine.matchLog ? engine.matchLog.slice(-100) : [];
         
-        // 收集玩家信息
+        // 收集玩家信息（只用武将名，避免混淆）
         state.players = engine.players.map(p => ({
             id: p.id,
-            name: p.name,
-            hero: p.hero ? p.hero.name : 'unknown',
+            name: p.hero ? p.hero.name : 'unknown',  // 统一用武将名
             isAI: p.isAI,
             identity: p.identity,
             faction: p.faction,

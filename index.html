@@ -2009,6 +2009,7 @@ function updatePrompt(human,state){
 
 // ---- 交互事件 ----
 function clickCard(idx){
+    if(!engine) return;
     const human=engine.getHumanPlayer(); if(!human){Logger.warn('clickCard失败: 无人类玩家');return;}
     const st=engine.getState();
 
@@ -2042,6 +2043,7 @@ function clickCard(idx){
     updateBoard(engine.getState());
 }
 function clickP(pid){
+    if(!engine) return;
     if(document.querySelector('.target-sel')){
         toggleTgt(pid);return;
     }
@@ -2081,10 +2083,12 @@ function clickP(pid){
 }
 // 点击自己头像查看技能
 function clickSelf(){
+    if(!engine) return;
     const human=engine.getHumanPlayer(); if(!human){return;}
     clickP(human.id);
 }
 function clickSkill(name){
+    if(!engine) return;
     const human=engine.getHumanPlayer(); if(!human){return;}
     Logger.action('点击技能: ' + name);
     try{
@@ -2123,10 +2127,12 @@ function clickSkill(name){
     }catch(e){Logger.error('技能执行失败: ' + name + ' - ' + e.message, e.stack);}
 }
 function endTurn(){
+    if(!engine) return;
     Logger.action('结束回合');
     engine.processAction({type:'endTurn'});
 }
 function doDiscard(){
+    if(!engine) return;
     const human=engine.getHumanPlayer(); if(!human)return;
     const cards=window._discSel.map(i=>human.handCards[i]).filter(Boolean);
     Logger.action('弃牌', cards.map(c=>c.name));
@@ -2153,9 +2159,14 @@ function quitToMenu(){
         // fallback：暴力清除所有可能残留的定时器
         for(let i = 1; i < 10000; i++) { clearTimeout(i); clearInterval(i); }
     }
-    // 2. 强制隐藏游戏画面
+    // 2. 强制隐藏游戏画面 + 清空动态生成的DOM内容
     const gs = document.getElementById('gameScreen');
     if(gs) { gs.classList.remove('active'); gs.style.display = 'none'; }
+    // 清空手牌区、技能栏等动态内容，防止残留元素被点击
+    ['handCards','playersArcArea','skillBar','equipZone','actionPrompt','gameLog','glog'].forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.innerHTML = '';
+    });
     // 3. 清理所有 overlay/弹窗
     document.querySelectorAll('.overlay, [id$="Overlay"], [id$="Modal"]').forEach(el => el.remove());
     // 清除 cardSelOverlay（id选择器兜底）
@@ -4178,7 +4189,7 @@ function showBugReportModal() {
         const bugDesc = textarea.value || '';
         const modal = document.getElementById('bugReportModal');
         if (modal) modal.remove();
-        window.sgsSubmitBugLog(bugDesc);
+        sgsSubmitBugLog(bugDesc);
     };
     
     // 更新游戏状态摘要
@@ -4297,7 +4308,7 @@ function showBugSubmitSuccess(issueUrl) {
 }
 
 // 全局可访问的提交函数（用于游戏卡死时）
-window.sgsSubmitBugLog = async function() {
+window.sgsSubmitBugLog = async function(bugDesc) {
     try {
         const state = _sgsCollectGameState();
         if (!state) {

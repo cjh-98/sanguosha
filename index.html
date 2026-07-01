@@ -124,7 +124,7 @@
             background-size: cover; background-position: center; background-repeat: no-repeat;
             position: relative;
             width: 100%;
-            height: calc(100vh - 100px);
+            height: 100%;
             flex-shrink: 0;
             /* 纵向布局：topbar + table-area + player-bottom */
             display: flex;
@@ -1092,14 +1092,9 @@ function enforceGameAspect(){
         const screenWidth = window.innerWidth;
         const screenHeight = window.innerHeight;
         
-        // 计算旋转后的尺寸：高度变成宽度，宽度变成高度
-        // 目标：让游戏区域填满整个屏幕，只是旋转显示
-        const rotatedWidth = screenHeight; // 旋转后，原来的高度变成宽度
-        const rotatedHeight = screenWidth; // 旋转后，原来的宽度变成高度
-        
         // 设置游戏区域尺寸和旋转
-        gs.style.width = rotatedWidth + 'px';
-        gs.style.height = rotatedHeight + 'px';
+        gs.style.width = screenHeight + 'px';
+        gs.style.height = screenWidth + 'px';
         gs.style.transform = 'rotate(90deg)';
         gs.style.transformOrigin = 'top left';
         gs.style.position = 'absolute';
@@ -1107,24 +1102,16 @@ function enforceGameAspect(){
         gs.style.top = '0';
         gs.style.margin = '0';
         
-        // 调整位置：旋转90度后，需要移动到正确位置
-        // 旋转后，游戏区域会超出屏幕，需要调整
-        gs.style.transform = `rotate(90deg) translate(${screenHeight - screenWidth}px, 0)`;
-        
     } else {
         // 桌面端：全屏自适应，填满整个可用空间
-        const app = document.getElementById('app');
-        if (app) {
-            const appRect = app.getBoundingClientRect();
-            gs.style.width = '100%';
-            gs.style.height = (appRect.height - 100) + 'px';
-            gs.style.transform = 'none';
-            gs.style.transformOrigin = 'top left';
-            gs.style.position = 'relative';
-            gs.style.left = '0';
-            gs.style.top = '0';
-            gs.style.margin = '0';
-        }
+        gs.style.width = '100%';
+        gs.style.height = '100%';
+        gs.style.transform = 'none';
+        gs.style.transformOrigin = 'top left';
+        gs.style.position = 'relative';
+        gs.style.left = '0';
+        gs.style.top = '0';
+        gs.style.margin = '0';
     }
 }
 window.addEventListener('resize', function(){

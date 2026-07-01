@@ -4079,12 +4079,14 @@ async function sgsSubmitBugLog() {
         
         const bugDesc = document.getElementById('bugDescription')?.value || '';
         
-        // 构建Issue内容
+        // 构建Issue内容 - 用户输入的描述放在标题
         const userName = state.userName;
         const date = new Date();
-        const title = `🐛 Bug报告 - ${userName} - ${date.toLocaleTimeString('zh-CN')}`;
+        const title = bugDesc 
+            ? `🐛 ${bugDesc}` 
+            : `🐛 Bug报告 - ${userName} - ${date.toLocaleTimeString('zh-CN')}`;
         
-        let body = `**用户**: ${userName}\n**ID**: \`${state.userId}\`\n**对局ID**: \`${state.matchId || '无'}\`\n\n`;
+        let body = `**用户**: ${userName}\n**ID**: \`${state.userId}\`\n**对局ID**: \`${state.matchId || '无'}\`\n**时间**: ${date.toLocaleString('zh-CN')}\n\n`;
         body += `**当前页面**: ${state.currentScreen}\n`;
         body += `**Bug描述**: ${bugDesc || '无'}\n\n`;
         body += `\`\`\`json\n${JSON.stringify({

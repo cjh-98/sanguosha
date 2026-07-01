@@ -529,6 +529,49 @@ SGS.GameEngine = (function() {
             return cards[Math.floor(Math.random() * cards.length)];
         }
 
+        // 选择目标角色（异步，人类弹出选择UI）
+        async chooseTarget(player, targets, prompt) {
+            if (!targets || targets.length === 0) return null;
+            if (targets.length === 1) return targets[0];
+            if (player.isAI) {
+                return targets[Math.floor(Math.random() * targets.length)];
+            }
+            return new Promise((resolve) => {
+                this._pendingTargetChoice = { player, targets, prompt, resolve };
+                this.notifyState();
+            });
+        }
+
+        // ========== 技能发动确认 ==========
+        // 统一技能确认接口：满足条件时，人类玩家弹窗询问是否发动；AI 走策略。
+        // 返回 Promise<boolean>：true=发动，false=不发动
+        async askSkillConfirm(player, skillName, desc) {
+            if (!player) return false;
+            if (player.isAI) {
+                // AI 决策：使用 AI 策略，否则默认 50% 发动
+                if (this.ai && typeof this.ai.shouldUseSkill === 'function') {
+                    return this.ai.shouldUseSkill(player, skillName, this);
+                }
+                return Math.random() < 0.5;
+            }
+            // 人类玩家：弹出确认对话框，等待用户点击
+            return new Promise((resolve) => {
+                if (typeof window !== 'undefined' && window.showSkillConfirmModal) {
+                    window.showSkillConfirmModal(skillName, desc, player.id, resolve);
+                } else {
+                    resolve(false);
+                }
+            });
+        }
+
+        // 获取技能描述文本（从英雄定义中查找）
+        getSkillDesc(heroId, skillName) {
+            const hero = SGS.HeroData.list.find(h => h.id === heroId);
+            if (!hero) return '';
+            const sk = (hero.skills || []).find(s => s.name === skillName);
+            return sk ? sk.desc : '';
+        }
+
         // ========== 距离计算 ==========
         getDistance(from, to) {
             if (from.id === to.id) return 0;
@@ -743,12 +786,12 @@ SGS.GameEngine = (function() {
             this.advancePhase();
         }
 
-        doJudge(player) {
+        async doJudge(player) {
             // 依次处理判定区
             try {
                 while (player.judgmentCards.length > 0) {
                     const judgeCard = player.judgmentCards.shift();
-                    this.resolveJudgment(player, judgeCard);
+                    await this.resolveJudgment(player, judgeCard);
 
                     // 检查是否在等待人类玩家操作（鬼才/鬼道）
                     if (this._waitingForGuicai || this._waitingForGuidao) {
@@ -774,9 +817,10 @@ SGS.GameEngine = (function() {
                         drawCount += 2;
                         this.log(`${player.name}发动好施，多摸2张牌`, 'highlight');
                     }
-                    // 裸衣 (许褚): AI自动选择
+                    // 裸衣 (许褚): 主动技，少摸1张牌，本回合杀/决斗伤害+1
                     if (player.skills.some(s => s.name === '裸衣')) {
-                        if (player.isAI || Math.random() < 0.5) {  // AI或随机选择发动
+                        const want = player.isAI ? true : await this.askSkillConfirm(player, '裸衣', '是否发动【裸衣】少摸1张牌，本回合杀/决斗伤害+1？');
+                        if (want) {
                             drawCount -= 1;
                             player.luoyiActive = true;  // 标记本回合杀/决斗伤害+1
                             this.log(`${player.name}发动裸衣，少摸1张牌，本回合杀/决斗伤害+1`, 'highlight');
@@ -934,7 +978,7 @@ SGS.GameEngine = (function() {
             this.advancePhase();
         }
 
-        resolveJudgment(player, judgeCard) {
+        async resolveJudgment(player, judgeCard) {
             const judgeResult = this.revealTopCard();
             if (!judgeResult) return;
 
@@ -1019,8 +1063,8 @@ SGS.GameEngine = (function() {
                     break;
                 case 'shandian':
                     if (finalResult.suit === 'spade' && finalResult.number >= 2 && finalResult.number <= 9) {
-                        this.log(`${player.name}被闪电击中！3点雷伤害`, 'danger');
-                        this.dealDamage(player, 3, { source: null, element: 'thunder', card: judgeCard });
+                    this.log(`${player.name}被闪电击中！3点雷伤害`, 'danger');
+                    await this.dealDamage(player, 3, { source: null, element: 'thunder', card: judgeCard });
                     } else {
                         const nextPlayer = this.getNextPlayer(player);
                         if (nextPlayer) {
@@ -1206,7 +1250,7 @@ SGS.GameEngine = (function() {
         }
 
         // 继续判定流程（鬼才/鬼道之后）
-        _continueJudgeAfterSkill(judgeCard, finalResult, currentPlayer) {
+        async _continueJudgeAfterSkill(judgeCard, finalResult, currentPlayer) {
             const player = currentPlayer; // 使用传入的player引用
             if (!player) return;
 
@@ -1235,8 +1279,8 @@ SGS.GameEngine = (function() {
                     break;
                 case 'shandian':
                     if (finalResult.suit === 'spade' && finalResult.number >= 2 && finalResult.number <= 9) {
-                        this.log(`${player.name}被闪电击中！3点雷伤害`, 'danger');
-                        this.dealDamage(player, 3, { source: null, element: 'thunder', card: judgeCard });
+                    this.log(`${player.name}被闪电击中！3点雷伤害`, 'danger');
+                    await this.dealDamage(player, 3, { source: null, element: 'thunder', card: judgeCard });
                     } else {
                         const nextPlayer = this.getNextPlayer(player);
                         if (nextPlayer && nextPlayer.isAlive) {
@@ -1463,7 +1507,7 @@ SGS.GameEngine = (function() {
             }
         }
 
-        async resolveSha(source, target, card, baseDamage = 1) {
+        async resolveSha(source, target, card, baseDamage = 1, depth = 0) {
             this.log(`${source.name}对${target.name}使用了【杀】`, 'highlight');
 
             // 享乐 (刘禅)：被杀需弃基本牌
@@ -1530,6 +1574,27 @@ SGS.GameEngine = (function() {
             // 触发指定目标事件（铁骑、马超等）
             this.emit('onShaTarget', { source, target, card, engine: this });
 
+            // 流离 (大乔): 被杀时转移给攻击范围内角色
+            if (depth < 10 && target.skills.some(s => s.name === '流离') && source && source.isAlive) {
+                const candidates = this.getAlivePlayers().filter(p =>
+                    p.id !== target.id && p.id !== source.id &&
+                    this.canAttack(target, p) && this.canAttack(source, p)
+                );
+                if (candidates.length > 0) {
+                    const wantLiuli = await this.askSkillConfirm(target, '流离',
+                        '是否发动【流离】将此杀转移给攻击范围内的一名角色？');
+                    if (wantLiuli) {
+                        const transferTarget = target.isAI
+                            ? candidates[Math.floor(Math.random() * candidates.length)]
+                            : await this.chooseTarget(target, candidates, '流离：选择转移的目标');
+                        if (transferTarget) {
+                            this.log(`${target.name}发动流离，将杀转移给${transferTarget.name}`, 'highlight');
+                            return await this.resolveSha(source, transferTarget, card, baseDamage, depth + 1);
+                        }
+                    }
+                }
+            }
+
             // 检查是否可被闪避
             let unavoidable = false;
             if (source.skills.some(s => s.name === '铁骑')) {
@@ -1561,19 +1626,24 @@ SGS.GameEngine = (function() {
                     if (target.skills.some(s => s.name === '雷击')) {
                         const aliveOthers = this.getAlivePlayers().filter(p => p.id !== target.id);
                         if (aliveOthers.length > 0) {
-                            const leijiTarget = target.isAI ? aliveOthers[Math.floor(Math.random() * aliveOthers.length)] : null;
-                            if (leijiTarget || !target.isAI) {
-                                this.log(`${target.name}发动雷击`, 'highlight');
-                                const judge = this.revealTopCard();
-                                const chosen = leijiTarget || aliveOthers[0];
-                                this.log(`雷击判定：${SGS.CardData.suitName[judge.suit]}${SGS.CardData.numberName[judge.number]}`, 'normal');
-                                if (judge.suit === 'spade') {
-                                    this.dealDamage(chosen, 2, { source: target, element: 'thunder', card: shan });
-                                    this.log(`${target.name}雷击成功，${chosen.name}受到2点雷伤害！`, 'danger');
-                                } else {
-                                    this.log(`雷击失败，判定不是♠`, 'normal');
+                            const wantLeiji = await this.askSkillConfirm(target, '雷击',
+                                '使用或打出闪后，是否发动【雷击】令一名其他角色进行判定（若为♠则受2点雷伤害）？');
+                            if (wantLeiji) {
+                                const chosen = target.isAI
+                                    ? aliveOthers[Math.floor(Math.random() * aliveOthers.length)]
+                                    : await this.chooseTarget(target, aliveOthers, '雷击：选择雷击的目标');
+                                if (chosen) {
+                                    this.log(`${target.name}发动雷击`, 'highlight');
+                                    const judge = this.revealTopCard();
+                                    this.log(`雷击判定：${SGS.CardData.suitName[judge.suit]}${SGS.CardData.numberName[judge.number]}`, 'normal');
+                                    if (judge.suit === 'spade') {
+                                        await this.dealDamage(chosen, 2, { source: target, element: 'thunder', card: shan });
+                                        this.log(`${target.name}雷击成功，${chosen.name}受到2点雷伤害！`, 'danger');
+                                    } else {
+                                        this.log(`雷击失败，判定不是♠`, 'normal');
+                                    }
+                                    this.discardPile.push(judge);
                                 }
-                                this.discardPile.push(judge);
                             }
                         }
                     }
@@ -1594,7 +1664,7 @@ SGS.GameEngine = (function() {
             }
 
             // 造成伤害
-            this.dealDamage(target, baseDamage, { source, element: card.element, card });
+            await this.dealDamage(target, baseDamage, { source, element: card.element, card });
         }
 
         // ========== 锦囊牌 ==========
@@ -1649,7 +1719,7 @@ SGS.GameEngine = (function() {
                         const sha = await this.requestResponse(p, 'sha', player);
                         if (!sha) {
                             this.log(`${p.name}受到1点伤害`, 'danger');
-                            this.dealDamage(p, 1, { source: player, card });
+                            await this.dealDamage(p, 1, { source: player, card });
                         } else {
                             this.discardPile.push(sha);
                         }
@@ -1663,7 +1733,7 @@ SGS.GameEngine = (function() {
                         if (!p.isAlive) continue;
                         const shan = await this.requestResponse(p, 'shan', player);
                         if (!shan) {
-                            this.dealDamage(p, 1, { source: player, card });
+                            await this.dealDamage(p, 1, { source: player, card });
                         } else {
                             this.discardPile.push(shan);
                         }
@@ -1721,11 +1791,16 @@ SGS.GameEngine = (function() {
                     // 奇才 (黄月英)：使用锦囊无距离限制
                     const hasQicai2 = player.skills.some(s => s.name === '奇才');
                     if (!t1 || (!hasQicai2 && this.getDistance(player, t1) > 1)) break;
-                    // 获取目标的所有牌（手牌+装备）
+                    // 获取目标的所有牌（手牌+装备+判定区）
                     const ghCards = [...t1.handCards];
                     const ghIsHand = t1.handCards.map(() => true);
+                    const ghIsJudgment = t1.handCards.map(() => false);
                     for (const slot of ['weapon', 'armor', 'horsePlus', 'horseMinus']) {
-                        if (t1.equipment[slot]) { ghCards.push(t1.equipment[slot]); ghIsHand.push(false); }
+                        if (t1.equipment[slot]) { ghCards.push(t1.equipment[slot]); ghIsHand.push(false); ghIsJudgment.push(false); }
+                    }
+                    // 判定区的延时锦囊（乐不思蜀、兵粮寸进、闪电）
+                    for (const jc of t1.judgmentCards) {
+                        ghCards.push(jc); ghIsHand.push(false); ghIsJudgment.push(true);
                     }
                     if (ghCards.length > 0) {
                         // 如果包含手牌则需要隐藏信息
@@ -1737,6 +1812,14 @@ SGS.GameEngine = (function() {
                             if (hIdx >= 0) {
                                 t1.handCards.splice(hIdx, 1);
                                 this.discardPile.push(chosen);
+                            } else if (t1.judgmentCards.some(jc => jc.instanceId === chosen.instanceId)) {
+                                // 从判定区移除
+                                const jIdx = t1.judgmentCards.indexOf(chosen);
+                                if (jIdx >= 0) {
+                                    t1.judgmentCards.splice(jIdx, 1);
+                                    this.discardPile.push(chosen);
+                                    this.log(`${player.name}拆了${t1.name}判定区的${chosen.name}`, 'highlight');
+                                }
                             } else {
                                 for (const slot of ['weapon', 'armor', 'horsePlus', 'horseMinus']) {
                                     if (t1.equipment[slot] && t1.equipment[slot].instanceId === chosen.instanceId) {
@@ -1820,7 +1903,7 @@ SGS.GameEngine = (function() {
                                 player.handCards.splice(player.handCards.indexOf(chosen), 1);
                                 this.discardPile.push(chosen);
                                 this.log(`${player.name}弃了${chosen.name}(${SGS.CardData.suitName[chosen.suit]})，火攻成功！`, 'danger');
-                                this.dealDamage(t3, 1, { source: player, element: 'fire', card });
+                                await this.dealDamage(t3, 1, { source: player, element: 'fire', card });
                             }
                         } else {
                             this.log(`${player.name}没有${SGS.CardData.suitName[showCard.suit]}花色的牌，火攻失败`, 'normal');
@@ -1898,13 +1981,13 @@ SGS.GameEngine = (function() {
                         const sha2 = await this.requestResponse(current, 'sha', other);
                         if (!sha2) {
                             this.log(`${current.name}决斗失败，受到1点伤害`, 'danger');
-                            this.dealDamage(current, 1, { source: other, card });
+                            await this.dealDamage(current, 1, { source: other, card });
                             break;
                         }
                         this.discardPile.push(sha2);
                     } else {
                         this.log(`${current.name}决斗失败，受到1点伤害`, 'danger');
-                        this.dealDamage(current, 1, { source: other, card });
+                        await this.dealDamage(current, 1, { source: other, card });
                         break;
                     }
                 }
@@ -1969,27 +2052,22 @@ SGS.GameEngine = (function() {
             
             if (!player.isAlive) return null;
 
-            // 流离 (大乔): 被杀时转移给攻击范围内角色
-            if (player.skills.some(s => s.name === '流离') && source) {
-                if (player.isAI) {
-                    const candidates = this.getAlivePlayers().filter(p =>
-                        p.id !== player.id && p.id !== source.id &&
-                        this.canAttack(player, p) && this.canAttack(source, p)
-                    );
-                    if (candidates.length > 0 && Math.random() < 0.5) {
-                        const target = candidates[Math.floor(Math.random() * candidates.length)];
-                        this.log(`${player.name}发动流离，将杀转移给${target.name}`, 'highlight');
-                        return null;
-                    }
-                } else {
-                    // 人类玩家：需要UI交互选择转移目标
-                    this.log(`${player.name}可以发动【流离】`, 'normal');
-                }
-            }
-
             // 红颜 (小乔): 黑桃当红桃
             if (player.skills.some(s => s.name === '红颜')) {
                 // 在手牌检查时，黑桃视为红桃（简化：在canUseCard中处理）
+            }
+
+            // 八阵 (卧龙): 锁定技，无防具时视为装备八卦阵
+            if (cardType === 'shan' && player.skills.some(s => s.name === '八阵') && !player.equipment.armor) {
+                const judge = this.revealTopCard();
+                this.log(`${player.name}八阵判定：${SGS.CardData.suitName[judge.suit]}`, 'normal');
+                this.emit('onJudge', { player, judgeCard: null, judgeResult: judge, engine: this });
+                if (judge.suit === 'heart' || judge.suit === 'diamond') {
+                    this.log(`八阵生效，视为打出闪！`, 'success');
+                    this.discardPile.push(judge);
+                    return { name: '闪(八阵)', subtype: 'shan', suit: judge.suit, number: judge.number };
+                }
+                this.discardPile.push(judge);
             }
 
             // 检查防具
@@ -2023,26 +2101,30 @@ SGS.GameEngine = (function() {
                 }
             }
 
-            // 倾国 (甄姬) - 人类玩家需要UI交互选择是否发动
+            // 倾国 (甄姬) - 主动技，人类弹窗询问是否发动
             if (cardType === 'shan' && player.skills.some(s => s.name === '倾国')) {
-                const blackCard = player.handCards.find(c => c.suit === 'spade' || c.suit === 'club');
-                if (blackCard) {
+                const blackCards = player.handCards.filter(c => c.suit === 'spade' || c.suit === 'club');
+                if (blackCards.length > 0) {
                     if (player.isAI) {
                         // AI自动决定是否发动倾国
                         const shouldUse = this.ai && this.ai.shouldRespond && this.ai.shouldRespond(player, 'qinged', source, this);
                         if (shouldUse) {
+                            const blackCard = blackCards[Math.floor(Math.random() * blackCards.length)];
                             this.discardCard(player, blackCard);
                             this.log(`${player.name}发动倾国，将黑色牌当闪`, 'success');
                             return blackCard;
                         }
                     } else {
-                        // 人类玩家：提示可以发动倾国，需要UI交互
-                        this.log(`${player.name}可以发动【倾国】（将黑色牌当闪）`, 'normal');
-                        // TODO: 实现UI交互让用户选择是否发动倾国
-                        // 暂时自动发动第一张黑色牌
-                        this.discardCard(player, blackCard);
-                        this.log(`${player.name}发动倾国，将黑色牌当闪`, 'success');
-                        return blackCard;
+                        const want = await this.askSkillConfirm(player, '倾国', '是否发动【倾国】将一张黑色手牌当闪打出？');
+                        if (want) {
+                            const blackCard = blackCards.length === 1 ? blackCards[0] :
+                                await this.chooseCard(player, blackCards, '倾国：选择当闪的黑色牌');
+                            if (blackCard) {
+                                this.discardCard(player, blackCard);
+                                this.log(`${player.name}发动倾国，将黑色牌当闪`, 'success');
+                                return blackCard;
+                            }
+                        }
                     }
                 }
             }
@@ -2099,7 +2181,7 @@ SGS.GameEngine = (function() {
         }
 
         // ========== 伤害系统 ==========
-        dealDamage(player, damage, opts = {}) {
+        async dealDamage(player, damage, opts = {}) {
             if (!player.isAlive) return;
             const { source = null, element = 'normal', card = null } = opts;
 
@@ -2148,20 +2230,32 @@ SGS.GameEngine = (function() {
                 this.log(`${source.name}裸衣加成，伤害+1`, 'highlight');
             }
 
-            // 天香 (小乔)
+            // 天香 (小乔) — 主动技，人类弹窗询问是否发动
             if (player.skills.some(s => s.name === '天香') && source && source.isAlive) {
-                const heartCards = player.handCards.filter(c => c.suit === 'heart');
+                // 红颜 (小乔): 黑桃牌视为红桃，可用于天香
+                const hasHongyan = player.skills.some(s => s.name === '红颜');
+                const heartCards = player.handCards.filter(c => c.suit === 'heart' || (hasHongyan && c.suit === 'spade'));
                 const otherTargets = this.getAlivePlayers().filter(p => p.id !== player.id);
                 if (heartCards.length > 0 && otherTargets.length > 0) {
-                    if (player.isAI && (player.hp <= 2 || Math.random() < 0.4)) {
-                        const chosen = heartCards[Math.floor(Math.random() * heartCards.length)];
-                        player.handCards.splice(player.handCards.indexOf(chosen), 1);
-                        this.discardPile.push(chosen);
-                        const target = otherTargets[Math.floor(Math.random() * otherTargets.length)];
-                        this.log(`${player.name}发动天香，将伤害转移给${target.name}`, 'highlight');
-                        this.dealDamage(target, damage, { source: player, element, card });
-                        this.drawCard(target, 1);
-                        return;
+                    const wantTianxiang = await this.askSkillConfirm(player, '天香',
+                        '受到伤害，是否发动【天香】弃置一张红桃牌，将伤害转移给另一名角色并令其摸一张牌？');
+                    if (wantTianxiang) {
+                        const chosen = player.isAI
+                            ? heartCards[Math.floor(Math.random() * heartCards.length)]
+                            : await this.chooseCard(player, heartCards, '天香：选择弃置的红桃牌');
+                        if (chosen) {
+                            player.handCards.splice(player.handCards.indexOf(chosen), 1);
+                            this.discardPile.push(chosen);
+                            const target = player.isAI
+                                ? otherTargets[Math.floor(Math.random() * otherTargets.length)]
+                                : await this.chooseTarget(player, otherTargets, '天香：选择伤害转移的目标');
+                            if (target) {
+                                this.log(`${player.name}发动天香，将伤害转移给${target.name}`, 'highlight');
+                                await this.dealDamage(target, damage, { source: player, element, card });
+                                this.drawCard(target, 1);
+                                return;
+                            }
+                        }
                     }
                 }
             }
@@ -2178,7 +2272,7 @@ SGS.GameEngine = (function() {
 
             // 铁索连环传导
             if (player.isChained && (element === 'fire' || element === 'thunder')) {
-                this.propagateChain(player, damage, element, source);
+                await this.propagateChain(player, damage, element, source);
                 player.isChained = false;
             }
 
@@ -2186,36 +2280,40 @@ SGS.GameEngine = (function() {
             this.emit('onDamaged', { player, damage, source, element, card, engine: this });
 
             // 技能触发：受到伤害后
-            // 奸雄 (曹操)
+            // 奸雄 (曹操) — LOCKED，自动发动
             if (player.skills.some(s => s.name === '奸雄') && card && source) {
                 player.handCards.push(card);
                 this.log(`${player.name}发动奸雄，获得了${card.name}`, 'highlight');
                 try { this.adapter && this.adapter.notifyEvent({ type: 'skill', skillName: '奸雄', playerId: player.id }); } catch(e){}
             }
-            // 反馈 (司马懿)
+            // 反馈 (司马懿) — 被动技，人类选择获得哪张牌
             if (player.skills.some(s => s.name === '反馈') && source && source.isAlive) {
                 const sourceCards = [...source.handCards];
                 for (const slot of ['weapon', 'armor', 'horsePlus', 'horseMinus']) {
                     if (source.equipment[slot]) sourceCards.push(source.equipment[slot]);
                 }
                 if (sourceCards.length > 0) {
-                    const chosen = sourceCards[Math.floor(Math.random() * sourceCards.length)];
-                    const hIdx = source.handCards.indexOf(chosen);
-                    if (hIdx >= 0) {
-                        source.handCards.splice(hIdx, 1);
-                    } else {
-                        for (const slot of ['weapon', 'armor', 'horsePlus', 'horseMinus']) {
-                            if (source.equipment[slot] && source.equipment[slot].instanceId === chosen.instanceId) {
-                                source.equipment[slot] = null;
-                                break;
+                    const chosen = source.isAI
+                        ? sourceCards[Math.floor(Math.random() * sourceCards.length)]
+                        : await this.chooseCard(source, sourceCards, '反馈：选择获得来源的一张牌');
+                    if (chosen) {
+                        const hIdx = source.handCards.indexOf(chosen);
+                        if (hIdx >= 0) {
+                            source.handCards.splice(hIdx, 1);
+                        } else {
+                            for (const slot of ['weapon', 'armor', 'horsePlus', 'horseMinus']) {
+                                if (source.equipment[slot] && source.equipment[slot].instanceId === chosen.instanceId) {
+                                    source.equipment[slot] = null;
+                                    break;
+                                }
                             }
                         }
+                        player.handCards.push(chosen);
+                        this.log(`${player.name}发动反馈，获得了${source.name}的${chosen.name}`, 'highlight');
                     }
-                    player.handCards.push(chosen);
-                    this.log(`${player.name}发动反馈，获得了${source.name}的${chosen.name}`, 'highlight');
                 }
             }
-            // 刚烈 (夏侯惇)
+            // 刚烈 (夏侯惇) — 被动技，强制判定，人类选择弃置的牌
             if (player.skills.some(s => s.name === '刚烈') && source && source.isAlive) {
                 const judge = this.revealTopCard();
                 this.log(`${player.name}刚烈判定：${SGS.CardData.suitName[judge.suit]}${SGS.CardData.numberName[judge.number]}`, 'normal');
@@ -2225,15 +2323,27 @@ SGS.GameEngine = (function() {
                         if (source.equipment[slot]) sourceCards.push(source.equipment[slot]);
                     }
                     if (sourceCards.length >= 2) {
-                        for (let i = 0; i < 2; i++) {
-                            if (sourceCards.length === 0) break;
-                            const idx = Math.floor(Math.random() * sourceCards.length);
-                            const c = sourceCards.splice(idx, 1)[0];
+                        const toDiscard = [];
+                        if (source.isAI) {
+                            while (toDiscard.length < 2 && sourceCards.length > 0) {
+                                const idx = Math.floor(Math.random() * sourceCards.length);
+                                toDiscard.push(sourceCards.splice(idx, 1)[0]);
+                            }
+                        } else {
+                            let remaining = [...sourceCards];
+                            for (let i = 0; i < 2 && remaining.length > 0; i++) {
+                                const c = await this.chooseCard(source, remaining, `刚烈：选择弃置的第${i + 1}张牌`);
+                                if (!c) break;
+                                toDiscard.push(c);
+                                remaining = remaining.filter(x => x.instanceId !== c.instanceId);
+                            }
+                        }
+                        for (const c of toDiscard) {
                             this.discardCard(source, c);
                         }
-                        this.log(`${source.name}受到刚烈影响，弃置了2张牌`, 'normal');
+                        if (toDiscard.length > 0) this.log(`${source.name}受到刚烈影响，弃置了${toDiscard.length}张牌`, 'normal');
                     } else {
-                        this.dealDamage(source, 1, { source: player });
+                        await this.dealDamage(source, 1, { source: player });
                         this.log(`${source.name}受到刚烈造成的1点伤害`, 'danger');
                     }
                 } else {
@@ -2241,82 +2351,121 @@ SGS.GameEngine = (function() {
                 }
                 this.discardPile.push(judge);
             }
-            // 遗计 (郭嘉)
+            // 遗计 (郭嘉) — 被动技(可)，人类弹窗询问是否发动
             if (player.skills.some(s => s.name === '遗计')) {
-                for (let i = 0; i < damage; i++) {
-                    this.drawCard(player, 2);
-                    this.log(`${player.name}发动遗计，摸了2张牌`, 'highlight');
-                    const y = Math.max(0, player.hp);
-                    if (y > 0 && player.handCards.length > 0) {
-                        const aliveOthers = this.getAlivePlayers().filter(p => p.id !== player.id);
-                        for (let j = 0; j < Math.min(y, player.handCards.length); j++) {
-                            if (aliveOthers.length > 0) {
-                                const target = aliveOthers[Math.floor(Math.random() * aliveOthers.length)];
-                                const cardToGive = player.handCards.pop();
-                                target.handCards.push(cardToGive);
-                                this.log(`${player.name}将${cardToGive.name}交给了${target.name}`, 'normal');
+                const wantYiji = await this.askSkillConfirm(player, '遗计',
+                    '受到伤害，是否发动【遗计】摸2张牌并交给其他角色？');
+                if (wantYiji) {
+                    for (let i = 0; i < damage; i++) {
+                        this.drawCard(player, 2);
+                        this.log(`${player.name}发动遗计，摸了2张牌`, 'highlight');
+                        const y = Math.max(0, player.hp);
+                        if (y > 0 && player.handCards.length > 0) {
+                            const aliveOthers = this.getAlivePlayers().filter(p => p.id !== player.id);
+                            const giveCount = Math.min(y, player.handCards.length);
+                            for (let j = 0; j < giveCount; j++) {
+                                if (aliveOthers.length === 0 || player.handCards.length === 0) break;
+                                const target = player.isAI
+                                    ? aliveOthers[Math.floor(Math.random() * aliveOthers.length)]
+                                    : await this.chooseTarget(player, aliveOthers, '遗计：选择交给牌的角色');
+                                if (target) {
+                                    const cardToGive = player.handCards.pop();
+                                    target.handCards.push(cardToGive);
+                                    this.log(`${player.name}将${cardToGive.name}交给了${target.name}`, 'normal');
+                                }
                             }
                         }
                     }
                 }
             }
-            // 武魂 (神关羽)
+            // 武魂 (神关羽) — LOCKED，自动累加梦魇
             if (player.skills.some(s => s.name === '武魂')) {
                 player.tokens = player.tokens || {};
                 player.tokens['梦魇'] = (player.tokens['梦魇'] || 0) + damage;
                 this.log(`${player.name}获得${damage}个梦魇标记`, 'normal');
             }
-            // 狂骨 (魏延) - 造成伤害后
+            // 节命 (荀彧) — 被动技(可)，受伤后令一名角色补牌至体力上限
+            if (player.skills.some(s => s.name === '节命')) {
+                const wantJieming = await this.askSkillConfirm(player, '节命',
+                    '受到伤害，是否发动【节命】令一名角色将手牌补至其体力上限？');
+                if (wantJieming) {
+                    const others = this.getAlivePlayers().filter(p => p.id !== player.id);
+                    if (others.length > 0) {
+                        const target = player.isAI
+                            ? others[Math.floor(Math.random() * others.length)]
+                            : await this.chooseTarget(player, others, '节命：选择补牌的角色');
+                        if (target) {
+                            const need = target.maxHp - target.handCards.length;
+                            if (need > 0) {
+                                this.drawCard(target, need);
+                                this.log(`${player.name}发动节命，${target.name}补了${need}张牌`, 'highlight');
+                            } else {
+                                this.log(`${target.name}手牌已满，节命无效果`, 'normal');
+                            }
+                        }
+                    }
+                }
+            }
+            // 狂骨 (魏延) — 被动技，造成伤害后摸牌
             if (source && source.skills.some(s => s.name === '狂骨')) {
                 this.drawCard(source, 1);
                 this.log(`${source.name}发动狂骨，摸了1张牌`, 'highlight');
             }
-            // 悲歌 (蔡文姬): 当一名角色受到【杀】伤害后，你可以弃牌令其判定
-            if (card && card.subtype === 'sha' && player.handCards.length > 0 && source && source.isAlive) {
-                // 找出有悲歌技能的角色（不一定是受伤者）
-                const beiGePlayer = this.getAlivePlayers().find(p => 
+            // 悲歌 (蔡文姬) — 主动技，有角色受【杀】伤害后，蔡文姬可弃牌令其判定
+            if (card && card.subtype === 'sha' && source && source.isAlive) {
+                const beiGePlayer = this.getAlivePlayers().find(p =>
                     p.skills.some(s => s.name === '悲歌') && p.handCards.length > 0
                 );
-                if (beiGePlayer && (beiGePlayer.isAI || Math.random() < 0.5)) {
-                    const discarded = beiGePlayer.handCards[0];
-                    this.discardCard(beiGePlayer, discarded);
-                    const judge = this.revealTopCard();
-                    this.log(`${beiGePlayer.name}发动悲歌，判定：${SGS.CardData.suitName[judge.suit]}`, 'highlight');
-                    switch (judge.suit) {
-                        case 'heart': // 红桃：回复1体力
-                            this.heal(player, 1);
-                            this.log(`${player.name}回复1点体力`, 'success');
-                            break;
-                        case 'diamond': // 方块：摸两张牌
-                            this.drawCard(player, 2);
-                            this.log(`${player.name}摸了2张牌`, 'success');
-                            break;
-                        case 'club': // 梅花：伤害来源弃2张牌
-                            if (source.handCards.length > 0) {
-                                for (let i = 0; i < 2 && source.handCards.length > 0; i++) {
-                                    const c = source.handCards[Math.floor(Math.random() * source.handCards.length)];
-                                    this.discardCard(source, c);
-                                }
-                                this.log(`${source.name}被弃了牌`, 'normal');
+                if (beiGePlayer) {
+                    const wantBeiGe = await this.askSkillConfirm(beiGePlayer, '悲歌',
+                        '有角色受到【杀】伤害，是否发动【悲歌】弃置一张牌令其判定？');
+                    if (wantBeiGe) {
+                        const discardCards = beiGePlayer.isAI ? [beiGePlayer.handCards[0]] :
+                            [await this.chooseCard(beiGePlayer, beiGePlayer.handCards, '悲歌：选择弃置的牌')];
+                        const discarded = discardCards[0];
+                        if (discarded) {
+                            this.discardCard(beiGePlayer, discarded);
+                            const judge = this.revealTopCard();
+                            this.log(`${beiGePlayer.name}发动悲歌，判定：${SGS.CardData.suitName[judge.suit]}`, 'highlight');
+                            switch (judge.suit) {
+                                case 'heart': // 红桃：回复1体力
+                                    this.heal(player, 1);
+                                    this.log(`${player.name}回复1点体力`, 'success');
+                                    break;
+                                case 'diamond': // 方块：摸两张牌
+                                    this.drawCard(player, 2);
+                                    this.log(`${player.name}摸了2张牌`, 'success');
+                                    break;
+                                case 'club': // 梅花：伤害来源弃2张牌
+                                    if (source.handCards.length > 0) {
+                                        for (let i = 0; i < 2 && source.handCards.length > 0; i++) {
+                                            const c = source.isAI
+                                                ? source.handCards[Math.floor(Math.random() * source.handCards.length)]
+                                                : await this.chooseCard(source, source.handCards, '悲歌：选择弃置来源的一张牌');
+                                            if (c) this.discardCard(source, c);
+                                        }
+                                        this.log(`${source.name}被弃了牌`, 'normal');
+                                    }
+                                    break;
+                                case 'spade': // 黑桃：伤害来源翻面
+                                    source.isFlipped = true;
+                                    this.log(`${source.name}被翻面`, 'danger');
+                                    break;
                             }
-                            break;
-                        case 'spade': // 黑桃：伤害来源翻面
-                            source.isFlipped = true;
-                            this.log(`${source.name}被翻面`, 'danger');
-                            break;
+                            this.discardPile.push(judge);
+                        }
                     }
-                    this.discardPile.push(judge);
                 }
             }
 
             // 检查死亡
             if (player.hp <= 0) {
-                this.handleDying(player, source);
+                await this.handleDying(player, source);
             }
             this.notifyState();
         }
 
-        propagateChain(player, damage, element, source) {
+        async propagateChain(player, damage, element, source) {
             const chained = this.getAlivePlayers().filter(p => p.isChained && p.id !== player.id);
             for (const p of chained) {
                 this.log(`铁索连环传导！${p.name}受到${damage}点${element === 'fire' ? '火焰' : '雷电'}伤害`, 'danger');
@@ -2324,7 +2473,7 @@ SGS.GameEngine = (function() {
                 p.hp -= damage;
                 this.emit('onDamaged', { player: p, damage, source, element, engine: this });
                 if (p.hp <= 0) {
-                    this.handleDying(p, source);
+                    await this.handleDying(p, source);
                 }
             }
         }
@@ -2346,7 +2495,7 @@ SGS.GameEngine = (function() {
         }
 
         // ========== 濒死处理 ==========
-        handleDying(player, killer) {
+        async handleDying(player, killer) {
             this.log(`${player.name}进入濒死状态！`, 'danger');
             this.emit('onDying', { player, killer, engine: this });
 
@@ -2366,11 +2515,8 @@ SGS.GameEngine = (function() {
                 }
             }
 
-            // 尝试求桃（异步执行，加catch防卡死）
-            this.requestTao(player, killer).catch(err => {
-                console.error('求桃流程出错:', err);
-                this.killPlayer(player, killer);
-            });
+            // 尝试求桃
+            await this.requestTao(player, killer);
         }
 
         async requestTao(player, killer) {
@@ -2432,10 +2578,10 @@ SGS.GameEngine = (function() {
             }
 
             // 没人救活
-            this.killPlayer(player, killer);
+            await this.killPlayer(player, killer);
         }
 
-        killPlayer(player, killer) {
+        async killPlayer(player, killer) {
             // 涅槃 (庞统)
             if (player.skills.some(s => s.name === '涅槃') && player.isAlive) {
                 player.hp = 3;
@@ -2466,54 +2612,56 @@ SGS.GameEngine = (function() {
                 killer: killer?.name
             });
 
-            // 归心 (神曹操): 其他角色死亡时获得其所有牌
-            const shenCaoCao = this.players.find(p => p.isAlive && p.skills.some(s => s.name === '归心'));
-            if (shenCaoCao && shenCaoCao.id !== player.id) {
-                // 获得死者手牌
-                for (const c of [...player.handCards]) {
-                    shenCaoCao.handCards.push(c);
-                }
-                player.handCards = [];
-                // 获得死者装备
-                for (const slot of ['weapon', 'armor', 'horsePlus', 'horseMinus']) {
-                    if (player.equipment[slot]) {
-                        shenCaoCao.handCards.push(player.equipment[slot]);
-                        player.equipment[slot] = null;
-                    }
-                }
-                this.log(`${shenCaoCao.name}发动【归心】，获得${player.name}的所有牌`, 'highlight');
+            // 收集死者所有牌
+            const deadCards = [...player.handCards, ...player.judgmentCards];
+            for (const slot of ['weapon', 'armor', 'horsePlus', 'horseMinus']) {
+                if (player.equipment[slot]) deadCards.push(player.equipment[slot]);
             }
 
-            // 弃置所有牌（如果没有被归心获得）
-            for (const c of [...player.handCards]) {
-                this.discardPile.push(c);
-            }
-            player.handCards = [];
-            for (const slot of ['weapon', 'armor', 'horsePlus', 'horseMinus']) {
-                if (player.equipment[slot]) {
-                    this.discardPile.push(player.equipment[slot]);
-                    player.equipment[slot] = null;
+            // 行殇 (曹丕): 其他角色死亡时，可获得其所有牌
+            let xingshangUsed = false;
+            if (killer && killer.skills.some(s => s.name === '行殇') && deadCards.length > 0) {
+                const want = killer.isAI ? true : await this.askSkillConfirm(killer, '行殇', '有角色死亡，是否发动【行殇】获得其所有牌？');
+                if (want) {
+                    for (const c of deadCards) killer.handCards.push(c);
+                    xingshangUsed = true;
+                    this.log(`${killer.name}发动行殇，获得了${deadCards.length}张牌`, 'highlight');
                 }
             }
-            for (const c of [...player.judgmentCards]) {
-                this.discardPile.push(c);
+
+            // 若未发动行殇，弃置死者所有牌
+            if (!xingshangUsed) {
+                for (const c of deadCards) this.discardPile.push(c);
             }
+            player.handCards = [];
             player.judgmentCards = [];
+            for (const slot of ['weapon', 'armor', 'horsePlus', 'horseMinus']) player.equipment[slot] = null;
 
             // 触发死亡事件
             this.emit('onPlayerDeath', { player, killer, engine: this });
 
-            // 行殇
-            if (killer && killer.skills.some(s => s.name === '行殇')) {
-                // 获得死者所有牌（已弃置，这里简化处理为摸等量牌）
-                this.drawCard(killer, 2);
-                this.log(`${killer.name}发动行殇，获得遗物`, 'highlight');
+            // 断肠
+            if (player.skills.some(s => s.name === '断肠') && killer) {
+                this.log(`${killer.name}受到断肠影响，失去所有技能！`, 'danger');
+                killer.hero = { ...killer.hero, skills: [] };
             }
 
             // 断肠
             if (player.skills.some(s => s.name === '断肠') && killer) {
                 this.log(`${killer.name}受到断肠影响，失去所有技能！`, 'danger');
                 killer.hero = { ...killer.hero, skills: [] };
+            }
+
+            // 武魂 (神关羽): 死亡时令梦魇标记最多者死亡
+            if (player.skills.some(s => s.name === '武魂')) {
+                const candidates = this.getAlivePlayers().filter(p => p.id !== player.id && p.tokens && p.tokens['梦魇'] > 0);
+                if (candidates.length > 0) {
+                    candidates.sort((a, b) => (b.tokens['梦魇'] || 0) - (a.tokens['梦魇'] || 0));
+                    const victim = candidates[0];
+                    this.log(`${player.name}发动武魂，${victim.name}因梦魇过多而亡！`, 'danger');
+                    victim.hp = 0;
+                    await this.killPlayer(victim, player);
+                }
             }
 
             // 身份局奖惩
@@ -2672,7 +2820,7 @@ SGS.GameEngine = (function() {
                     player.hp -= 1;
                     this.drawCard(player, 2);
                     this.log(`${player.name}发动苦肉，失去1体力摸2牌`, 'highlight');
-                    if (player.hp <= 0) this.handleDying(player, player);
+                    if (player.hp <= 0) await this.handleDying(player, player);
                     break;
                 case '仁德':
                     if (params.targetId !== undefined && params.cards && params.cards.length > 0) {
@@ -2720,7 +2868,7 @@ SGS.GameEngine = (function() {
                             this.log(`反间牌为${c.suitSymbol||SGS.CardData.suitName[c.suit]}${c.name}`, 'normal');
                             target.handCards.splice(target.handCards.indexOf(c), 1);
                             if (c.suit !== declaredSuit) {
-                                this.dealDamage(target, 1, { source: player, card: c });
+                                await this.dealDamage(target, 1, { source: player, card: c });
                                 this.log(`${target.name}猜错花色，受到1点伤害`, 'danger');
                             }
                             player.handCards.push(c);
@@ -2793,7 +2941,7 @@ SGS.GameEngine = (function() {
                                 if (!p.isAlive) continue;
                                 const shan = await this.requestResponse(p, 'shan', player);
                                 if (!shan) {
-                                    this.dealDamage(p, 1, { source: player, card: { subtype: 'sha' } });
+                                    await this.dealDamage(p, 1, { source: player, card: { subtype: 'sha' } });
                                 } else {
                                     this.discardPile.push(shan);
                                 }
@@ -2812,7 +2960,7 @@ SGS.GameEngine = (function() {
                         } else {
                             player.hp -= 1;
                         }
-                        this.dealDamage(target, 1, { source: player });
+                        await this.dealDamage(target, 1, { source: player });
                         this.log(`${player.name}对${target.name}发动强袭`, 'highlight');
                     }
                     break;
@@ -2831,15 +2979,15 @@ SGS.GameEngine = (function() {
                                 );
                                 if (targetsInRange.length > 0) {
                                     const damaged = targetsInRange[0]; // 简化：选第一个
-                                    this.dealDamage(damaged, 1, { source: player });
+                                    await this.dealDamage(damaged, 1, { source: player });
                                     this.log(`${target.name}拼点失败，${damaged.name}受到1点伤害`, 'danger');
                                 } else {
                                     // 无人在攻击范围内，打对手自己
-                                    this.dealDamage(target, 1, { source: player });
+                                    await this.dealDamage(target, 1, { source: player });
                                     this.log(`${target.name}拼点失败，受到1点伤害`, 'danger');
                                 }
                             } else {
-                                this.dealDamage(player, 1, { source: player });
+                                await this.dealDamage(player, 1, { source: player });
                                 this.log(`${player.name}拼点失败，受到1点伤害`, 'danger');
                             }
                             this.discardCard(player, myCard);
@@ -2874,7 +3022,7 @@ SGS.GameEngine = (function() {
                         }
                         const sha = await this.requestResponse(p, 'sha', player);
                         if (!sha) {
-                            this.dealDamage(p, 1, { source: player });
+                            await this.dealDamage(p, 1, { source: player });
                             this.log(`${p.name}乱武未能出杀，失去1点体力`, 'danger');
                         } else {
                             this.log(`${p.name}乱武对${nearest.name}使用了杀`, 'normal');
@@ -2933,7 +3081,7 @@ SGS.GameEngine = (function() {
                     if (player.hp > minHp) {
                         player.hp -= 1;
                         this.log(`${player.name}崩坏：失去1点体力`, 'danger');
-                        if (player.hp <= 0) this.handleDying(player, player);
+                        if (player.hp <= 0) await this.handleDying(player, player);
                     } else {
                         this.log(`${player.name}崩坏：体力已是最低，不触发`, 'normal');
                     }
@@ -3084,48 +3232,7 @@ SGS.GameEngine = (function() {
                         this.log(`${player.name}蛊惑：将${params.card.name}当作${params.asCard}使用`, 'highlight');
                     }
                     break;
-                case '琴音':
-                    // 神周瑜：弃牌阶段可以令所有角色回1体力或掉1体力
-                    const alivePlayers2 = this.getAlivePlayers();
-                    for (const p of alivePlayers2) {
-                        this.heal(p, 1);
-                    }
-                    this.log(`${player.name}发动琴音，所有角色回1体力`, 'success');
-                    break;
-                case '业炎':
-                    // 神周瑜：结束阶段可以对1-3名角色造成1点火焰伤害
-                    if (params.targetIds) {
-                        for (const tid of params.targetIds) {
-                            const target = this.players[tid];
-                            if (target && target.isAlive) {
-                                this.dealDamage(target, 1, { source: player, element: 'fire', card: null });
-                            }
-                        }
-                        this.log(`${player.name}发动业炎`, 'danger');
-                    }
-                    break;
-                case '归心':
-                    // 神曹操：其他角色死亡时，你获得其所有牌
-                    // 在killPlayer中处理
-                    break;
-                case '飞影':
-                    // 神曹操：锁定技，其他角色计算与你的距离+1
-                    player.distanceMod += 1;
-                    break;
-                case '龙魂':
-                    // 神赵云：可以将装备牌当杀或闪使用
-                    if (params.card && params.asType) {
-                        const card = params.card;
-                        if (card.type === 'equip') {
-                            this.discardPile.push(card);
-                            const slot = card.slot;
-                            if (player.equipment[slot] && player.equipment[slot].instanceId === card.instanceId) {
-                                player.equipment[slot] = null;
-                            }
-                            this.log(`${player.name}龙魂：将装备牌当${params.asType}使用`, 'highlight');
-                        }
-                    }
-                    break;
+                // 注：神周瑜/神曹操/神赵云 暂未加入武将池，琴音/业炎/归心/飞影/龙魂 待接入
                 case '八阵':
                     // 诸葛亮：锁定技，若你没有手牌，视为拥有八卦阵
                     if (player.handCards.length === 0) {
@@ -3141,7 +3248,7 @@ SGS.GameEngine = (function() {
                         const card = params.card;
                         if (card.element === 'fire' || card.suit === 'heart' || card.suit === 'diamond') {
                             this.discardCard(player, card);
-                            this.dealDamage(target, 1, { source: player, element: 'fire', card });
+                            await this.dealDamage(target, 1, { source: player, element: 'fire', card });
                             this.log(`${player.name}火计：对${target.name}造成1点火焰伤害`, 'danger');
                         }
                     }

@@ -493,6 +493,7 @@
             cursor:pointer;transition:all 0.18s ease;position:relative;overflow:hidden;color:#1a1a2e;
             -webkit-tap-highlight-color:transparent;
             box-shadow:0 3px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.5);
+            user-select: none;
         }
         .card:active { transform:scale(0.95) translateY(2px); }
         .card.sel { transform:translateY(-18px) scale(1.08); box-shadow:0 10px 24px rgba(230,200,77,0.8), inset 0 0 0 2.5px #e6c84d; border-color:#e6c84d; border-width:2.5px; z-index:10; }
@@ -1904,7 +1905,7 @@ function renderHand(human, state){
         const cardImg=getCardImagePath(c);
         cardsHtml+=`<div class="card ${suitC} ${typeCls} ${elemCls}${isSelected?' sel':''}${canUse?' ok':''}"
                          data-instance-id="${c.instanceId}" data-i="${ci}"
-                         ondragstart="return false" onmousedown="startHandDrag(event)">
+                         ondragstart="return false" onmousedown="startHandDrag(event)"
                          onclick="clickCard(${ci})">
             <span class="cs ${suitC}">${suitChar}</span>
             <span class="cn">${numStr}</span>
@@ -2256,7 +2257,7 @@ function openTargetPicker(card){
         case'juedou':case'guohe':case'huogong':case'jiedao':
             targets=engine.getAlivePlayers().filter(p=>p.id!==human.id);break;
         case'lebusi':targets=engine.getAlivePlayers().filter(p=>p.id!==human.id&&!p.judgmentCards.some(c=>c.subtype==='lebusi'));break;
-        case'tiesuo':targets=engine.getAlivePlayers().filter(p=>p.id!==human.id);break;
+        case'tiesuo':targets=engine.getAlivePlayers();break; // 铁索连环可以对自己使用
         default:targets=[];
     }
     const mt=card.subtype==='tiesuo'?2:1;
@@ -3854,6 +3855,42 @@ class BridgeAdapter{
     isConnected(){return true;}
 }
 
+// ======== 技能发动确认弹窗 ========
+// 引擎调用 window.showSkillConfirmModal(skillName, desc, playerId, resolve)
+// resolve 是引擎传入的 Promise resolve 回调，用户点击后调用 resolve(true/false)
+function showSkillConfirmModal(skillName, desc, playerId, resolve) {
+    const overlay = document.getElementById('skillConfirmOverlay');
+    const nameEl = document.getElementById('skillConfirmName');
+    const descEl = document.getElementById('skillConfirmDesc');
+    const yesBtn = document.getElementById('skillConfirmYes');
+    const noBtn = document.getElementById('skillConfirmNo');
+    if (!overlay || !nameEl || !descEl) return;
+    if (typeof resolve !== 'function') return;
+    nameEl.textContent = '【' + skillName + '】';
+    descEl.textContent = desc || '';
+    overlay.style.display = 'flex';
+    let settled = false;
+    const onYes = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(true);
+    };
+    const onNo = () => {
+        if (settled) return;
+        settled = false;
+        cleanup();
+        resolve(false);
+    };
+    const cleanup = () => {
+        overlay.style.display = 'none';
+        yesBtn.removeEventListener('click', onYes);
+        noBtn.removeEventListener('click', onNo);
+    };
+    yesBtn.addEventListener('click', onYes);
+    noBtn.addEventListener('click', onNo);
+}
+
 // ======== 出牌动画系统（正版三国杀风格） ========
 
 // 出牌动画：光线从来源射向目标 + 卡牌图标在中间闪现
@@ -4139,6 +4176,37 @@ function boot(){
         }
     };
 
+    // 目标角色选择弹窗
+    window.showTargetSelector = function(targets, promptText) {
+        return new Promise((resolve) => {
+            const overlay = document.getElementById('targetSelOverlay');
+            const title = document.getElementById('targetSelTitle');
+            const list = document.getElementById('targetSelList');
+            if (!overlay || !title || !list) { resolve(null); return; }
+            title.textContent = promptText || '选择目标';
+            window._targetSelResolve = resolve;
+            list.innerHTML = targets.map(t => {
+                const factionC = {wei:'#5b8def',shu:'#e8503a',wu:'#3ab06a',qun:'#c9a227'}[t.faction] || '#aaa';
+                const roleC = {lord:'#e6c84d',rebel:'#e8503a',loyal:'#5b8def',spy:'#9b59b6'}[t.role] || '#aaa';
+                return `<div class="target-sel-item" onclick="window.doSelectTarget('${t.id}')" style="cursor:pointer;border:2px solid ${factionC};border-radius:8px;padding:8px 12px;margin:6px;background:rgba(0,0,0,0.3);text-align:center;min-width:90px;">
+                    <div style="color:#fff;font-weight:bold;font-size:14px;">${t.name}</div>
+                    <div style="color:${roleC};font-size:11px;margin-top:2px;">${t.hero ? t.hero.name : ''}</div>
+                    <div style="color:${factionC};font-size:11px;">${t.hp}/${t.maxHp}血</div>
+                </div>`;
+            }).join('');
+            overlay.style.display = 'flex';
+        });
+    };
+
+    window.doSelectTarget = function(targetId) {
+        const overlay = document.getElementById('targetSelOverlay');
+        if (overlay) overlay.style.display = 'none';
+        if (window._targetSelResolve) {
+            window._targetSelResolve(targetId);
+            window._targetSelResolve = null;
+        }
+    };
+
     // 在 updateBoard 中检查卡牌选择（使用Promise方式）
     const _origUpdateBoard = updateBoard;
     window.updateBoard = function(state) {
@@ -4152,6 +4220,14 @@ function boot(){
                 pc.resolve(chosen || null);
             });
             engine._pendingCardChoice = null;
+        }
+        if (engine && engine._pendingTargetChoice) {
+            const pt = engine._pendingTargetChoice;
+            window.showTargetSelector(pt.targets, pt.prompt).then((targetId) => {
+                const chosen = pt.targets.find(t => String(t.id) === String(targetId));
+                pt.resolve(chosen || null);
+            });
+            engine._pendingTargetChoice = null;
         }
         // 调用原始 updateBoard
         if (_origUpdateBoard) _origUpdateBoard(state);
@@ -4656,6 +4732,27 @@ function onHandDragEnd(e){
         <div style="background:linear-gradient(180deg,#2a2218,#1a1410);border:2px solid #8b6914;border-radius:12px;padding:16px 20px;max-width:88%;max-height:85%;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.7);">
             <div id="cardSelTitle" style="color:#e6c84d;font-size:15px;font-weight:bold;text-align:center;margin-bottom:12px;text-shadow:0 1px 3px #000;"></div>
             <div id="cardSelList" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:4px;"></div>
+        </div>
+    </div>
+
+    <!-- 技能发动确认弹窗 -->
+    <div id="skillConfirmOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:300;justify-content:center;align-items:center;flex-direction:column;">
+        <div style="background:linear-gradient(180deg,#2a2218,#1a1410);border:2px solid #e6c84d;border-radius:12px;padding:20px 24px;max-width:90%;width:360px;box-shadow:0 8px 32px rgba(0,0,0,0.8);text-align:center;">
+            <div style="color:#e6c84d;font-size:18px;font-weight:bold;margin-bottom:6px;text-shadow:0 1px 3px #000;">是否发动技能？</div>
+            <div id="skillConfirmName" style="color:#fff;font-size:22px;font-weight:bold;margin-bottom:8px;"></div>
+            <div id="skillConfirmDesc" style="color:#ccc;font-size:13px;line-height:1.5;margin-bottom:16px;"></div>
+            <div style="display:flex;gap:12px;justify-content:center;">
+                <button class="btn btn-primary" id="skillConfirmYes" style="min-width:100px;">发动</button>
+                <button class="btn btn-secondary" id="skillConfirmNo" style="min-width:100px;">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 目标角色选择弹窗 -->
+    <div id="targetSelOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:300;justify-content:center;align-items:center;flex-direction:column;">
+        <div style="background:linear-gradient(180deg,#2a2218,#1a1410);border:2px solid #e6c84d;border-radius:12px;padding:20px 24px;max-width:90%;width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.8);text-align:center;">
+            <div id="targetSelTitle" style="color:#e6c84d;font-size:16px;font-weight:bold;margin-bottom:12px;text-shadow:0 1px 3px #000;"></div>
+            <div id="targetSelList" style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px;"></div>
         </div>
     </div>
 </body>

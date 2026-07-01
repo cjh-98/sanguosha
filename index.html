@@ -148,12 +148,12 @@
         .topbar .btn-sm { background:linear-gradient(180deg,#3a3020,#251e12); color:#d4b86a; border-color:#5c4a28; font-size:11px; }
 
 
-        /* 日志面板包裹层 - 桌面右上角悬浮（参考官方三国杀） */
+        /* 日志面板包裹层 - 右下角悬浮，在用户UI上方 */
         .log-panel-wrap {
-            position: absolute; top: 38px; right: 8px;
-            width: 220px; max-height: 45%;
+            position: absolute; bottom: 8px; right: 8px;
+            width: 240px; max-height: 35vh;
             display: flex; flex-direction: column;
-            background: rgba(15,12,8,0.92);
+            background: rgba(15,12,8,0.95);
             border: 1.5px solid #5c4a28;
             border-radius: 6px;
             box-shadow: 0 4px 16px rgba(0,0,0,0.6);
@@ -823,7 +823,6 @@
         </div>
         <div class="topbar-info">
             <span id="deckInfo"></span>
-            <button class="topbar-btn" onclick="toggleGameLog()">日志</button>
             <button class="topbar-btn" onclick="confirmQuit()">退出</button>
         </div>
     </div>
@@ -2068,7 +2067,10 @@ function quitToMenu(){
     gameStarted=false;engine=null;aiPlayer=null;showScreen('mainMenu');
 }
 function confirmQuit(){
-    if(confirm('确定退出当前对局吗？')) quitToMenu();
+    if(confirm('确定退出当前对局吗？')) {
+        _sgsUploadMatchLog('quit');
+        quitToMenu();
+    }
 }
 function restartGame(){
     gameStarted=false;engine=null;aiPlayer=null;goHeroSelect();
@@ -2922,6 +2924,74 @@ let _sgsDataConfig = {
 };
 let _sgsUploadedCount = 0;
 
+// 上传对局日志到GitHub
+async function _sgsUploadMatchLog(reason) {
+    try {
+        const state = _sgsCollectGameState();
+        if (!state || !state.matchId) return;
+        
+        const logData = {
+            userId: state.userId,
+            userName: state.userName,
+            matchId: state.matchId,
+            reason: reason || 'unknown',
+            timestamp: new Date().toISOString(),
+            gameState: {
+                turnCount: state.turnCount,
+                phase: state.phase,
+                currentPlayer: state.currentPlayer,
+                deckCount: state.deckCount,
+                discardCount: state.discardCount,
+                players: state.players
+            },
+            matchLog: state.matchLog || [],
+            matchHistory: state.latestMatch || null
+        };
+        
+        // 存本地备份
+        try {
+            const existing = JSON.parse(localStorage.getItem('sgs_pending_logs') || '[]');
+            existing.push(logData);
+            if (existing.length > 20) existing.shift();
+            localStorage.setItem('sgs_pending_logs', JSON.stringify(existing));
+        } catch(e) {}
+        
+        // 上传到 GitHub
+        const title = `[${reason}] 对局日志 - ${state.userName} - ${state.matchId}`;
+        const body = `**原因**: ${reason}\n**用户**: ${state.userName}\n\`\`\`json\n${JSON.stringify(logData, null, 2)}\n\`\`\``;
+        
+        const resp = await fetch('https://api.github.com/repos/' + _sgsDataConfig.repo + '/issues', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'token ' + _sgsDataConfig.token,
+                'Accept': 'application/vnd.github+json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title: title.substring(0, 256),
+                body: body,
+                labels: ['auto-submit', 'debug-log']
+            })
+        });
+        
+        if (resp.ok) {
+            _sgsUploadedCount++;
+            _sgsShowToast('✅ 日志已自动上传', '#2ecc71');
+        }
+    } catch(e) {
+        console.warn('日志自动上传失败(不影响游戏):', e.message);
+    }
+}
+
+// 显示Toast提示
+function _sgsShowToast(msg, bgColor) {
+    const t = document.createElement('div');
+    t.style.cssText = `position:fixed;top:8px;left:50%;transform:translateX(-50%);background:${bgColor||'#2ecc71'};color:#000;padding:8px 18px;border-radius:6px;z-index:99999;font-weight:bold;font-size:13px;box-shadow:0 2px 10px rgba(0,0,0,0.4);pointer-events:none;`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.5s'; setTimeout(() => t.remove(), 500); }, 2500);
+}
+
 // 用户标识
 function _sgsGetUserId() {
   let uid = localStorage.getItem('sgs_user_id');
@@ -3215,6 +3285,8 @@ window.sgsSubmitBugLog = async function() {
 
 // 提交Bug报告的入口函数
 function submitBugLog() {
+    // 先上传对局日志，再弹窗
+    _sgsUploadMatchLog('bug-submit');
     showBugReportModal();
 }
 

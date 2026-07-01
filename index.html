@@ -4087,8 +4087,6 @@ async function sgsSubmitBugLog(bugDesc = '') {
             return;
         }
         
-        const bugDesc = document.getElementById('bugDescription')?.value || '';
-        
         // 构建Issue内容 - 用户输入的描述放在标题
         const userName = state.userName;
         const date = new Date();
@@ -4152,7 +4150,6 @@ async function sgsSubmitBugLog(bugDesc = '') {
         _sgsUploadedCount++;
         
         // 显示成功提示
-        document.getElementById('bugReportModal')?.remove();
         showBugSubmitSuccess(result.html_url);
         
     } catch(e) {

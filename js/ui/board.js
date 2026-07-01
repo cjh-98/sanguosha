@@ -286,6 +286,18 @@ SGS.UI.Board = (function() {
         if (!gameStarted || !state) return;
         const human = engine.getHumanPlayer();
         if (!human) return;
+        
+        // 检查是否有待处理的卡牌选择（顺手牵羊/过河拆桥等）
+        if (engine && engine._pendingCardChoice) {
+            const pc = engine._pendingCardChoice;
+            const hideInfo = pc.hideInfo || false;
+            // 显示卡牌选择UI
+            showCardSelector(pc.cards, pc.prompt, hideInfo, (cardId) => {
+                const chosen = pc.cards.find(c => c.instanceId === cardId);
+                pc.resolve(chosen || null);
+            });
+            return; // 不继续更新，等待玩家选择
+        }
 
         // 顶部信息
         const currentPlayer = engine.players[state.currentPlayerIdx];
@@ -975,6 +987,74 @@ SGS.UI.Board = (function() {
                 activeAnimations.delete(cardId);
             }, 800);
         }, duration);
+    }
+    
+    // ========== 卡牌选择器 ==========
+    let cardSelectorOverlay = null;
+    
+    function showCardSelector(cards, promptText, hideInfo, onSelect) {
+        // 移除已有的选择器
+        const existing = document.getElementById('cardSelectorOverlay');
+        if (existing) existing.remove();
+        
+        cardSelectorOverlay = document.createElement('div');
+        cardSelectorOverlay.id = 'cardSelectorOverlay';
+        cardSelectorOverlay.className = 'overlay';
+        cardSelectorOverlay.innerHTML = `
+            <div class="card-selector-modal" style="max-width:90%;max-height:85%;overflow:auto;">
+                <div style="color:var(--accent-gold);font-size:1.4vw;font-weight:bold;text-align:center;margin-bottom:1.2vw;padding:1.2vw;">${promptText}</div>
+                <div id="cardSelectorList" style="display:flex;gap:1vw;flex-wrap:wrap;justify-content:center;padding:1vw;min-height:10vw;">
+                    ${cards.map(c => {
+                        const suitChar = SGS.CardData.suitName[c.suit];
+                        const colorClass = SGS.CardData.suitColor[c.suit];
+                        const elementClass = c.element === 'fire' ? 'fire' : c.element === 'thunder' ? 'thunder' : '';
+                        const nameDisplay = elementClass ? `${c.element === 'fire' ? '火' : '雷'}${c.name}` : c.name;
+                        
+                        if (hideInfo) {
+                            // 对手牌：显示卡牌背面
+                            return `<div class="card card-back card-selector-item" data-id="${c.instanceId}" onclick="SGS.UI.Board.selectCardFromList('${c.instanceId}')" style="width:7vw;height:10vh;cursor:pointer;">
+                                <div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:4vw;">🂠</div>
+                            </div>`;
+                        } else {
+                            return `<div class="card ${colorClass} ${elementClass} card-selector-item" data-id="${c.instanceId}" onclick="SGS.UI.Board.selectCardFromList('${c.instanceId}')" style="width:7vw;height:10vh;cursor:pointer;">
+                                <span class="card-suit ${colorClass}">${suitChar}</span>
+                                <span class="card-name">${nameDisplay}</span>
+                            </div>`;
+                        }
+                    }).join('')}
+                </div>
+                <div style="text-align:center;margin-top:1vw;">
+                    <button class="btn btn-small" onclick="SGS.UI.Board.cancelCardSelector()">取消</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(cardSelectorOverlay);
+    }
+    
+    function selectCardFromList(cardId) {
+        if (engine && engine._pendingCardChoice) {
+            const pc = engine._pendingCardChoice;
+            const chosen = pc.cards.find(c => c.instanceId === cardId);
+            if (chosen) {
+                pc.resolve(chosen);
+            }
+            // 移除选择器
+            if (cardSelectorOverlay) {
+                cardSelectorOverlay.remove();
+                cardSelectorOverlay = null;
+            }
+        }
+    }
+    
+    function cancelCardSelector() {
+        if (engine && engine._pendingCardChoice) {
+            const pc = engine._pendingCardChoice;
+            pc.resolve(null);
+        }
+        if (cardSelectorOverlay) {
+            cardSelectorOverlay.remove();
+            cardSelectorOverlay = null;
+        }
     }
     
     // ========== 事件处理 ==========

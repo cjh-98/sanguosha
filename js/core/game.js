@@ -133,6 +133,10 @@ SGS.GameEngine = (function() {
             try {
                 this.adapter && this.adapter.notifyEvent({ type: 'log', msg, _type: type });
             } catch(e) { console.error('log通知失败:', e); }
+            // 同时记录到对局日志
+            if (this.matchId) {
+                this.addMatchEvent('game_log', { msg, type });
+            }
         }
 
         // ========== 对局日志系统 ==========
@@ -207,6 +211,97 @@ SGS.GameEngine = (function() {
         // 清除历史记录
         static clearMatchHistory() {
             localStorage.removeItem('sgsMatchHistory');
+        }
+        
+        // 获取当前对局日志（用于实时上传）
+        getMatchLog() {
+            return {
+                matchId: this.matchId,
+                startTime: this.matchStartTime,
+                players: this.players.map(p => ({
+                    name: p.name,
+                    hero: p.hero.name,
+                    isAI: p.isAI,
+                    identity: p.identity,
+                    faction: p.faction
+                })),
+                log: this.matchLog
+            };
+        }
+        
+        // 实时上传日志片段到GitHub
+        async uploadLogChunk() {
+            if (!this.matchId) return;
+            
+            try {
+                // 获取保存的token
+                const token = localStorage.getItem('sgsGitHubToken');
+                if (!token) return; // 没有token就不上传
+                
+                const logData = this.getMatchLog();
+                const chunkId = 'chunk_' + Date.now();
+                
+                // 构建Issue内容
+                const date = new Date();
+                const body = `**实时日志片段**\n\n`;
+                body += `\`\`\`json\n${JSON.stringify(logData, null, 2)}\n\`\`\`\n`;
+                
+                const issueData = {
+                    title: `📊 实时日志 - ${chunkId} (${date.toLocaleTimeString('zh-CN')})`,
+                    body: body,
+                    labels: ['auto-submit', 'debug-log']
+                };
+                
+                await fetch('https://api.github.com/repos/cjh-98/sanguosha-data/issues', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(issueData)
+                });
+                
+                console.log('实时日志已上传:', chunkId);
+            } catch(e) {
+                // 静默失败，不影响游戏
+                console.debug('实时日志上传失败:', e);
+            }
+        }
+        
+        // 启动实时日志上传定时器
+        startRealtimeLogUpload(interval = 30000) {
+            if (this._logUploadTimer) clearInterval(this._logUploadTimer);
+            this._logUploadTimer = setInterval(() => this.uploadLogChunk(), interval);
+        }
+        
+        // 停止实时日志上传
+        stopRealtimeLogUpload() {
+            if (this._logUploadTimer) {
+                clearInterval(this._logUploadTimer);
+                this._logUploadTimer = null;
+            }
+        }
+                    title: `📊 实时日志 - ${chunkId} (${date.toLocaleTimeString('zh-CN')})`,
+                    body: body,
+                    labels: ['auto-submit', 'debug-log']
+                };
+                
+                await fetch('https://api.github.com/repos/cjh-98/sanguosha-data/issues', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(issueData)
+                });
+                
+                console.log('实时日志已上传:', chunkId);
+            } catch(e) {
+                // 静默失败，不影响游戏
+                console.debug('实时日志上传失败:', e);
+            }
         }
 
         // ========== 事件系统 ==========
@@ -327,6 +422,7 @@ SGS.GameEngine = (function() {
                 this.turnCount = 1;
                 this.log('游戏开始！', 'highlight');
                 this.startMatchLog(); // 开始记录对局
+                this.startRealtimeLogUpload(30000); // 每30秒上传一次日志
                 this.notifyState();
                 this.startTurn();
             } catch(e) {
@@ -1567,13 +1663,14 @@ SGS.GameEngine = (function() {
                         // 第二步：使用者选择是否弃置一张同花色牌
                         const sameSuit = player.handCards.filter(c => c.suit === showCard.suit);
                         if (sameSuit.length > 0) {
-                            // 让玩家选择弃哪张同花色牌（如果多张），或直接弃第一张
-                            // 简化：让AI自动选，人类也选第一张同花色的
-                            const discard = sameSuit[0];
-                            player.handCards.splice(player.handCards.indexOf(discard), 1);
-                            this.discardPile.push(discard);
-                            this.log(`${player.name}弃了${discard.name}(${SGS.CardData.suitName[discard.suit]})，火攻成功！`, 'danger');
-                            this.dealDamage(t3, 1, { source: player, element: 'fire', card });
+                            // 让玩家从同花色牌中选择一张弃置
+                            const chosen = await this.chooseCard(player, sameSuit, `弃置一张${SGS.CardData.suitName[showCard.suit]}牌进行火攻`);
+                            if (chosen) {
+                                player.handCards.splice(player.handCards.indexOf(chosen), 1);
+                                this.discardPile.push(chosen);
+                                this.log(`${player.name}弃了${chosen.name}(${SGS.CardData.suitName[chosen.suit]})，火攻成功！`, 'danger');
+                                this.dealDamage(t3, 1, { source: player, element: 'fire', card });
+                            }
                         } else {
                             this.log(`${player.name}没有${SGS.CardData.suitName[showCard.suit]}花色的牌，火攻失败`, 'normal');
                         }
@@ -2310,6 +2407,9 @@ SGS.GameEngine = (function() {
             const humanPlayer = this.players.find(p => !p.isAI);
             const isWin = humanPlayer && this.winner && this.winner.includes(humanPlayer.id);
             const result = isWin ? 'win' : 'lose';
+            
+            // 停止实时日志上传
+            this.stopRealtimeLogUpload();
             
             // 保存对局记录
             this.saveMatchLog(result);

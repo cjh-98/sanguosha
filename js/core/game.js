@@ -1373,7 +1373,24 @@ SGS.GameEngine = (function() {
                     }
                     break;
                 case 'shan':
+                    // 激将 (刘备 主公技): 需闪时请蜀势力角色打出闪
+                    if (player.isLord && player.skills.some(s => s.name === '激将') && player.faction === 'shu') {
+                        const shuHelpers = this.getAlivePlayers().filter(p => p.id !== player.id && p.faction === 'shu' && p.handCards.some(c => c.subtype === 'shan'));
+                        if (shuHelpers.length > 0) {
+                            for (const helper of shuHelpers) {
+                                const shan = helper.handCards.find(c => c.subtype === 'shan');
+                                if (shan) {
+                                    if (helper.isAI && this.ai && this.ai.shouldSaveLord(helper, player, this)) {
+                                        this.discardCard(helper, shan);
+                                        this.log(`${helper.name}激将：为${player.name}打出闪`, 'success');
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
                     return false; // 闪只能响应打出
+                    break;
                 case 'tao':
                     if (player.hp >= player.maxHp) return false;
                     break;
@@ -1461,6 +1478,52 @@ SGS.GameEngine = (function() {
                 } else {
                     this.log(`${source.name}没有基本牌，享乐使【杀】无效！`, 'danger');
                     return;
+                }
+                // 护驾 (曹操 主公技): 需闪时请魏势力角色打出闪
+                if (target.isLord && target.skills.some(s => s.name === '护驾') && target.faction === 'wei') {
+                    const weiHelpers = this.getAlivePlayers().filter(p => p.id !== target.id && p.faction === 'wei' && p.handCards.some(c => c.subtype === 'shan'));
+                    if (weiHelpers.length > 0) {
+                        let saved = false;
+                        for (const helper of weiHelpers) {
+                            const shan = helper.handCards.find(c => c.subtype === 'shan');
+                            if (shan) {
+                                if (helper.isAI && this.ai && this.ai.shouldSaveLord(helper, target, this)) {
+                                    this.discardCard(helper, shan);
+                                    this.log(`${helper.name}护驾：为${target.name}打出闪`, 'success');
+                                    saved = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!saved) {
+                            this.log(`${target.name}护驾：魏势力无人打出闪`, 'danger');
+                        }
+                    }
+                }
+                // 黄天 (张角 主公技): 需闪时令反贼角色打出闪
+                if (target.isLord && target.skills.some(s => s.name === '黄天') && target.faction === 'qun') {
+                    const rebelHelpers = this.getAlivePlayers().filter(p => p.id !== target.id && p.faction === 'rebel' && p.handCards.some(c => c.subtype === 'shan'));
+                    if (rebelHelpers.length > 0) {
+                        let saved = false;
+                        for (const helper of rebelHelpers) {
+                            const shan = helper.handCards.find(c => c.subtype === 'shan');
+                            if (shan) {
+                                if (helper.isAI && this.ai && this.ai.shouldSaveLord(helper, target, this)) {
+                                    this.discardCard(helper, shan);
+                                    this.log(`${helper.name}黄天：为${target.name}打出闪`, 'success');
+                                    saved = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!saved) {
+                            this.log(`${target.name}黄天：反贼无人打出闪`, 'danger');
+                        }
+                    }
+                }
+                // 制霸 (孙策 主公技): 吴势力角色可以对自己使用杀
+                if (target.isLord && target.skills.some(s => s.name === '制霸') && target.faction === 'wu' && source.faction === 'wu') {
+                    this.log(`${source.name}制霸：吴势力角色可以对${target.name}使用杀`, 'highlight');
                 }
             }
 
@@ -2955,10 +3018,12 @@ SGS.GameEngine = (function() {
                     }
                     break;
                 case '魂姿':
-                    // 孙策觉醒技：体力<=2时觉醒
-                    if (player.hp <= 2 && !player.skills.some(s => s.name === '魂姿觉醒')) {
-                        player.skills.push({ name: '魂姿觉醒', type: 'locked', desc: '觉醒技，体力<=2时获得"英姿"和"英魂"' });
-                        this.log(`${player.name}觉醒！`, 'highlight');
+                    // 孙策觉醒技：体力=1时觉醒
+                    if (player.hp === 1 && !player.skills.some(s => s.name === '魂姿觉醒')) {
+                        player.skills.push({ name: '魂姿觉醒', type: 'locked', desc: '觉醒技，体力=1时获得"英姿"和"英魂"' });
+                        // 英姿效果：本回合立即额外摸1张牌
+                        this.drawCard(player, 1);
+                        this.log(`${player.name}觉醒！获得英姿效果，本回合摸1张牌`, 'highlight');
                     }
                     break;
                 case '直谏':
@@ -3099,6 +3164,44 @@ SGS.GameEngine = (function() {
                             }
                         }
                         this.log(`${player.name}连环：使用铁索连环`, 'highlight');
+                    }
+                    break;
+                case '志继':
+                    // 姜维觉醒技：体力=1时觉醒，获得观星
+                    if (player.hp === 1 && !player.skills.some(s => s.name === '志继觉醒')) {
+                        player.skills.push({ name: '志继觉醒', type: 'locked', desc: '觉醒技，体力=1时获得"观星"' });
+                        player.maxHp -= 1;
+                        if (player.hp > player.maxHp) player.hp = player.maxHp;
+                        this.drawCard(player, 3);
+                        this.log(`${player.name}志继觉醒！获得观星，摸3张牌`, 'highlight');
+                    }
+                    break;
+                case '凿险':
+                    // 邓艾觉醒技：体力=1时觉醒，获得屯田
+                    if (player.hp === 1 && !player.skills.some(s => s.name === '凿险觉醒')) {
+                        player.skills.push({ name: '凿险觉醒', type: 'locked', desc: '觉醒技，体力=1时获得"屯田"' });
+                        player.maxHp -= 1;
+                        if (player.hp > player.maxHp) player.hp = player.maxHp;
+                        // 获得屯田效果：每回合开始时摸一张牌
+                        player.skillStates = player.skillStates || {};
+                        player.skillStates['屯田'] = true;
+                        this.log(`${player.name}凿险觉醒！获得屯田`, 'highlight');
+                    }
+                    break;
+                case '若愚':
+                    // 刘禅觉醒技：体力=1时觉醒，获得享乐
+                    if (player.hp === 1 && !player.skills.some(s => s.name === '若愚觉醒')) {
+                        player.skills.push({ name: '若愚觉醒', type: 'locked', desc: '觉醒技，体力=1时获得"享乐"' });
+                        player.maxHp -= 1;
+                        if (player.hp > player.maxHp) player.hp = player.maxHp;
+                        this.log(`${player.name}若愚觉醒！获得享乐`, 'highlight');
+                    }
+                    break;
+                case '屯田':
+                    // 邓艾：回合开始时摸一张牌
+                    if (player.skillStates && player.skillStates['屯田']) {
+                        this.drawCard(player, 1);
+                        this.log(`${player.name}屯田：摸1张牌`, 'highlight');
                     }
                     break;
             }

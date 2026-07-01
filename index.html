@@ -790,47 +790,37 @@
 <!-- ===== 游戏桌面（横屏圆桌风格） ===== -->
 <div id="gameScreen" class="screen">
     <div class="topbar">
-        <div>
+        <div class="topbar-info">
             <button class="btn-sm" onclick="if(confirm('确定退出当前对局？'))quitToMenu()" style="margin-right:6px">←返回</button>
-            <span id="turnInfo"></span> <span id="phaseInfo" style="color:var(--accent-gold)"></span>
+            <span id="turnInfo"></span>
+            <span id="phaseInfo" class="topbar-phase"></span>
+            <div class="phase-indicator" id="phaseIndicator"></div>
         </div>
-        <div>
+        <div class="topbar-info">
             <span id="deckInfo"></span>
-            <button class="btn-sm" id="aiSpeedBtn" onclick="toggleAiSpeed()" style="margin-left:8px; min-width:40px;">1x</button>
+            <button class="topbar-btn" onclick="SGS.UI.Board.toggleLog()">日志</button>
+            <button class="topbar-btn" onclick="SGS.UI.Board.confirmQuit()">退出</button>
         </div>
     </div>
-    <div class="table-area" id="tableArea">
-        <div id="playersTop"></div>
-        <div class="table-center">
-            <div class="prompt" id="prompt">游戏开始...</div>
+    <!-- 弧形对手区域 - 渲染后由JS填充 -->
+    <div class="players-arc-area" id="playersArcArea"></div>
+    <div class="players-area">
+        <div class="center-area">
+            <div class="game-log" id="gameLog"></div>
+            <div class="action-prompt" id="actionPrompt">游戏开始...</div>
         </div>
-        <!-- 日志面板：桌面右上角悬浮 -->
-        <div class="log-panel-wrap" id="logPanelWrap" style="display:none">
-            <div class="log-panel-header" onclick="toggleGameLog()">
-                <span>📜 牌局记录</span>
-                <span class="log-panel-close" onclick="toggleGameLog()">✕</span>
-            </div>
-            <div class="game-log-panel" id="glog"></div>
-        </div>
-    </div>
-    <div class="player-bottom">
-        <div class="myinfo">
-            <div class="myinfo-left" data-pid="" onclick="clickSelf()" style="cursor:pointer">
-                <div class="my-avatar" id="myAvatar"></div>
-                <div class="my-name-hp">
-                    <span class="mhn" id="mhn"></span>
-                    <span class="mhp" id="mhp"></span>
+        <div class="hand-area">
+            <div class="my-info">
+                <div class="my-info-left">
+                    <span class="my-hero-name" id="myHeroName"></span>
+                    <span class="my-hp" id="myHp"></span>
+                    <span id="myIdentity"></span>
                 </div>
-                <span id="midBadge"></span>
+                <div class="equip-zone" id="myEquips"></div>
             </div>
-            <div class="equip-zone" id="equipZone"></div>
-        </div>
-        <div class="skill-bar" id="skillBar"></div>
-        <div class="hand-cards" id="handCards"></div>
-        <div class="action-bar" id="actionBar">
-            <button class="log-toggle-btn" onclick="toggleGameLog()">📜 牌局记录</button>
-            <button class="btn-submit-log" onclick="submitBugLog()" title="提交bug日志">🐛 提交Bug</button>
-            <span id="logUploadStatus" style="font-size:11px;color:var(--accent-gold);margin-left:8px;"></span>
+            <div class="skill-bar" id="skillBar"></div>
+            <div class="hand-cards" id="handCards"></div>
+            <div class="action-bar" id="actionBar"></div>
         </div>
     </div>
 </div>
@@ -1649,51 +1639,50 @@ function _updateBoardImpl(state){
             // 只创建一次
         })();
 
-    // 对手列表 - 围绕圆桌椭圆排列（横屏布局）
+    // 对手列表 - 弧形凸型布局（中间高两边低）
     const oppList=state.players.filter(p=>p.id!==human.id);
     const nOpp=oppList.length;
-    let topH='';
-    for(let i=0;i<nOpp;i++){
-        const p=oppList[i];
-        const pos=getSeatPos(i,nOpp);
-        const fc=p.heroRevealed||Cfg.mode!=='national'?p.heroFaction:'unknown';
-        const fn=p.heroRevealed||Cfg.mode!=='national'?(SGS.HeroData.factionName[p.heroFaction]||'?'):'?';
-        const fctCls=fc==='魏'?'fct-wei':fc==='蜀'?'fct-shu':fc==='吴'?'fct-wu':'fct-qun';
-        const showName=p.heroRevealed||Cfg.mode!=='national'?p.heroName:'???';
-        const heroId=p.heroId||'';
-        // 构造图片路径
-        const imgPath=heroId?`assets/images/heroes/${heroId}.jpg`:'';
-        const eqList=[];
-        if(p.equipment.weapon)eqList.push(p.equipment.weapon.name);
-        if(p.equipment.armor)eqList.push(p.equipment.armor.name);
-        if(p.equipment.horseMinus)eqList.push('-1马');
-        if(p.equipment.horsePlus)eqList.push('+1马');
-        const hpShow=Math.max(0,p.hp);
-        const hpStr='<span class="hc-hp-icon full">'+'♥'.repeat(hpShow)+'</span>'+'<span class="hc-hp-icon empty">'+'♡'.repeat(Math.max(0,p.maxHp-hpShow))+'</span>';
-        // 立绘图片或占位符
-        const portraitHtml=imgPath
-            ?`<img class="hc-portrait" src="${imgPath}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="${showName}"><div class="hc-portrait-placeholder" style="display:none">${showName.charAt(0)}</div>`
-            :`<div class="hc-portrait-placeholder">${showName.charAt(0)}</div>`;
-        const isCur=cp&&p.id===cp.id;
-        topH+=`<div class="hero-card${isCur?' cur':''}${!p.isAlive?' dead':''}${p.isChained?' chained':''}${p.isFlipped?' flipped':''}" data-pid="${p.id}" style="position:absolute; left:${pos.x.toFixed(1)}%; top:${pos.y.toFixed(1)}%; margin-left:-38px; margin-top:-54px;" onclick="clickP(${p.id})">
-            <div class="hc-faction ${fctCls}">${fn}</div>
-            ${p.judgmentCards.length?`<div class="hc-judge-badges">${p.judgmentCards.map(c=>{
-                const cls=c.subtype==='lebusi'?'lebu':c.subtype==='bingliang'?'bing':c.subtype==='shandian'?'shandian':'';
-                const txt=c.subtype==='lebusi'?'乐':c.subtype==='bingliang'?'兵':c.subtype==='shandian'?'闪':'?';
-                return `<span class="hc-judge-badge ${cls}">${txt}</span>`;
-            }).join('')}</div>`:''}
-            ${p.drunk?`<div class="hc-status-badges"><span class="hc-status-badge drunk">酒</span></div>`:''}
-            ${portraitHtml}
-            <div class="hc-info">
-                <div class="hc-name">${showName}${p.isAmbitious?'(野)':''}</div>
-                <div class="hc-hp-row">${hpStr}</div>
-                <div class="hc-hand">牌${p.handCount}</div>
-            </div>
-            ${eqList.length?`<div class="hc-equip-mini">${eqList.map(e=>`<span class="eq-tag">${e}</span>`).join('')}</div>`:''}
-            ${!p.isAlive?'<div class="dead-stamp">阵亡</div>':''}
-        </div>`;
+    const arcArea = document.getElementById('playersArcArea');
+    if (arcArea) {
+        // 计算弧形偏移：中间最高，两边降低（使用margin-bottom）
+        const getArcOffset = (idx, total) => {
+            if (total <= 1) return 0;
+            const centerIdx = (total - 1) / 2;
+            const distanceFromCenter = Math.abs(idx - centerIdx);
+            const maxOffset = total <= 3 ? 50 : total <= 5 ? 50 : total <= 7 ? 50 : 45;
+            const normalizedDist = distanceFromCenter / centerIdx;
+            return Math.round(maxOffset * (1 - normalizedDist * normalizedDist));
+        };
+        const getArcScale = (idx, total) => {
+            if (total <= 1) return 1;
+            const centerIdx = (total - 1) / 2;
+            const distanceFromCenter = Math.abs(idx - centerIdx);
+            const normalizedDist = distanceFromCenter / centerIdx;
+            return (1 - normalizedDist * 0.15).toFixed(2);
+        };
+        let arcHtml = '';
+        for (let i = 0; i < nOpp; i++) {
+            const p = oppList[i];
+            const arcOffset = getArcOffset(i, nOpp);
+            const arcScale = getArcScale(i, nOpp);
+            const isCur = cp && p.id === cp.id;
+            const fc = p.heroFaction || 'unknown';
+            const fn = p.heroRevealed || Cfg.mode !== 'national' ? (SGS.HeroData.factionName[p.heroFaction] || '?') : '?';
+            const showName = p.heroRevealed || Cfg.mode !== 'national' ? p.heroName : '???';
+            const hpShow = Math.max(0, p.hp);
+            arcHtml += `<div class="player-mini${isCur ? ' current' : ''}${!p.isAlive ? ' dead' : ''}"
+                              data-pid="${p.id}"
+                              onclick="clickP(${p.id})"
+                              style="margin-bottom: ${arcOffset}px; transform: scale(${arcScale});">
+                <div class="pm-name">${p.name}</div>
+                <div class="pm-hero">${showName}</div>
+                <div class="pm-hp">${'❤'.repeat(hpShow)}</div>
+                <div class="pm-cards">手牌:${p.handCount}</div>
+                <div class="pm-faction faction-${fc}">${fn}</div>
+            </div>`;
+        }
+        arcArea.innerHTML = arcHtml;
     }
-    document.getElementById('playersTop').innerHTML=topH;
 
     // 自己信息
     const hs=human;
@@ -1703,31 +1692,9 @@ function _updateBoardImpl(state){
     document.getElementById('mhn').textContent=hs.hero.name;
     const myHpShow=Math.max(0,hs.hp);
     document.getElementById('mhp').innerHTML=`<span class="h-full">${'❤'.repeat(myHpShow)}</span><span class="h-empty">${'♡'.repeat(Math.max(0,hs.maxHp-myHpShow))}</span> <span style="font-size:10px;color:#a0a0b0">(${hs.hp}/${hs.maxHp})</span>`;
-    // 自己的小头像
-    const myHeroId=hs.hero.id||'';
-    const myImgPath=myHeroId?`assets/images/heroes/${myHeroId}.jpg`:'';
-    const myAvatar=document.getElementById('myAvatar');
-    if(myAvatar){
-        if(myImgPath){
-            myAvatar.innerHTML=`<img src="${myImgPath}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="${hs.hero.name}"><div class="hc-portrait-placeholder" style="display:none;width:100%;height:100%">${hs.hero.name.charAt(0)}</div>`;
-        }else{
-            myAvatar.innerHTML=`<div class="hc-portrait-placeholder" style="width:100%;height:100%">${hs.hero.name.charAt(0)}</div>`;
-        }
-    }
-    if(Cfg.mode==='national'){
-        document.getElementById('midBadge').innerHTML=
-            `<span class="id-bdg" style="background:${SGS.HeroData.factionColor[hs.faction]}">${SGS.HeroData.factionName[hs.faction]}</span>`;
-    }else{
-        const ic={lord:'id-lord',loyal:'id-loyal',rebel:'id-rebel',spy:'id-spy'};
-        document.getElementById('midBadge').innerHTML=
-            `<span class="id-bdg ${ic[hs.identity]||''}">${SGS.Config.identityName[hs.identity]||''}</span>`;
-    }
-    // 装备区
-    let ez='';
-    for(const [slot,card] of Object.entries(hs.equipment)){
-        if(card)ez+=`<span class="eqi">${card.name}</span>`;
-    }
-    document.getElementById('equipZone').innerHTML=ez;
+    // 自己的小头像 - 由 SGS.UI.Board 渲染
+    // 身份标识 - 由 SGS.UI.Board 渲染
+    // 装备区 - 由 SGS.UI.Board 渲染
 
     // 手牌
     renderHand(hs, state);

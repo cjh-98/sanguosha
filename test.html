@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三国杀 - 游戏测试</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #1a1a2e; color: #e0e0e0; min-height: 100vh; padding: 20px; }
+        .test-container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #f0c040; text-align: center; margin-bottom: 20px; }
+        .test-section { background: #16213e; border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+        .test-section h2 { color: #e6c84d; margin-bottom: 10px; border-bottom: 1px solid #0f3460; padding-bottom: 5px; }
+        .log { background: #0f172a; border-radius: 4px; padding: 10px; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; margin-top: 10px; }
+        .log-entry { padding: 2px 0; border-bottom: 1px solid #1e293b; }
+        .log-entry.highlight { color: #f0c040; }
+        .log-entry.danger { color: #ef4444; }
+        .log-entry.success { color: #22c55e; }
+        .log-entry.normal { color: #94a3b8; }
+        button { background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #2563eb; }
+        .status { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; }
+        .status-item { background: #0f172a; padding: 8px; border-radius: 4px; font-size: 12px; }
+        .status-item .label { color: #64748b; }
+        .status-item .value { color: #e2e8f0; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>三国杀 - 游戏流程测试</h1>
+        
+        <div class="test-section">
+            <h2>测试控制</h2>
+            <button onclick="startTest()">开始测试</button>
+            <button onclick="testLuoshen()">测试洛神</button>
+            <button onclick="testGuicai()">测试鬼才</button>
+            <button onclick="testAllSkills()">测试所有技能</button>
+            <button onclick="clearLog()">清除日志</button>
+        </div>
+
+        <div class="test-section">
+            <h2>游戏状态</h2>
+            <div class="status" id="gameStatus">
+                <div class="status-item"><span class="label">当前阶段:</span> <span class="value" id="currentPhase">-</span></div>
+                <div class="status-item"><span class="label">当前玩家:</span> <span class="value" id="currentPlayer">-</span></div>
+                <div class="status-item"><span class="label">等待状态:</span> <span class="value" id="waitingState">-</span></div>
+                <div class="status-item"><span class="label">牌堆:</span> <span class="value" id="deckCount">-</span></div>
+                <div class="status-item"><span class="label">弃牌堆:</span> <span class="value" id="discardCount">-</span></div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>测试日志</h2>
+            <div class="log" id="testLog"></div>
+        </div>
+    </div>
+
+    <script src="js/data/cards.js"></script>
+    <script src="js/data/heroes.js"></script>
+    <script src="js/core/engine.js"></script>
+    <script src="js/core/game.js"></script>
+    <script>
+        let engine = null;
+        const testLogEl = document.getElementById('testLog');
+
+        function log(msg, type = 'normal') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            testLogEl.appendChild(entry);
+            testLogEl.scrollTop = testLogEl.scrollHeight;
+        }
+
+        function clearLog() {
+            testLogEl.innerHTML = '';
+            log('日志已清除');
+        }
+
+        function updateStatus() {
+            if (!engine) return;
+            const state = engine.getState();
+            document.getElementById('currentPhase').textContent = state.phase || '-';
+            document.getElementById('currentPlayer').textContent = state.currentPlayer || '-';
+            
+            const waiting = [];
+            if (engine._waitingForLuoshen) waiting.push('洛神');
+            if (engine._waitingForGuicai) waiting.push('鬼才');
+            if (engine._waitingForGuidao) waiting.push('鬼道');
+            document.getElementById('waitingState').textContent = waiting.length > 0 ? waiting.join(', ') : '无';
+            document.getElementById('deckCount').textContent = engine.deck.length;
+            document.getElementById('discardCount').textContent = engine.discardPile.length;
+        }
+
+        function startTest() {
+            log('开始测试游戏...');
+            try {
+                engine = new SGS.GameEngine({
+                    playerCount: 2,
+                    gameMode: 'standard',
+                    includeMilitary: false
+                });
+
+                // 选择武将：人类玩家用甄姬，AI用司马懿
+                const zhenji = SGS.HeroData.heroes.find(h => h.name === '甄姬');
+                const simayi = SGS.HeroData.heroes.find(h => h.name === '司马懿');
+                
+                if (!zhenji || !simayi) {
+                    log('找不到武将数据！', 'danger');
+                    return;
+                }
+
+                engine.selectHero(0, zhenji);
+                engine.selectHero(1, simayi);
+                
+                log(`人类玩家武将: ${zhenji.name}, 技能: ${zhenji.skills.map(s => s.name).join(', ')}`, 'highlight');
+                log(`AI玩家武将: ${simayi.name}, 技能: ${simayi.skills.map(s => s.name).join(', ')}`, 'highlight');
+
+                // 替换log方法以捕获日志
+                const originalLog = engine.log.bind(engine);
+                engine.log = function(msg, type) {
+                    originalLog(msg, type);
+                    log(msg, type);
+                };
+
+                // 开始游戏
+                engine.start();
+                log('游戏开始！', 'success');
+                updateStatus();
+
+                // 定期检查状态
+                setInterval(updateStatus, 500);
+            } catch (e) {
+                log(`错误: ${e.message}`, 'danger');
+                console.error(e);
+            }
+        }
+
+        function testLuoshen() {
+            log('测试洛神技能...');
+            if (!engine) {
+                log('请先开始测试！', 'danger');
+                return;
+            }
+
+            const human = engine.getHumanPlayer();
+            if (!human) {
+                log('找不到人类玩家！', 'danger');
+                return;
+            }
+
+            log(`人类玩家: ${human.name}, 武将: ${human.hero.name}`, 'highlight');
+            log(`技能: ${human.skills.map(s => s.name).join(', ')}`, 'highlight');
+            log(`手牌数: ${human.handCards.length}`, 'normal');
+            log(`牌堆剩余: ${engine.deck.length}`, 'normal');
+
+            if (!human.skills.some(s => s.name === '洛神')) {
+                log('人类玩家没有洛神技能！', 'danger');
+            }
+        }
+
+        function testGuicai() {
+            log('测试鬼才技能...');
+            if (!engine) {
+                log('请先开始测试！', 'danger');
+                return;
+            }
+
+            const ai = engine.players.find(p => p.isAI);
+            if (!ai) {
+                log('找不到AI玩家！', 'danger');
+                return;
+            }
+
+            log(`AI玩家: ${ai.name}, 武将: ${ai.hero.name}`, 'highlight');
+            log(`技能: ${ai.skills.map(s => s.name).join(', ')}`, 'highlight');
+
+            if (!ai.skills.some(s => s.name === '鬼才')) {
+                log('AI玩家没有鬼才技能！', 'danger');
+            }
+        }
+
+        function testAllSkills() {
+            log('测试所有技能...');
+            if (!engine) {
+                log('请先开始测试！', 'danger');
+                return;
+            }
+
+            engine.players.forEach((player, idx) => {
+                log(`玩家${idx + 1}: ${player.name} (${player.hero.name}), 技能: ${player.skills.map(s => s.name).join(', ')}`, 'highlight');
+            });
+
+            log('开始模拟游戏流程...');
+            // 这里可以添加自动模拟逻辑
+        }
+
+        log('测试页面已加载');
+    </script>
+</body>
+</html>

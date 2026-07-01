@@ -1,0 +1,2777 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>三国杀</title>
+    <style>
+        /* 内联基础样式 - 确保页面一定有内容可显示 */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-card: #0f3460;
+            --bg-panel: rgba(15, 52, 96, 0.85);
+            --accent-gold: #e6c84d;
+            --accent-red: #c41e3a;
+            --accent-green: #2ecc71;
+            --text-primary: #f0f0f0;
+            --text-secondary: #a0a0b0;
+            --border-gold: #8b6914;
+        }
+        html, body {
+            width: 100%; height: 100%; overflow: hidden;
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: var(--bg-primary); color: var(--text-primary);
+        }
+        #app { width: 100%; height: 100%; position: relative; overflow: hidden; }
+        .screen { display: none; width: 100%; height: 100%;
+                  flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 40px 20px; }
+        .screen.active { display: flex !important; }
+
+        /* 主菜单 */
+        #mainMenu {
+            background: radial-gradient(ellipse at center, #1a2a4e 0%, #0a0a1e 100%);
+        }
+        .menu-title {
+            font-size: clamp(32px, 10vw, 56px);
+            font-weight: 900; color: var(--accent-gold);
+            text-shadow: 0 0 20px rgba(230,200,77,0.5), 2px 2px 6px rgba(0,0,0,0.8);
+            letter-spacing: 12px;
+        }
+        .menu-subtitle { color: var(--text-secondary); letter-spacing: 6px; font-size: 14px; }
+        .menu-buttons { display: flex; flex-direction: column; gap: 16px; align-items: center; width: 100%; max-width: 320px; }
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            padding: 14px 28px; border: 2px solid var(--border-gold); border-radius: 8px;
+            background: linear-gradient(135deg, var(--bg-card), var(--bg-secondary));
+            color: var(--accent-gold); font-size: 17px; font-weight: bold;
+            cursor: pointer; transition: all 0.2s; text-align: center;
+            min-width: 160px; letter-spacing: 2px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn:active { transform: scale(0.96); background: linear-gradient(135deg, var(--border-gold), var(--bg-card)); }
+        .btn-primary { background: linear-gradient(135deg, var(--accent-red), #8b0000); color: #fff; border-color: var(--accent-gold); }
+        .btn-large { padding: 18px 44px; font-size: 20px; width: 80%; max-width: 300px; }
+        .version-tag { position: fixed; bottom: 16px; font-size: 11px; color: var(--text-secondary); opacity: 0.5; }
+
+        /* 设置页 */
+        #setupScreen { align-items: stretch; justify-content: flex-start; padding: 16px; gap: 10px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .setup-header { display: flex; align-items: center; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-gold); flex-shrink: 0; }
+        .setup-header h2 { font-size: 20px; color: var(--accent-gold); flex: 1; text-align: center; }
+        .section { background: var(--bg-panel); border: 1px solid var(--border-gold); border-radius: 10px; padding: 12px; flex-shrink: 0; }
+        .section-title { font-size: 14px; color: var(--accent-gold); margin-bottom: 8px; font-weight: bold; }
+        .option-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+        .opt {
+            padding: 9px 6px; border: 2px solid var(--bg-card); border-radius: 8px;
+            text-align: center; cursor: pointer; font-size: 13px;
+            background: rgba(0,0,0,0.3); color: var(--text-secondary); transition: all 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .opt.on { border-color: var(--accent-gold); background: rgba(230,200,77,0.15); color: var(--accent-gold); font-weight: bold; }
+        .opt:active { transform: scale(0.95); }
+        .row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; }
+        .row-label { font-size: 14px; }
+        .sw { width: 46px; height: 24px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-gold); cursor: pointer; transition: background 0.25s; position: relative; flex-shrink: 0; }
+        .sw.on { background: var(--accent-gold); }
+        .sw::after { content:''; position:absolute; width:18px;height:18px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left 0.25s; }
+        .sw.on::after { left: 22px; background: var(--bg-primary); }
+        .footer-btns { display: flex; gap: 12px; justify-content: center; padding: 16px 0; flex-shrink: 0; }
+        .small-hint { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+
+        /* Ban页 */
+        #banScreen { align-items: stretch; justify-content: flex-start; padding: 16px; gap: 10px; overflow-y: auto; }
+        .tab-bar { display: flex; gap: 6px; margin-bottom: 4px; flex-shrink: 0; }
+        .tab { flex: 1; padding: 8px; text-align: center; border: 2px solid var(--bg-card); border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--text-secondary); }
+        .tab.on { border-color: var(--accent-gold); color: var(--accent-gold); background: rgba(230,200,77,0.1); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
+        .hcard {
+            background: linear-gradient(160deg, #3a2a14 0%, #1a1208 100%); border: 2px solid #5c4a28; border-radius: 8px;
+            padding: 6px; cursor: pointer; text-align: center; transition: all 0.15s; overflow: hidden;
+            -webkit-tap-highlight-color: transparent; box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+        }
+        .hcard.sel { border-color: #e6c84d; box-shadow: 0 0 12px rgba(230,200,77,0.6); }
+        .hcard:active { transform: scale(0.95); }
+        .hname { font-size: 14px; font-weight: bold; color: #f0d890; text-shadow: 0 1px 2px #000; }
+        .htag { display:inline-block; padding:1px 7px; border-radius:10px; font-size:10px; margin:2px 0; }
+        .tag-w{background:#4a90d9;color:#fff} .tag-s{background:#e74c3c;color:#fff}
+        .tag-u{background:#2ecc71;color:#fff} .tag-q{background:#95a5a6;color:#fff}
+        .hhp { font-size: 11px; color: #e74c3c; }
+        .hskill { font-size: 9px; color: var(--text-secondary); margin-top: 2px; max-height: 36px; overflow: hidden; line-height: 1.3; }
+
+        /* 选将 */
+        #heroSelectScreen { align-items: stretch; justify-content: flex-start; padding: 16px; gap: 10px; overflow-y: auto; }
+        .sel-header { text-align: center; padding: 6px 0; flex-shrink: 0; }
+        .sel-header h2 { font-size: 18px; color: var(--accent-gold); }
+        .sel-header p { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+        .sel-footer { display: flex; justify-content: center; padding: 12px 0; gap: 12px; flex-shrink: 0; }
+
+        /* 身份展示 */
+        #identityScreen { align-items: center; justify-content: center; gap: 20px; padding: 20px; }
+        .id-big-text { font-size: 24px; color: var(--accent-gold); text-align: center; }
+        .id-hero-text { font-size: 18px; color: var(--text-primary); }
+        .id-desc { font-size: 14px; color: var(--text-secondary); text-align: center; max-width: 300px; line-height: 1.6; }
+
+        /* ======== 游戏桌面（正版三国杀圆桌风格 - JS强制横屏比例） ======== */
+        #gameScreen {
+            display: flex;
+            flex-direction: column; padding: 0; overflow: hidden;
+            background: #0d0a06;
+            background-image: url('assets/images/ui/ol_bg.jpg');
+            background-size: cover; background-position: center; background-repeat: no-repeat;
+            position: relative;
+            width: 100%;
+            height: auto;    /* 初始auto，JS会设为 width÷2 */
+            flex-shrink: 0;
+            /* 纵向布局：topbar + table-area + player-bottom */
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            justify-content: flex-start;
+            gap: 0;
+        }
+        #gameScreen::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.5) 100%);
+            pointer-events: none; z-index: 0;
+        }
+        #gameScreen > * { position: relative; z-index: 1; }
+
+        /* 顶部信息栏 */
+        .topbar { display:flex; width:100%; box-sizing:border-box; align-items:center; justify-content:space-between; padding:4px 10px;
+            background:linear-gradient(180deg,#2a2218 0%,#1a1410 100%); border-bottom:2px solid #5c4a28;
+            height:34px; flex-shrink:0; font-size:11px; white-space: nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.5); }
+        .topbar span { color:#d4b86a; text-shadow:0 1px 2px rgba(0,0,0,0.9); }
+        .topbar .btn-sm { background:linear-gradient(180deg,#3a3020,#251e12); color:#d4b86a; border-color:#5c4a28; font-size:11px; }
+
+        /* 圆桌区域 - 对手围绕椭圆排列（横屏） */
+        .table-area { flex:1; width:100%; position: relative; overflow: visible; min-height:160px; }
+        .table-area::after {
+            content: ''; position: absolute; top: 45%; left: 50%;
+            width: 80%; height: 70%; transform: translate(-50%,-50%);
+            border-radius: 50%;
+            background: radial-gradient(ellipse, rgba(139,105,20,0.05) 0%, transparent 70%);
+            pointer-events: none; z-index: 0;
+        }
+
+        /* 日志面板包裹层 - 桌面右上角悬浮（参考官方三国杀） */
+        .log-panel-wrap {
+            position: absolute; top: 38px; right: 8px;
+            width: 220px; max-height: 45%;
+            display: flex; flex-direction: column;
+            background: rgba(15,12,8,0.92);
+            border: 1.5px solid #5c4a28;
+            border-radius: 6px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+            z-index: 50;
+            overflow: hidden;
+        }
+        .log-panel-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 5px 8px; cursor: pointer;
+            background: linear-gradient(180deg, rgba(92,74,40,0.5), rgba(42,34,24,0.7));
+            border-bottom: 1px solid #5c4a28;
+            color: #e6c84d; font-size: 12px; font-weight: bold;
+            text-shadow: 0 1px 2px #000;
+            flex-shrink: 0;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        .log-panel-header:hover { background: linear-gradient(180deg, rgba(92,74,40,0.7), rgba(42,34,24,0.85)); }
+        .log-panel-close { font-size: 14px; cursor: pointer; color: #d4b86a; padding: 0 2px; }
+        .log-panel-close:hover { color: #e74c3c; }
+
+        /* 日志内容面板（在包裹层内滚动） */
+        .game-log-panel {
+            flex: 1; overflow-y: auto; overflow-x: hidden;
+            padding: 5px 7px; font-size: 10.5px; line-height: 1.55;
+            color: #b8b8c8; -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin; scrollbar-color: #5c4a28 transparent;
+        }
+        .game-log-panel::-webkit-scrollbar { width: 3px; }
+        .game-log-panel::-webkit-scrollbar-thumb { background: #5c4a28; border-radius: 2px; }
+        .game-log-panel div { margin-bottom: 2px; word-break: break-all; padding: 1px 0; border-bottom: 1px solid rgba(92,74,40,0.2); }
+        .game-log-panel .log-danger { color: #ff6b6b; }
+        .game-log-panel .log-success { color: #51cf66; }
+        .game-log-panel .log-highlight { color: #e6c84d; font-weight: bold; }
+
+        /* 底部操作栏中的日志按钮 */
+        .log-toggle-btn {
+            padding: 4px 12px; font-size: 11px;
+            background: linear-gradient(180deg, rgba(42,34,24,0.8), rgba(26,20,16,0.9));
+            color: #d4b86a; border: 1px solid #5c4a28; border-radius: 4px;
+            cursor: pointer; white-space: nowrap;
+            text-shadow: 0 1px 1px rgba(0,0,0,0.5);
+            transition: all 0.15s; -webkit-tap-highlight-color: transparent;
+        }
+        .log-toggle-btn:hover { background: linear-gradient(180deg, rgba(62,50,32,0.85), rgba(36,28,20,0.95)); color: #e6c84d; }
+        .log-toggle-btn:active { transform: scale(0.95); }        }
+        #playersTop {
+            position:absolute; top:0; left:0; right:0; bottom:0;
+            z-index: 2; margin:0; padding:0;
+        }
+        /* 圆桌上的武将牌 - 绝对定位（位置由 inline style 控制） */
+        #playersTop .hero-card {
+            position: absolute;
+            z-index: 10;
+            flex: none;
+        }
+
+        /* 武将牌（正版风格）- 带立绘的卡片 */
+        .hero-card {
+            width:72px; height:100px; cursor:pointer;
+            border-radius:5px; overflow:hidden;
+            box-shadow:0 3px 10px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(212,184,106,0.2), 0 0 0 1px rgba(230,200,77,0.25);
+            transition:all 0.2s; flex-shrink:0;
+            background:#2a2018;
+        }
+        .hero-card:active { transform:scale(0.95); }
+        .hero-card.cur { box-shadow:0 0 16px rgba(230,180,60,0.7),0 0 0 2px #e6b43c; z-index:2; }
+        .hero-card.dead { opacity:0.35; filter:grayscale(0.8); }
+        .hero-card.dead::after {
+            content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);z-index:3;
+        }
+        .hero-card.dead .dead-stamp {
+            position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-12deg);
+            font-size:13px;font-weight:900;color:#c41e3a;text-shadow:0 0 6px #000,0 0 2px #000;z-index:4;border:2px solid #c41e3a;padding:2px 8px;border-radius:3px;
+        }
+        /* 铁索连环标记 - 大铁链锁住效果 */
+        .hero-card.chained {
+            box-shadow: 0 0 0 3px #f39c12, 0 0 12px rgba(243,156,18,0.6);
+            position: relative;
+        }
+        .hero-card.chained::before {
+            content: '⛓';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 22px;
+            color: #f39c12;
+            text-shadow: 0 0 8px rgba(243,156,18,0.9), 0 0 4px #000;
+            z-index: 6;
+            background: rgba(0,0,0,0.85);
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            border: 2px solid #f39c12;
+            box-shadow: 0 0 10px rgba(243,156,18,0.7);
+        }
+        .hero-card.chained::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border: 3px solid #f39c12;
+            border-radius: 8px;
+            z-index: 3;
+            pointer-events: none;
+            opacity: 0.6;
+            animation: chainPulse 1.5s ease-in-out infinite;
+        }
+        @keyframes chainPulse {
+            0%, 100% { opacity: 0.4; box-shadow: inset 0 0 8px rgba(243,156,18,0.3); }
+            50% { opacity: 0.8; box-shadow: inset 0 0 16px rgba(243,156,18,0.6); }
+        }
+        .hero-card.flipped {
+            position:relative;
+        }
+        .hero-card.flipped .hc-portrait,
+        .hero-card.flipped .hc-portrait-placeholder {
+            opacity:0.3;
+            filter: grayscale(1) brightness(0.5);
+        }
+        .hero-card.flipped::before {
+            content:'翻';position:absolute;top:50%;left:50%;
+            transform:translate(-50%,-50%);
+            font-size:20px;font-weight:900;color:#e67e22;
+            text-shadow:0 0 10px rgba(230,126,34,0.9),0 0 4px #000;
+            z-index:10;background:rgba(0,0,0,0.75);border-radius:50%;
+            width:36px;height:36px;display:flex;align-items:center;justify-content:center;
+            border:2px solid #e67e22;box-shadow:0 0 12px rgba(230,126,34,0.5);
+        }
+        /* 标记容器 */
+        .hc-judge-badges {
+            position:absolute;top:1px;right:1px;
+            display:flex;flex-direction:column;gap:1px;z-index:4;
+        }
+        .hc-judge-badge {
+            font-size:9px;font-weight:bold;padding:1px 3px;border-radius:2px;
+            color:#fff;text-shadow:0 1px 1px rgba(0,0,0,0.8);
+            line-height:1.2;white-space:nowrap;
+            border:1px solid rgba(255,255,255,0.3);
+        }
+        .hc-judge-badge.lebu { background:rgba(231,76,60,0.9); }  /* 乐不思蜀 - 红色 */
+        .hc-judge-badge.bing { background:rgba(52,152,219,0.9); }  /* 兵粮寸断 - 蓝色 */
+        .hc-judge-badge.shandian { background:rgba(241,196,15,0.9); color:#333; }  /* 闪电 - 黄色 */
+        /* 状态标记（醉酒等） */
+        .hc-status-badges {
+            position:absolute;bottom:28px;left:1px;
+            display:flex;flex-direction:column;gap:1px;z-index:4;
+        }
+        .hc-status-badge {
+            font-size:8px;font-weight:bold;padding:1px 2px;border-radius:2px;
+            color:#fff;text-shadow:0 1px 1px rgba(0,0,0,0.8);
+            line-height:1.2;white-space:nowrap;
+        }
+        .hc-status-badge.drunk { background:rgba(155,89,182,0.9); }  /* 酒 - 紫色 */
+
+        /* 立绘区域 */
+        .hc-portrait {
+            width:100%; height:62px; object-fit:cover; object-position:top center;
+            display:block; background:#1a140e;
+        }
+        .hc-portrait-placeholder {
+            width:100%;height:62px;display:flex;align-items:center;justify-content:center;
+            font-size:26px;color:rgba(212,184,106,0.3);
+            background:linear-gradient(135deg,#2a2420 0%,#1a1612 100%);
+        }
+
+        /* 武将牌底部信息区 */
+        .hc-info {
+            padding:3px 4px; background:linear-gradient(180deg,#2a2218 0%,#1a1410 100%);
+            border-top:1px solid #5c4a28;
+        }
+        .hc-name {
+            font-size:11px;font-weight:bold;color:#f0d890;text-align:center;
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;
+            text-shadow:0 1px 1px #000;
+        }
+        .hc-hp-row {
+            display:flex;align-items:center;justify-content:center;gap:1px;margin-top:1px;
+        }
+        .hc-hp-icon { font-size:8px; line-height:1; letter-spacing:-1px; }
+        .hc-hp-icon.full { color:#dc3545; text-shadow:0 0 2px rgba(220,53,69,0.5); }
+        .hc-hp-icon.empty { color:rgba(255,255,255,0.12); }
+        .hc-hand { font-size:8px; color:#8a7a5a; text-align:center; margin-top:1px; }
+        .hc-faction {
+            position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:3px;
+            display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:bold;
+            color:#fff;border:1px solid rgba(255,255,255,0.3);
+            z-index:2; text-shadow:0 1px 1px rgba(0,0,0,0.6);
+        }
+        .fct-wei{background:linear-gradient(135deg,#3a6db5,#264a82)}
+        .fct-shu{background:linear-gradient(135deg,#d4443c,#8b1a14)}
+        .fct-wu{background:linear-gradient(135deg,#3cb371,#1a7a3a)}
+        .fct-qun{background:linear-gradient(135deg,#888,#555)}
+        .hc-equip-mini {
+            position:absolute;bottom:24px;left:2px;right:2px;
+            display:flex;flex-wrap:wrap;gap:1px;z-index:2;
+        }
+        .eq-tag { font-size:6px;padding:0 3px;border-radius:2px;
+                   background:rgba(0,0,0,0.65);border:1px solid #5c4a28;color:#d4b86a;white-space:nowrap; }
+
+        /* 桌面中心 - 提示文字 */
+        .table-center {
+            position: absolute; top: 46%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1; text-align: center; pointer-events: none;
+        }
+        .prompt {
+            font-size:13px; color:#e6c84d; text-align:center; padding:6px 16px;
+            background:linear-gradient(180deg,rgba(0,0,0,0.6),rgba(0,0,0,0.4)); border-radius:18px; border:1px solid #8b6914; max-width:88%;
+            text-shadow:0 1px 2px #000; box-shadow:0 2px 8px rgba(0,0,0,0.4);
+        }
+        /* 日志内容样式（右侧栏内） */
+        .game-log-panel div { margin-bottom: 2px; word-break: break-all; padding: 1px 0; border-bottom: 1px solid rgba(92,74,40,0.25); }
+        .game-log-panel .log-danger { color: #ff6b6b; }
+        .game-log-panel .log-success { color: #51cf66; }
+        .game-log-panel .log-highlight { color: #e6c84d; font-weight: bold; }
+
+        /* 竖屏提示 - 仅在手机竖屏时显示 */
+        #rotateHint {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #0d0a06; z-index: 9999;
+            flex-direction: column; align-items: center; justify-content: center;
+            gap: 20px; text-align: center; padding: 40px;
+        }
+        #rotateHint .rh-icon { font-size: 60px; animation: rh-rotate 2s ease-in-out infinite; }
+        #rotateHint .rh-text { font-size: 18px; color: #e6c84d; letter-spacing: 3px; }
+        #rotateHint .rh-sub { font-size: 13px; color: #a0a0b0; }
+        @keyframes rh-rotate { 0%,100%{transform:rotate(0deg)} 50%{transform:rotate(90deg)} }
+        /* 仅手机竖屏(非桌面)时提示旋转 - 通过 max-aspect-ratio + hover 判断是否为触摸设备 */
+        @media (max-width: 768px) and (orientation: portrait) and (hover: none) and (pointer: coarse) {
+            #rotateHint { display: flex !important; }
+        }
+
+        .player-bottom { flex-shrink:0; width:100%; box-sizing:border-box; background:linear-gradient(180deg,rgba(0,0,0,0.7),rgba(0,0,0,0.5)); border-top:2px solid #8b6914; padding:5px 8px; }
+        .my-avatar { width:36px; height:36px; border-radius:4px; overflow:hidden; border:1px solid #8b6914; flex-shrink:0; box-shadow:0 1px 4px rgba(0,0,0,0.5); }
+        .my-avatar img { width:100%; height:100%; object-fit:cover; object-position:top center; }
+        .myinfo { display:flex; align-items:center; justify-content:space-between; padding:0 5px 3px; gap:6px; }
+        .myinfo-left { display:flex; align-items:center; gap:7px; font-size:11px; white-space: nowrap; cursor:pointer; }
+        .mhn { color:#e6c84d; font-weight:bold; font-size:14px; text-shadow:0 1px 2px #000; }
+        .mhp { font-size:13px; letter-spacing:1px; }
+        .mhp .h-full { color:#e74c3c; text-shadow:0 0 4px rgba(231,76,60,0.6); }
+        .mhp .h-empty { color:rgba(255,255,255,0.15); }
+        .equip-zone { display:flex; gap:3px; flex-wrap:wrap; }
+        .eqi { font-size:9px; padding:1px 6px; border-radius:4px; background:linear-gradient(135deg,rgba(0,0,0,0.5),rgba(0,0,0,0.3));
+               border:1px solid #8b6914; color:#e6c84d; box-shadow:0 1px 2px rgba(0,0,0,0.3); }
+
+        /* 技能按钮（古风/篆刻风格） */
+        .skill-bar { display:flex; gap:6px; padding:3px; overflow-x:auto; flex-shrink:0; }
+        .skb { padding:4px 12px; font-size:12px; border:1px solid #8b6914; border-radius:14px;
+                background:linear-gradient(180deg,rgba(139,105,20,0.25),rgba(139,105,20,0.05));
+                color:#e6c84d; cursor:pointer; white-space:nowrap; flex-shrink:0;
+                text-shadow:0 1px 1px #000; transition:all 0.2s; font-weight:bold;
+                box-shadow:inset 0 1px 0 rgba(230,200,77,0.2), 0 1px 3px rgba(0,0,0,0.3);
+        }
+        .skb.on { background:linear-gradient(180deg,rgba(230,200,77,0.35),rgba(230,200,77,0.15)); box-shadow:0 0 8px rgba(230,200,77,0.4), inset 0 1px 0 rgba(230,200,77,0.4); }
+        .skb.on:active { transform:scale(0.95); }
+        .skb:disabled { opacity:0.3; }
+        .skb-locked { padding:4px 10px; font-size:11px; color:#8b6914;
+                    opacity:0.6; cursor:default; white-space:nowrap; flex-shrink:0;
+                    border:1px dashed rgba(139,105,20,0.3); border-radius:10px;
+                    background:transparent; font-weight:normal; }
+
+        /* 卡牌（正版三国杀卡牌风格 - 参考官方手牌设计） */
+        .hand-cards { display:flex; gap:5px; overflow-x:auto; padding:4px 6px 2px; min-height:108px; align-items:center; }
+        .card {
+            flex-shrink:0; width:68px;height:96px;border-radius:6px;
+            border:2px solid #8b6914;
+            background:linear-gradient(160deg, #f7f1e0 0%, #e8d8b0 40%, #d8c898 100%);
+            display:flex;flex-direction:column;align-items:center;
+            cursor:pointer;transition:all 0.18s ease;position:relative;overflow:hidden;color:#1a1a2e;
+            -webkit-tap-highlight-color:transparent;
+            box-shadow:0 2px 5px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.5);
+        }
+        .card:active { transform:scale(0.95) translateY(2px); }
+        .card.sel { transform:translateY(-16px) scale(1.06); box-shadow:0 8px 20px rgba(230,200,77,0.7), inset 0 0 0 2px #e6c84d; border-color:#e6c84d; border-width:2.5px; z-index:10; }
+        .card.ok { box-shadow:0 0 10px rgba(46,204,113,0.7), 0 2px 5px rgba(0,0,0,0.45); border-color:#2ecc71; }
+        .card.ok:hover { box-shadow:0 0 14px rgba(46,204,113,0.9), 0 4px 10px rgba(0,0,0,0.5); }
+        .card.trick { background:linear-gradient(160deg, #dceef7 0%, #a8cce4 40%, #88b8d4 100%); }
+        .card.delay { background:linear-gradient(160deg, #f5e0d8 0%, #e8b8b0 40%, #d89890 100%); }
+        .card.equip { background:linear-gradient(160deg, #d8f0d8 0%, #a8dda8 40%, #88cc88 100%); }
+        .card.fire { box-shadow:0 0 10px rgba(231,76,60,0.6), 0 2px 5px rgba(0,0,0,0.45); border-color:#e74c3c; }
+        .card.thunder { box-shadow:0 0 10px rgba(155,89,182,0.6), 0 2px 5px rgba(0,0,0,0.45); border-color:#9b59b6; }
+
+        /* 卡牌顶部：花色 + 点数 */
+        .cs { position:absolute;top:3px;left:4px;font-size:14px;font-weight:bold;z-index:2;
+              text-shadow:0 1px 2px rgba(255,255,255,0.6), 0 0 3px rgba(0,0,0,0.15);
+              line-height:1; }
+        .cs.red{color:#c41e3a} .cs.blk{color:#1a1a2e}
+        .cn { position:absolute;top:3px;right:4px;font-size:11px;font-weight:bold;
+              text-shadow:0 1px 1px rgba(255,255,255,0.5);z-index:2;line-height:1; }
+
+        /* 卡牌图片区域（中间主体） */
+        .card-img {
+            position:absolute;top:20px;left:3px;right:3px;bottom:28px;
+            object-fit:contain;object-position:center; opacity:0.55;
+            pointer-events:none; transition:opacity 0.2s;
+        }
+        .card:hover .card-img { opacity:0.75; }
+        .card.sel .card-img { opacity:0.85; }
+
+        /* 卡牌底部：名称 + 类型 */
+        .cname { position:absolute;bottom:2px;left:0;right:0;text-align:center;
+                 font-size:11px;font-weight:bold;line-height:1.2;padding:0 2px;
+                 white-space:nowrap;overflow:hidden;text-overflow:ellipsis; z-index:2;
+                 text-shadow:0 1px 1px rgba(255,255,255,0.4), 0 0 2px rgba(0,0,0,0.08); }
+        .cname.r{color:#c41e3a} .cname.b{color:#1a1a2e}
+        .ctype { position:absolute;bottom:0;right:2px;font-size:6px;color:#777; z-index:2; opacity:0.65; letter-spacing:-0.5px; }
+
+        /* ======== 出牌动画系统（正版三国杀风格） ======== */
+        /* 卡牌闪现 */
+        .card-flash {
+            display: flex; flex-direction: column; align-items: center; gap: 2px;
+            background: linear-gradient(160deg, #f7f1e0 0%, #e8d8b0 50%, #d8c898 100%);
+            border: 2px solid #e6c84d; border-radius: 6px; padding: 4px;
+            box-shadow: 0 0 20px rgba(230,200,77,0.6), 0 4px 16px rgba(0,0,0,0.5);
+        }
+        .card-flash img { width: 40px; height: 40px; object-fit: contain; }
+        .card-flash span { font-size: 10px; font-weight: bold; color: #1a1a2e; }
+        .card-flash .cf-name { font-size: 18px; font-weight: bold; color: #1a1a2e; padding: 8px 4px; }
+
+        /* 伤害飘字 */
+        .damage-float {
+            position: fixed; z-index: 301; pointer-events: none;
+            font-size: 28px; font-weight: 900; color: #ff0000;
+            text-shadow: 0 0 6px currentColor, 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
+            transform: translateX(-50%);
+            animation: dmg-pop 1s ease-out forwards;
+        }
+        .heal-float { color: #00ff00 !important; }
+        @keyframes dmg-pop {
+            0% { transform: translateX(-50%) scale(0.5); opacity: 0; }
+            20% { transform: translateX(-50%) scale(1.5); opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        /* 闪避飘字 */
+        .shan-float {
+            position: fixed; z-index: 301; pointer-events: none;
+            font-size: 24px; font-weight: 900; color: #00bfff;
+            text-shadow: 0 0 6px currentColor, 2px 2px 0 #000, -2px -2px 0 #000;
+            transform: translateX(-50%);
+        }
+
+        /* 受击震动 */
+        @keyframes hit-shake-anim {
+            0%, 100% { transform: translateX(0); }
+            10% { transform: translateX(-6px) translateY(-2px); }
+            20% { transform: translateX(6px) translateY(2px); }
+            30% { transform: translateX(-5px) translateY(-1px); }
+            40% { transform: translateX(5px) translateY(1px); }
+            50% { transform: translateX(-4px); }
+            60% { transform: translateX(4px); }
+            70% { transform: translateX(-3px); }
+            80% { transform: translateX(3px); }
+            90% { transform: translateX(-1px); }
+        }
+        .hit-shake { animation: hit-shake-anim 0.4s ease-in-out; }
+
+        /* 受击红闪 */
+        @keyframes hit-flash-anim {
+            0%, 100% { filter: none; box-shadow: inherit; }
+            50% { filter: brightness(1.5) sepia(1) hue-rotate(-50deg) saturate(3); box-shadow: 0 0 20px #ff0000; }
+        }
+        .hit-flash { animation: hit-flash-anim 0.4s ease-in-out; }
+
+        /* 回血绿闪 */
+        @keyframes heal-flash-anim {
+            0%, 100% { filter: none; box-shadow: inherit; }
+            50% { filter: brightness(1.3) sepia(1) hue-rotate(60deg) saturate(2); box-shadow: 0 0 20px #00ff00; }
+        }
+        .heal-flash { animation: heal-flash-anim 0.4s ease-in-out; }
+
+        /* 闪避动作 */
+        @keyframes shan-dodge-anim {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px) rotate(-5deg); }
+            50% { transform: translateX(10px) rotate(5deg); }
+            75% { transform: translateX(-5px) rotate(-2deg); }
+        }
+        .shan-dodge { animation: shan-dodge-anim 0.4s ease-in-out; }
+
+        .card-back-sel {
+            flex-shrink:0; width:64px; height:90px; border-radius:6px;
+            border:2px solid #8b6914;
+            background: linear-gradient(135deg, #1a1a2e 0%, #2a2a4e 50%, #1a1a2e 100%);
+            display:flex; align-items:center; justify-content:center;
+            cursor:pointer; transition:all 0.18s; position:relative; overflow:hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.45), inset 0 1px 0 rgba(139,105,20,0.3);
+        }
+        .card-back-sel:active { transform:scale(0.95); }
+        .card-back-sel:hover { border-color:#e6c84d; box-shadow:0 0 10px rgba(230,200,77,0.5); }
+        .card-back-inner {
+            font-size: 28px;
+            color: #8b6914;
+            text-shadow: 0 0 8px rgba(139,105,20,0.5);
+        }
+
+        /* 卡牌飞到中央动画 */
+        .card-fly {
+            position: fixed; z-index: 300; pointer-events: none;
+            transition: left 0.3s cubic-bezier(0.2,0.8,0.3,1),
+                        top 0.3s cubic-bezier(0.2,0.8,0.3,1),
+                        transform 0.3s ease-out, opacity 0.4s ease-out;
+            transform: translate(-50%,-50%) scale(0.5) rotate(-5deg);
+            opacity: 0.9;
+        }
+        .card-fly.arrive {
+            transform: translate(-50%,-50%) scale(1.1) rotate(3deg);
+            opacity: 1;
+        }
+        .card-fly.fadeout {
+            transform: translate(-50%,-50%) scale(0.6) rotate(10deg);
+            opacity: 0;
+        }
+
+        .action-bar { display:flex; gap:8px; justify-content:center; padding:4px 8px; flex-shrink:0; min-height:34px; }
+        .btn-sm { padding:7px 18px; font-size:13px; border:1.5px solid #8b6914; border-radius:6px;
+                   background:linear-gradient(180deg,rgba(42,34,24,0.8),rgba(26,20,16,0.9)); color:#e6c84d; cursor:pointer;
+                   box-shadow:0 2px 5px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08);
+                   transition:all 0.15s; font-weight:bold; text-shadow:0 1px 2px rgba(0,0,0,0.6);
+                   -webkit-tap-highlight-color:transparent; letter-spacing:1px; }
+        .btn-sm:hover { background:linear-gradient(180deg,rgba(62,50,32,0.85),rgba(36,28,20,0.92)); }
+        .btn-sm:active { transform:scale(0.96); box-shadow:0 1px 3px rgba(0,0,0,0.3); }
+        .btn-sm.danger { border-color:#c41e3a; color:#e74c3c; background:linear-gradient(180deg,rgba(80,20,20,0.8),rgba(50,10,10,0.9)); }
+        .btn-sm.danger:hover { background:linear-gradient(180deg,rgba(100,30,30,0.85),rgba(65,15,15,0.95)); }
+        .btn-sm.end-turn { border-color:#e6c84d; color:#fff; background:linear-gradient(180deg,rgba(139,105,20,0.7),rgba(92,74,40,0.85));
+                           box-shadow:0 0 8px rgba(230,200,77,0.3), 0 2px 5px rgba(0,0,0,0.4); }
+        .btn-sm.end-turn:hover { background:linear-gradient(180deg,rgba(170,130,30,0.8),rgba(120,95,50,0.9)); box-shadow:0 0 12px rgba(230,200,77,0.5); }
+        .btn-sm:disabled { opacity:0.35; cursor:not-allowed; }
+        .phase-dot { width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,0.2); display:inline-block; }
+        .phase-dot.on { background:#e6c84d; box-shadow:0 0 5px #e6c84d; }
+
+        /* 结束页 */
+        #gameOverScreen { align-items:center; justify-content:center; gap:18px; padding:20px; }
+        .go-title { font-size:34px;font-weight:900;text-shadow:0 0 18px currentColor; }
+        .go-win{color:var(--accent-green)}.go-lose{color:var(--accent-red)}
+        .go-info { text-align:center;font-size:15px;line-height:2; color:var(--text-primary); max-width:360px; }
+        .go-id-row { display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.1);font-size:13px; }
+        .id-bdg { display:inline-block;padding:2px 9px;border-radius:9px;font-size:11px;font-weight:bold; }
+        .id-lord{background:#f39c12;color:#fff} .id-loyal{background:#3498db;color:#fff}
+        .id-rebel{background:#e74c3c;color:#fff} .id-spy{background:#9b59b6;color:#fff}
+
+        /* 规则 */
+        #rulesScreen { align-items:stretch; justify-content:flex-start; padding:16px; gap:10px; overflow-y:auto; }
+        .rules-body { background:var(--bg-panel);border:1px solid var(--border-gold);border-radius:10px;padding:14px;font-size:13px;line-height:1.75;color:var(--text-primary); }
+        .rules-body h3 { color:var(--accent-gold);margin:10px 0 5px;font-size:15px; }
+        .rules-body p,.rules-body li { margin-bottom:4px; }
+        .rules-body ul { padding-left:18px; margin-bottom:6px; }
+
+        /* 弹窗 */
+        .overlay { position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:98;display:flex;align-items:center;justify-content:center;z-index:99; }
+        .modal {
+            background:var(--bg-secondary);border:2px solid var(--border-gold);border-radius:12px;
+            padding:16px;max-width:88%;width:330px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,0.5);
+        }
+        .modal h4 { color:var(--accent-gold);font-size:16px;margin-bottom:8px; }
+        .modal p { font-size:13px;line-height:1.6;color:var(--text-primary);margin-bottom:10px; }
+        .target-sel { position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:99;
+                      display:flex;align-items:center;justify-content:center; }
+        .ts-box { background:var(--bg-secondary);border:2px solid var(--border-gold);border-radius:12px;
+                  padding:14px;max-width:88%;width:340px;max-height:78%;overflow-y:auto; }
+        .ts-title { font-size:15px;color:var(--accent-gold);text-align:center;margin-bottom:10px; }
+        .titem { display:flex;align-items:center;justify-content:space-between;
+                 padding:9px 12px;background:var(--bg-card);border:2px solid transparent;border-radius:7px;
+                 cursor:pointer;margin-bottom:5px; }
+        .titem.sel { border-color:var(--accent-red);background:rgba(196,30,58,0.18); }
+        .titem:active { transform:scale(0.97); }
+    </style>
+</head>
+<body>
+<div id="rotateHint">
+    <div class="rh-icon">📱</div>
+    <div class="rh-text">请横屏使用</div>
+    <div class="rh-sub">三国杀为横屏游戏，请旋转您的设备</div>
+</div>
+<div id="app">
+
+<!-- ===== 主菜单（HTML内联，不依赖JS渲染） ===== -->
+<div id="mainMenu" class="screen active">
+    <div class="menu-title">三国杀</div>
+    <div class="menu-subtitle">群雄逐鹿 · 单机版</div>
+    <div class="menu-buttons">
+        <button class="btn btn-large btn-primary" onclick="goSetup()">开始游戏</button>
+        <button class="btn btn-large" onclick="goRules()">规则说明</button>
+        <button class="btn btn-large" onclick="goAbout()">关于</button>
+        <button class="btn btn-large" onclick="goLogPanel()">📋 操作日志</button>
+    </div>
+        <div class="version-tag">单机版 v1.0 · 预留联机接口</div>
+    </div>
+
+<!-- ===== 建房设置 ===== -->
+<div id="setupScreen" class="screen">
+    <div class="setup-header">
+        <button class="btn-sm" onclick="showScreen('mainMenu')">返回</button>
+        <h2>创建对局</h2>
+        <div style="width:54px"></div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">游戏模式</div>
+        <div class="option-grid" id="modeGrid"></div>
+        <div class="small-hint" id="modeHint">标准身份局，使用标准版卡牌</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">玩家人数</div>
+        <div class="option-grid" id="countGrid"></div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">选将方式</div>
+        <div class="option-grid" id="pickGrid"></div>
+        <div class="small-hint" id="pickHint">每人随机获得若干武将供选择</div>
+    </div>
+
+    <div class="section" id="militarySec">
+        <div class="section-title">卡牌扩展</div>
+        <div class="row">
+            <span class="row-label">包含军争篇卡牌</span>
+            <div class="sw on" id="militarySw" onclick="toggleMilitary()"></div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Ban设置</div>
+        <div class="small-hint" style="margin-bottom:6px">选择本局禁用的武将和卡牌</div>
+        <button class="btn-sm" id="banBtn" onclick="goBan()">前往Ban选</button>
+    </div>
+
+    <div class="section">
+        <div class="section-title">对手说明</div>
+        <div class="small-hint">
+            单机模式：除你之外均为AI对手<br>
+            <span style="color:var(--accent-gold)">联机（开发中）：可邀请好友加入房间对战</span>
+        </div>
+    </div>
+
+    <div class="footer-btns">
+        <button class="btn btn-primary btn-large" onclick="goHeroSelect()">确认设置</button>
+    </div>
+</div>
+
+<!-- ===== Ban选 ===== -->
+<div id="banScreen" class="screen">
+    <div class="setup-header">
+        <button class="btn-sm" onclick="showScreen('setupScreen')">返回</button>
+        <h2>Ban设置</h2>
+        <div style="width:54px"></div>
+    </div>
+    <div class="tab-bar">
+        <div class="tab on" id="tabHero" onclick="switchTab('hero')">禁武将</div>
+        <div class="tab" id="tabCard" onclick="switchTab('card')">禁卡牌</div>
+    </div>
+    <div class="small-hint" id="banCountInfo">已禁用 0 个武将</div>
+    <div class="grid" id="banGrid"></div>
+    <div class="footer-btns"><button class="btn btn-primary" onclick="showScreen('setupScreen')">完成</button></div>
+</div>
+
+<!-- ===== 选将 ===== -->
+<div id="heroSelectScreen" class="screen">
+    <div class="sel-header">
+        <h2 id="selTitle">选择武将</h2>
+        <p id="selDesc">从以下武将中选择你的角色</p>
+    </div>
+    <div class="grid" id="heroGrid"></div>
+    <div class="sel-footer">
+        <button class="btn-sm" onclick="showScreen('setupScreen')">返回</button>
+        <span id="selPickInfo" style="color:var(--accent-gold);font-size:13px;align-self:center">请选择1个武将</span>
+        <button class="btn btn-primary" id="confirmHeroBtn" disabled onclick="confirmHeroes()">确认</button>
+    </div>
+</div>
+
+<!-- ===== 身份展示 ===== -->
+<div id="identityScreen" class="screen">
+    <img id="idHeroImg" style="display:none;width:180px;height:250px;object-fit:cover;object-position:top center;border-radius:8px;border:3px solid #5c4a28;box-shadow:0 4px 16px rgba(0,0,0,0.6)" alt="">
+    <div class="id-big-text" id="idText">你的身份：主公</div>
+    <div class="id-hero-text" id="idHeroText">你的武将：曹操</div>
+    <div class="id-desc" id="idDesc">你是主公！消灭所有反贼和内奸。</div>
+    <button class="btn btn-primary btn-large" onclick="startPlayGame()">进入游戏</button>
+</div>
+
+<!-- ===== 游戏桌面（横屏圆桌风格） ===== -->
+<div id="gameScreen" class="screen">
+    <div class="topbar">
+        <div>
+            <button class="btn-sm" onclick="if(confirm('确定退出当前对局？'))quitToMenu()" style="margin-right:6px">←返回</button>
+            <span id="turnInfo"></span> <span id="phaseInfo" style="color:var(--accent-gold)"></span>
+        </div>
+        <div>
+            <span id="deckInfo"></span>
+            <button class="btn-sm" id="aiSpeedBtn" onclick="toggleAiSpeed()" style="margin-left:8px; min-width:40px;">1x</button>
+        </div>
+    </div>
+    <div class="table-area" id="tableArea">
+        <div id="playersTop"></div>
+        <div class="table-center">
+            <div class="prompt" id="prompt">游戏开始...</div>
+        </div>
+        <!-- 日志面板：桌面右上角悬浮 -->
+        <div class="log-panel-wrap" id="logPanelWrap" style="display:none">
+            <div class="log-panel-header" onclick="toggleGameLog()">
+                <span>📜 牌局记录</span>
+                <span class="log-panel-close" onclick="toggleGameLog()">✕</span>
+            </div>
+            <div class="game-log-panel" id="glog"></div>
+        </div>
+    </div>
+    <div class="player-bottom">
+        <div class="myinfo">
+            <div class="myinfo-left" data-pid="" onclick="clickSelf()" style="cursor:pointer">
+                <div class="my-avatar" id="myAvatar"></div>
+                <div class="my-name-hp">
+                    <span class="mhn" id="mhn"></span>
+                    <span class="mhp" id="mhp"></span>
+                </div>
+                <span id="midBadge"></span>
+            </div>
+            <div class="equip-zone" id="equipZone"></div>
+        </div>
+        <div class="skill-bar" id="skillBar"></div>
+        <div class="hand-cards" id="handCards"></div>
+        <div class="action-bar" id="actionBar">
+            <button class="log-toggle-btn" onclick="toggleGameLog()">📜 牌局记录</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== 结束 ===== -->
+<div id="gameOverScreen" class="screen">
+    <div class="go-title go-win" id="goTitle">胜利！</div>
+    <div class="go-info" id="goInfo"></div>
+    <div class="go-info" id="goIdTable"></div>
+    <div style="display:flex;gap:12px">
+        <button class="btn" onclick="quitToMenu()">返回主菜单</button>
+        <button class="btn-sm" onclick="showScreen('logScreen');window._returnScreen='gameOverScreen';" style="margin-left:8px;background:rgba(230,200,77,0.15);border:1px solid #8b6914;color:#e6c84d">📜 查看牌局记录</button>
+        <button class="btn btn-primary" onclick="restartGame()">再来一局</button>
+    </div>
+</div>
+
+<!-- ===== 日志面板 ===== -->
+<div id="logScreen" class="screen">
+    <div class="setup-header">
+        <button class="btn-sm" onclick="showScreen(window._returnScreen||'mainMenu')">返回</button>
+        <h2>操作日志</h2>
+        <div style="width:54px"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+        <button class="btn-sm" onclick="copyLog()">📋 复制全部日志</button>
+        <button class="btn-sm" onclick="downloadLog()">💾 下载日志文件</button>
+        <button class="btn-sm danger" onclick="clearLog()">🗑 清空日志</button>
+    </div>
+    <div id="logContent" style="background:#0a0a1e;border:1px solid var(--border-gold);border-radius:8px;padding:10px;font-size:11px;font-family:monospace;line-height:1.6;white-space:pre-wrap;word-break:break-all;max-height:70vh;overflow-y:auto;flex:1"></div>
+</div>
+
+<!-- ===== 规则 ===== -->
+<div id="rulesScreen" class="screen">
+    <div class="setup-header">
+        <button class="btn-sm" onclick="showScreen('mainMenu')">返回</button>
+        <h2>规则说明</h2>
+        <div style="width:54px"></div>
+    </div>
+    <div class="rules-body">
+<h3>游戏概述</h3>
+<p>三国杀是以三国时期为背景的策略卡牌桌游。玩家扮演三国武将，通过出牌和技能击败对手。</p>
+<h3>身份局（标准/军争）</h3>
+<ul>
+<li><b>主公</b>：公开身份，需消灭反贼和内奸</li>
+<li><b>忠臣</b>：保护主公，消灭反贼和内奸</li>
+<li><b>反贼</b>：消灭主公</li>
+<li><b>内奸</b>：成为最后的幸存者</li>
+</ul>
+<p>军争模式增加火杀、雷杀、酒、铁索连环等卡牌，节奏更快。</p>
+<h3>国战模式</h3>
+<p>每人两张同势力武将（主+副），暗置开局。同势力超过半数时后续亮将者变为野心家。消灭所有不同势力角色即胜。</p>
+<h3>回合流程</h3>
+<p>回合开始 → 判定 → 摸牌(2张) → 出牌(每回合限1杀) → 弃牌(手牌≤体力) → 回合结束</p>
+<h3>基本牌</h3>
+<ul>
+<li><b>杀</b>：对攻击范围内目标造成1点伤害（每回合1次）</li>
+<li><b>闪</b>：抵消一次杀的攻击</li>
+<li><b>桃</b>：回复1体力或救人</li>
+<li><b>酒</b>：下一张杀+1伤害，或濒死时自救</li>
+</ul>
+<h3>操作提示</h3>
+<p>点击手牌选择 → 点击目标使用 | 绿色边框 = 可使用 | 红色边框 = 已选中</p>
+    </div>
+</div>
+
+</div><!-- end app -->
+
+<!-- JS文件按顺序加载 -->
+<script src="js/data/cards.js"></script>
+<script src="js/data/heroes.js"></script>
+<script src="js/data/config.js"></script>
+<script src="js/net/interface.js"></script>
+<script src="js/core/game.js"></script>
+<script src="js/core/ai.js"></script>
+
+<script>
+// ============================================================
+// 三国杀单机版 - 主控制器 (v3 全局函数模式)
+// 所有函数直接定义在全局作用域，确保 onclick="xxx()" 可调用
+// ============================================================
+
+// 全局错误处理器 - 捕获所有未处理的JavaScript错误
+window.addEventListener('error', function(e) {
+    const msg = 'JavaScript错误: ' + e.message + '\n文件: ' + (e.filename || 'inline') + '\n行号: ' + e.lineno;
+    console.error('[GlobalError]', msg, e.error);
+    if (typeof Logger !== 'undefined') {
+        Logger.error('全局错误: ' + e.message, '行号:' + e.lineno + ' 文件:' + e.filename);
+    }
+    // 只在关键错误时弹窗（避免刷屏）
+    if (e.message && !e.message.includes('Script error')) {
+        // 延迟弹窗，避免阻塞
+        setTimeout(() => alert('游戏发生错误:\n' + e.message + '\n\n请点击「📋 操作日志」查看详情'), 100);
+    }
+});
+
+'use strict';
+
+// 页面加载完成后检查所有依赖
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('[Init] 页面加载完成，检查依赖...');
+    const checks = [
+        { name: 'SGS', obj: typeof SGS !== 'undefined' },
+        { name: 'SGS.CardData', obj: typeof SGS !== 'undefined' && typeof SGS.CardData !== 'undefined' },
+        { name: 'SGS.HeroData', obj: typeof SGS !== 'undefined' && typeof SGS.HeroData !== 'undefined' },
+        { name: 'SGS.Config', obj: typeof SGS !== 'undefined' && typeof SGS.Config !== 'undefined' },
+        { name: 'SGS.GameEngine', obj: typeof SGS !== 'undefined' && typeof SGS.GameEngine !== 'undefined' },
+        { name: 'SGS.AI', obj: typeof SGS !== 'undefined' && typeof SGS.AI !== 'undefined' },
+        { name: 'Logger', obj: typeof Logger !== 'undefined' },
+        { name: 'Cfg', obj: typeof Cfg !== 'undefined' },
+        { name: 'goSetup', obj: typeof goSetup === 'function' },
+        { name: 'showScreen', obj: typeof showScreen === 'function' },
+    ];
+    let allOK = true;
+    for (const c of checks) {
+        if (!c.obj) {
+            console.error('[Init] ❌ ' + c.name + ' 未定义！');
+            allOK = false;
+        } else {
+            console.log('[Init] ✅ ' + c.name + ' 已加载');
+        }
+    }
+    if (!allOK) {
+        const errMsg = checks.filter(c => !c.obj).map(c => '❌ ' + c.name).join('\n');
+        setTimeout(() => alert('游戏加载失败！以下依赖未定义:\n' + errMsg + '\n\n请刷新页面重试'), 500);
+    } else {
+        console.log('[Init] ✅ 所有依赖已加载，游戏准备就绪');
+        if (typeof Logger !== 'undefined') Logger.info('游戏脚本加载完成，所有依赖已就绪');
+    }
+});
+
+// ============================================================
+// 日志系统 - localStorage 存储 + 页面内日志面板（不依赖外部服务器）
+// 报错时打开右上角「📋日志」按钮可查看/复制全部日志
+// ============================================================
+const Logger = {
+    STORAGE_KEY: 'sgs_game_log',
+    MAX_ENTRIES: 200,        // 最多保留 200 条
+    MAX_DETAIL_LEN: 800,    // 单条 detail 最长 800 字符（超长截断）
+    MAX_MSG_LEN: 200,       // 单条 msg 最长 200 字符
+    currentScreen: 'mainMenu',
+    entries: [],
+
+    init() {
+        // 从 localStorage 恢复历史日志
+        try {
+            const saved = localStorage.getItem(this.STORAGE_KEY);
+            if (saved) this.entries = JSON.parse(saved) || [];
+            // 启动时也裁剪一次，防止旧数据超限
+            if (this.entries.length > this.MAX_ENTRIES) {
+                this.entries = this.entries.slice(-this.MAX_ENTRIES);
+                this.save();
+            }
+        } catch(e) { this.entries = []; }
+    },
+
+    save() {
+        try {
+            // 只存最近 MAX_ENTRIES 条，避免 localStorage 溢出
+            if (this.entries.length > this.MAX_ENTRIES) {
+                this.entries = this.entries.slice(-this.MAX_ENTRIES);
+            }
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.entries));
+        } catch(e) { /* localStorage 满了，忽略 */ }
+    },
+
+    log(type, msg, detail) {
+        const now = new Date();
+        const ts = now.toLocaleTimeString('zh-CN', { hour12: false }) + '.' +
+                   String(now.getMilliseconds()).padStart(3,'0');
+        // 截断超长字段，避免单条日志过大
+        let m = String(msg);
+        if (m.length > this.MAX_MSG_LEN) m = m.slice(0, this.MAX_MSG_LEN) + '…';
+        let d = null;
+        if (detail) {
+            d = typeof detail === 'string' ? detail : (function(){
+                try { return JSON.stringify(detail); } catch(_) { return String(detail); }
+            })();
+            if (d.length > this.MAX_DETAIL_LEN) d = d.slice(0, this.MAX_DETAIL_LEN) + '…';
+        }
+        const entry = {
+            t: ts,
+            type,  // action | info | warn | error
+            msg: m,
+            detail: d,
+            screen: this.currentScreen,
+        };
+        this.entries.push(entry);
+        this.save();
+
+        // 控制台同步打印
+        const prefix = `[${ts}]`;
+        if (type === 'error') console.error(prefix, '❌', msg, detail || '');
+        else if (type === 'action') console.log(prefix, '👉', msg);
+        else if (type === 'warn') console.warn(prefix, '⚠️', msg, detail || '');
+        else console.log(prefix, 'ℹ️', msg, detail || '');
+    },
+
+    action(msg, detail) { this.log('action', msg, detail); },
+    info(msg, detail) { this.log('info', msg, detail); },
+    warn(msg, detail) { this.log('warn', msg, detail); },
+    error(msg, detail) { this.log('error', msg, detail); },
+
+    // 导出全部日志为文本
+    exportText() {
+        let out = '===== 三国杀操作日志 =====\n';
+        out += '导出时间: ' + new Date().toLocaleString('zh-CN', {hour12:false}) + '\n';
+        out += '日志条数: ' + this.entries.length + ' (上限' + this.MAX_ENTRIES + ')\n';
+        out += '='.repeat(40) + '\n\n';
+        for (const e of this.entries) {
+            const icon = e.type==='error'?'❌':e.type==='action'?'👉':e.type==='warn'?'⚠️':'ℹ️';
+            out += `[${e.t}] ${icon} [${e.screen}] ${e.msg}`;
+            if (e.detail) out += '\n    详情: ' + e.detail;
+            out += '\n';
+        }
+        return out;
+    },
+
+    clear() {
+        this.entries = [];
+        this.save();
+    },
+};
+Logger.init();
+
+// 全局错误捕获
+window.addEventListener('error', function(e) {
+    Logger.error('JS运行错误: ' + (e.message || '未知错误'), {
+        file: (e.filename||'').split('/').pop(),
+        line: e.lineno,
+        stack: e.error ? (e.error.stack || String(e.error)).substring(0, 500) : null,
+    });
+});
+window.addEventListener('unhandledrejection', function(e) {
+    Logger.error('Promise异常: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason)), {
+        stack: e.reason && e.reason.stack ? e.reason.stack.substring(0, 500) : null,
+    });
+});
+console.log('[Logger] 日志系统已就绪 (localStorage模式)');
+
+// ---- 全局状态 ----
+const Cfg = {
+    mode: 'standard',      // standard | military | national
+    playerCount: 8,
+    pickMode: 'random',     // random | free
+    includeMilitary: true,
+    bannedHeroes: [],
+    bannedCards: [],
+};
+
+let engine = null, aiPlayer = null;
+let gameStarted = false;
+let selHeroIds = [];
+let banTabCur = 'hero';
+let selectedCardIdx = -1;
+let selectedTargets = [];
+
+// ---- 屏幕切换 ----
+function showScreen(id){
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    Logger.currentScreen = id;
+    Logger.action('切换屏幕 → ' + id);
+    // 游戏屏幕强制横屏比例
+    if(id==='gameScreen') enforceGameAspect();
+}
+
+// 强制游戏区保持 2:1 横屏比例（用JS精确控制，比CSS aspect-ratio更可靠）
+function enforceGameAspect(){
+    const gs=document.getElementById('gameScreen');
+    if(!gs) return;
+    // 先设auto让浏览器重新计算宽度
+    gs.style.height='auto';
+    // 根据实际宽度计算高度 = 宽度 ÷ 2
+    const w=gs.offsetWidth;
+    if(w>0) gs.style.height=(w/2)+'px';
+}
+window.addEventListener('resize', function(){
+    if(document.getElementById('gameScreen').classList.contains('active')){
+        enforceGameAspect();
+    }
+});
+
+// ---- 导航函数（被HTML按钮调用） ----
+function goSetup(){ 
+    // 可见提示：在页面上显示消息
+    const statusDiv = document.getElementById('initStatus');
+    if (statusDiv) {
+        statusDiv.style.display = 'block';
+        statusDiv.textContent = '正在启动游戏设置...';
+        statusDiv.style.color = '#e6c84d';
+    }
+    try { 
+        if (typeof Logger !== 'undefined') Logger.action('点击「开始游戏」'); 
+        if (statusDiv) statusDiv.textContent = '正在初始化设置...';
+        initSetup(); 
+        if (statusDiv) statusDiv.textContent = '正在切换屏幕...';
+        showScreen('setupScreen'); 
+        if (statusDiv) { statusDiv.textContent = '设置页面已打开！'; statusDiv.style.color = '#2ecc71'; }
+    } catch(e) { 
+        const errMsg = '启动游戏设置失败: ' + e.message;
+        console.error('[goSetup]', errMsg, e.stack);
+        if (typeof Logger !== 'undefined') Logger.error('goSetup失败: ' + e.message, e.stack); 
+        if (statusDiv) { statusDiv.textContent = errMsg; statusDiv.style.color = '#e74c3c'; }
+        alert(errMsg + '\n\n请点击「📋 操作日志」查看详情'); 
+    } 
+}
+function goRules(){ Logger.action('点击「规则说明」'); showScreen('rulesScreen'); }
+function goAbout(){
+    Logger.action('点击「关于」');
+    document.getElementById('rulesScreen').querySelector('.rules-body').innerHTML =
+        '<h3>三国杀单机版 v1.0</h3>'+
+        '<p>完整的三国杀本地游玩程序，支持移动端。</p>'+
+        '<h3>功能特性</h3><ul>'+
+        '<li>标准身份局、军争局、国战三种模式</li>'+
+        '<li>2-10人游戏，支持不同人数配置</li>'+
+        '<li>随机选将 / 自由选将两种模式</li>'+
+        '<li>Ban武将和Ban卡牌功能</li>'+
+        '<li>智能AI对手（基于规则决策）</li>'+
+        '<li>完整牌组：标准108 + 军争52 = 共160张</li>'+
+        '<li>40+武将（标准25 + 风火林山）</li></ul>'+
+        '<h3>技术架构</h3><ul>'+
+        '<li>纯HTML/CSS/JS，无需构建工具</li>'+
+        '<li>移动端响应式设计，可直接在手机浏览器运行</li>'+
+        '<li>联机接口已预留（WebSocket架构），当前为单机版本</li></ul>';
+    showScreen('rulesScreen');
+}
+function goLogPanel(){
+    Logger.action('查看操作日志');
+    const el = document.getElementById('logContent');
+    if(el) el.textContent = Logger.exportText();
+    window._returnScreen = 'mainMenu';
+    showScreen('logScreen');
+}
+function copyLog(){
+    const text = Logger.exportText();
+    // 尝试复制到剪贴板
+    if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(()=>{
+            alert('日志已复制到剪贴板！\n共' + Logger.entries.length + '条记录\n请粘贴给我查看');
+        }).catch(()=>{
+            fallbackCopy(text);
+        });
+    } else {
+        fallbackCopy(text);
+    }
+}
+function fallbackCopy(text){
+    // 创建textarea来复制
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+        document.execCommand('copy');
+        alert('日志已复制！共' + Logger.entries.length + '条\n请粘贴给我查看');
+    } catch(e) {
+        alert('复制失败，请手动选择日志文本复制');
+    }
+    document.body.removeChild(ta);
+}
+function downloadLog(){
+    const text = Logger.exportText();
+    const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sgs_log_' + new Date().toISOString().slice(0,10) + '_' + Date.now() + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    Logger.action('下载日志文件');
+}
+function clearLog(){
+    if(confirm('确定清空所有日志记录吗？')){
+        Logger.clear();
+        const el = document.getElementById('logContent');
+        if(el) el.textContent = '（日志已清空）';
+        Logger.info('日志已手动清空');
+    }
+}
+function goBan(){ Logger.action('点击「Ban选」'); initBan(); showScreen('banScreen'); }
+
+// ---- 初始化设置页 ----
+function initSetup(){
+    try {
+        // 模式
+        const modes = [['standard','身份局','标准身份局，使用标准版卡牌'],
+                       ['military','军争局','军争身份局，标准+军争篇卡牌'],
+                       ['national','国战','国战模式，双将暗将，势力对抗']];
+        let h = '';
+        for(const [k,n,d] of modes){
+            h += `<div class="opt${Cfg.mode===k?' on':''}" data-v="${k}" data-d="${d}"
+                      onclick="setMode(this)">${n}</div>`;
+        }
+        const mg = document.getElementById('modeGrid');
+        if(mg){mg.innerHTML=h;}
+
+        // 人数
+        let isNat = Cfg.mode==='national';
+        let nums = isNat ? [4,5,6,7,8] : [2,3,4,5,6,7,8,9,10];
+        h = '';
+        for(const n of nums){
+            h += `<div class="opt${Cfg.playerCount===n?' on':''}" onclick="setCount(${n})">${n}人</div>`;
+        }
+        document.getElementById('countGrid').innerHTML = h;
+
+        // 选将
+        h = `<div class="opt${Cfg.pickMode==='random'?' on':''}" onclick="setPick('random')">随机选将</div>
+             <div class="opt${Cfg.pickMode==='free'?' on':''}" onclick="setPick('free')">自由选将</div>`;
+        document.getElementById('pickGrid').innerHTML = h;
+
+        document.getElementById('militarySec').style.display = isNat ? 'none' : '';
+        updateModeHint();
+    } catch(e) {
+        Logger.error('initSetup失败: ' + e.message, e.stack);
+        alert('初始化设置页失败: ' + e.message);
+    }
+}
+
+function setMode(el){
+    try {
+        Cfg.mode = el.dataset.v;
+        Logger.action('选择模式: ' + el.dataset.v + ' (' + el.textContent + ')');
+        if(Cfg.mode==='national'){Cfg.includeMilitary=true;if(Cfg.playerCount<4)Cfg.playerCount=4;}
+        initSetup();
+    } catch(e){ Logger.error('setMode失败: '+e.message, e.stack); alert('setMode错误: '+e.message); }
+}
+function setCount(n){ try{Cfg.playerCount=n; Logger.action('选择人数: '+n+'人'); initSetup();}catch(e){Logger.error('setCount失败',e.stack);alert(e.message);} }
+function setPick(m){ try{Cfg.pickMode=m; Logger.action('选将方式: '+m); initSetup();}catch(e){Logger.error('setPick失败',e.stack);alert(e.message);} }
+function toggleMilitary(){
+    try{
+        Cfg.includeMilitary=!Cfg.includeMilitary;
+        const sw=document.getElementById('militarySw');
+        sw.classList.toggle('on',Cfg.includeMilitary);
+        Logger.action('切换军争扩展: ' + (Cfg.includeMilitary?'开':'关'));
+    }catch(e){Logger.error('toggleMilitary失败',e.stack);alert(e.message);}
+}
+function updateModeHint(){
+    const hints={standard:'标准身份局，使用标准版卡牌',
+                 military:'军争身份局，标准+军争篇卡牌',
+                 national:'国战模式，双将暗将，势力对抗'};
+    document.getElementById('modeHint').textContent=hints[Cfg.mode]||'';
+    document.getElementById('pickHint').textContent=
+        Cfg.pickMode==='random'?'每人随机获得若干武将供选择':'从全武将池自由选择';
+}
+
+// ---- Ban选 ----
+function initBan(){ switchTab(banTabCur); }
+
+function switchTab(tab){
+    try {
+        banTabCur = tab;
+        Logger.action('Ban页切换tab: ' + tab);
+        document.getElementById('tabHero').classList.toggle('on',tab==='hero');
+        document.getElementById('tabCard').classList.toggle('on',tab==='card');
+        const g=document.getElementById('banGrid');
+        const ci=document.getElementById('banCountInfo');
+        if(tab==='hero'){
+            const heroes = SGS.HeroData.getAll();
+            let h='';
+            for(const H of heroes){
+                const cls=Cfg.bannedHeroes.includes(H.id)?' sel':'';
+                const tagCls='tag-'+(H.faction==='wei'?'w':H.faction==='shu'?'s':H.faction==='wu'?'u':H.faction==='shen'?'shen':'q');
+                const fname=SGS.HeroData.factionName[H.faction]||'?';
+                const imgPath=`assets/images/heroes/${H.id}.jpg`;
+                h+=`<div class="hcard${cls}" onclick="toggleBanH('${H.id}',this)">
+                    <img src="${imgPath}" onerror="this.style.display='none'" style="width:100%;height:70px;object-fit:cover;object-position:top center;border-radius:4px;border:1px solid #5c4a28" alt="${H.name}">
+                    <div class="hname">${H.name}</div><div class="htag ${tagCls}">${fname}</div>
+                    <div class="hhp">${H.maxHp}血</div><div class="hskill">${(H.skills||[]).map(s=>s.name).join(' ')}</div></div>`;
+            }
+            g.innerHTML=h;
+            ci.textContent=`已禁用 ${Cfg.bannedHeroes.length} 个武将`;
+        }else{
+            const allCards = SGS.CardData.allCards;
+            const seen=new Set();
+            let h='';
+            for(const c of allCards){
+                if(seen.has(c.subtype))continue;seen.add(c.subtype);
+                const cls=Cfg.bannedCards.includes(c.subtype)?' sel':'';
+                h+=`<div class="hcard${cls}" onclick="toggleBanC('${c.subtype}',this)">
+                    <div class="hname">${c.name}</div><div class="hskill">${(c.desc||'').substring(0,30)}</div></div>`;
+            }
+            g.innerHTML=h;
+            ci.textContent=`已禁用 ${Cfg.bannedCards.length} 种卡牌`;
+        }
+    } catch(e) {
+        Logger.error('switchTab失败: ' + e.message, e.stack);
+        alert('Ban页加载失败: ' + e.message);
+    }
+}
+function toggleBanH(id,el){
+    try {
+        const i=Cfg.bannedHeroes.indexOf(id);
+        if(i>=0){Cfg.bannedHeroes.splice(i,1);el.classList.remove('sel');Logger.action('取消Ban武将: ' + id);}
+        else{Cfg.bannedHeroes.push(id);el.classList.add('sel');Logger.action('Ban武将: ' + id);}
+        document.getElementById('banCountInfo').textContent=`已禁用 ${Cfg.bannedHeroes.length} 个武将`;
+    } catch(e){ Logger.error('toggleBanH失败', e.stack); }
+}
+function toggleBanC(sub,el){
+    try {
+        const i=Cfg.bannedCards.indexOf(sub);
+        if(i>=0){Cfg.bannedCards.splice(i,1);el.classList.remove('sel');Logger.action('取消Ban卡牌: ' + sub);}
+        else{Cfg.bannedCards.push(sub);el.classList.add('sel');Logger.action('Ban卡牌: ' + sub);}
+        document.getElementById('banCountInfo').textContent=`已禁用 ${Cfg.bannedCards.length} 种卡牌`;
+    } catch(e){ Logger.error('toggleBanC失败', e.stack); }
+}
+
+// ---- 选将 ----
+function goHeroSelect(){
+    Logger.action('点击「确认设置」→ 进入选将', {mode:Cfg.mode, count:Cfg.playerCount, pick:Cfg.pickMode, military:Cfg.includeMilitary, banH:Cfg.bannedHeroes.length, banC:Cfg.bannedCards.length});
+    try {
+        selHeroIds=[];
+        const isNat = Cfg.mode==='national';
+        const maxPick=isNat?2:1;
+
+        // 检查 SGS 模块是否加载
+        if(typeof SGS === 'undefined' || !SGS.HeroData){
+            throw new Error('武将数据模块未加载！请检查 js/data/heroes.js');
+        }
+
+        // 准备可选武将池
+        let pool;
+        if(Cfg.pickMode==='random'){
+            pool = SGS.HeroData.randomPick(isNat?12:10,Cfg.bannedHeroes);
+        }else{
+            pool = SGS.HeroData.getAll().filter(h=>!Cfg.bannedHeroes.includes(h.id));
+        }
+        if(!pool || pool.length===0){
+            throw new Error('武将池为空！bannedHeroes=' + Cfg.bannedHeroes.length);
+        }
+        Logger.info('武将池: ' + pool.length + '个武将可选');
+
+        let h='';
+        for(const H of pool){
+            const fc = H.faction==='wei'?'w':H.faction==='shu'?'s':H.faction==='wu'?'u':H.faction==='qun'?'q':'q';
+            const fname = SGS.HeroData.factionName[H.faction] || '?';
+            const skills = (H.skills||[]).map(s=>s.name).join(' ');
+            const imgPath = `assets/images/heroes/${H.id}.jpg`;
+            h+=`<div class="hcard" data-hid="${H.id}" onclick="pickHero('${H.id}')">
+                  <img src="${imgPath}" onerror="this.style.display='none'" style="width:100%;height:80px;object-fit:cover;object-position:top center;border-radius:4px;border:1px solid #5c4a28" alt="${H.name}">
+                  <div class="hname">${H.name}</div>
+                  <div class="htag tag-${fc}">${fname}</div>
+                  <div class="hhp">${H.maxHp}血</div>
+                  <div class="hskill">${skills}</div></div>`;
+        }
+        document.getElementById('heroGrid').innerHTML = h;
+        document.getElementById('selTitle').textContent = isNat ? '选择双将（同势力）' : '选择武将';
+        document.getElementById('selDesc').textContent = isNat ?
+            '请选择两张同势力的武将作为主将和副将' : '从以下武将中选择你的角色';
+
+        window._selMax=maxPick;
+        updateSelBtn();
+        showScreen('heroSelectScreen');
+    } catch(e) {
+        Logger.error('进入选将失败: ' + e.message, e.stack);
+        alert('进入选将失败: ' + e.message + '\n\n请点击主菜单「📋 操作日志」复制日志发给我');
+    }
+}
+window._selMax=1;
+
+function pickHero(hid){
+    const card=document.querySelector(`[data-hid="${hid}"]`);
+    if(!card){Logger.warn('选将失败: 找不到武将卡片 ' + hid);return;}
+    const idx=selHeroIds.indexOf(hid);
+    if(idx>=0){selHeroIds.splice(idx,1);card.classList.remove('sel');Logger.action('取消选将: ' + hid);return;}
+    if(selHeroIds.length >= window._selMax){
+        // 替换最后一个
+        const oldId=selHeroIds[selHeroIds.length-1];
+        const oldCard=document.querySelector(`[data-hid="${oldId}"]`);
+        if(oldCard)oldCard.classList.remove('sel');
+        selHeroIds.pop();
+    }
+    // 国战检查同势力
+    if(Cfg.mode==='national' && selHeroIds.length>0){
+        const first=SGS.HeroData.getById(selHeroIds[0]);
+        const cur=SGS.HeroData.getById(hid);
+        if(first && cur && first.faction!==cur.faction){
+            alert('国战需要选择同势力的武将！'); return;}
+    }
+    selHeroIds.push(hid);
+    card.classList.add('sel');
+    updateSelBtn();
+}
+function updateSelBtn(){
+    const isNat=Cfg.mode==='national';
+    document.getElementById('selPickInfo').textContent =
+        isNat?`已选: ${selHeroIds.length}/2`: '请选择1个武将';
+    document.getElementById('confirmHeroBtn').disabled = selHeroIds.length !== window._selMax;
+}
+function confirmHeroes(){
+    Logger.action('确认选将', selHeroIds);
+    try {
+        if(!engine) createEngine();
+        // 设人类武将
+        if(Cfg.mode==='national'){
+            const h1=SGS.HeroData.getById(selHeroIds[0]);
+            const h2=SGS.HeroData.getById(selHeroIds[1]);
+            if(h1&&h2) engine.setPlayerHero(0,h1,h2);
+            else throw new Error('武将数据缺失: ' + selHeroIds.join(','));
+        }else{
+            const h=SGS.HeroData.getById(selHeroIds[0]);
+            if(h) engine.setPlayerHero(0,h);
+            else throw new Error('武将数据缺失: ' + selHeroIds[0]);
+        }
+        // AI选将
+        assignAIHeroes();
+        // 显示身份
+        showIdentity();
+    } catch(e) {
+        Logger.error('确认选将失败: ' + e.message, e.stack);
+        alert('确认选将失败: ' + e.message + '\n\n请点击主菜单「📋 操作日志」复制日志发给我');
+    }
+}
+function createEngine(){
+    Logger.info('创建游戏引擎', {mode:Cfg.mode, count:Cfg.playerCount});
+    try {
+        engine = new SGS.GameEngine.GameEngine({
+            mode:Cfg.mode,
+            playerCount:Cfg.playerCount,
+            pickMode:Cfg.pickMode,
+            includeMilitary:Cfg.includeMilitary,
+            bannedHeroes:Cfg.bannedHeroes,
+            bannedCards:Cfg.bannedCards,
+        });
+        aiPlayer = new SGS.AI.AIPlayer();
+        engine.setAI(aiPlayer);
+        engine.setAdapter(new BridgeAdapter());
+        engine.init();
+        Logger.info('引擎初始化完成');
+    } catch(e) {
+        Logger.error('创建引擎失败: ' + e.message, e.stack);
+        throw e;
+    }
+}
+function assignAIHeroes(){
+    const used=[engine.players[0].hero.id];
+    if(engine.players[0].nationalHero)used.push(engine.players[0].nationalHero.id);
+    const exclude=[...Cfg.bannedHeroes,...used];
+
+    for(let i=1;i<engine.playerCount;i++){
+        if(Cfg.mode==='national'){
+            // 国战：随机选一个势力
+            const factions=['wei','shu','wu','qun'];
+            const fac=factions[Math.floor(Math.random()*factions.length)];
+            let pool=SGS.HeroData.getByFaction(fac).filter(h=>!exclude.includes(h.id));
+            if(pool.length<2) pool=SGS.HeroData.getAll().filter(h=>!exclude.includes(h.id));
+            if(pool.length>=2){
+                let h1=pool[Math.floor(Math.random()*pool.length)];
+                let h2=pool[Math.floor(Math.random()*pool.length)];
+                while(h2.id===h1.id && pool.length>1)
+                    h2=pool[Math.floor(Math.random()*pool.length)];
+                engine.setPlayerHero(i,h1,h2);
+                exclude.push(h1.id,h2.id);
+            }
+        }else{
+            let pool=SGS.HeroData.randomPick(5,exclude);
+            if(!pool||pool.length===0) pool=SGS.HeroData.getAll().filter(h=>!exclude.includes(h.id));
+            const chosen=aiPlayer.chooseHero(pool,engine,i);
+            if(chosen){engine.setPlayerHero(i,chosen); exclude.push(chosen.id);}
+        }
+    }
+}
+
+// ---- 身份展示 ----
+function showIdentity(){
+    const human=engine.getHumanPlayer();
+    if(!human)return;
+    const isNat=Cfg.mode==='national';
+    let msg='', desc='';
+    if(isNat){
+        msg=`你的势力：${SGS.HeroData.factionName[human.faction]}`;
+        desc='消灭所有不同势力的角色！';
+    }else{
+        const names={lord:'主公',loyal:'忠臣',rebel:'反贼',spy:'内奸'};
+        msg=`你的身份：${names[human.identity]||human.identity}`;
+        desc=human.identity==='lord'?'你是主公！消灭所有反贼和内奸。':
+             human.identity==='loyal'?'你是忠臣！保护主公。':
+             human.identity==='rebel'?'你是反贼！消灭主公。':
+             human.identity==='spy'?'你是内奸！成为最后的幸存者。':'';
+    }
+    document.getElementById('idText').textContent=msg;
+    document.getElementById('idHeroText').textContent=
+        `你的武将：${human.hero.name}${human.nationalHero?' & '+human.nationalHero.name:''}`;
+    document.getElementById('idDesc').textContent=desc;
+    // 显示武将立绘
+    const heroImg=document.getElementById('idHeroImg');
+    if(heroImg && human.hero.id){
+        heroImg.src=`assets/images/heroes/${human.hero.id}.jpg`;
+        heroImg.style.display='block';
+        heroImg.onerror=function(){this.style.display='none';};
+    }
+    showScreen('identityScreen');
+}
+
+// ---- 开始游戏 ----
+function startPlayGame(){
+    Logger.action('进入游戏');
+    try {
+        gameStarted=true;
+        showScreen('gameScreen');
+        Logger.info('准备调用 engine.startGame()');
+        
+        // 检查engine是否正确初始化
+        if(!engine) {
+            throw new Error('游戏引擎未初始化！请返回重新选将');
+        }
+        
+        // 检查所有玩家是否都有武将
+        const missingHero = engine.players.find(p => !p.hero);
+        if(missingHero) {
+            throw new Error(`玩家 ${missingHero.name} 没有武将！`);
+        }
+        
+        // 加超时监控：3秒后如果还在begin阶段说明卡住了
+        setTimeout(function(){
+            if(engine && engine.phase === SGS.Config.PHASE.BEGIN){
+                Logger.warn('检测到回合卡在BEGIN阶段，强制推进');
+                try { engine.nextTurn(); } catch(e){ Logger.error('强制推进失败', e.stack); }
+            }
+        }, 3000);
+        
+        engine.startGame();
+        Logger.info('engine.startGame() 已返回');
+    } catch(e) {
+        Logger.error('游戏启动失败: ' + e.message, e.stack);
+        alert('游戏启动失败: ' + e.message + '\n\n请复制日志发给我');
+        // 返回主菜单
+        showScreen('mainMenu');
+    }
+}
+
+// ---- 游戏状态更新（引擎回调） ----
+function updateBoard(state){
+    try {
+        _updateBoardImpl(state);
+    } catch(e) {
+        Logger.error('updateBoard渲染失败: ' + e.message, e.stack);
+        console.error('渲染失败:', e);
+    }
+}
+// 座位计算 - 对手沿抛物线弧线均匀分布（横屏2:1比例适配）
+function getSeatPos(i, nOpp){
+    if(nOpp<=1) return {x:50, y:10};
+    // 线性映射到水平位置 [8%, 92%]，避免贴边
+    const t=i/(nOpp-1);
+    const x=8 + t*84;
+    // y用二次抛物线：两边低、中间高，形成自然的弧线
+    const y=10 + 35*(4*t*(1-t));
+    return {x, y};
+}
+
+function _updateBoardImpl(state){
+    if(!state || !gameStarted) return;
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const cp=engine.players[state.currentPlayerIdx];
+
+    // 每次更新都强制刷新横屏比例（屏幕刚激活时offsetWidth可能为0）
+    enforceGameAspect();
+
+    document.getElementById('turnInfo').textContent=`第${state.turnCount}回合 · ${cp?cp.heroName:''}`;
+    document.getElementById('phaseInfo').textContent=SGS.Config.phaseName[state.phase]||'';
+    document.getElementById('deckInfo').textContent=`牌堆:${state.deckCount}`;
+
+    // 阶段指示器
+    const phases=['begin','judge','draw','play','discard','end'];
+    document.getElementById('phaseInfo').parentElement.querySelector('#phaseInfo') ||
+        (function(){
+            // 只创建一次
+        })();
+
+    // 对手列表 - 围绕圆桌椭圆排列（横屏布局）
+    const oppList=state.players.filter(p=>p.id!==human.id);
+    const nOpp=oppList.length;
+    let topH='';
+    for(let i=0;i<nOpp;i++){
+        const p=oppList[i];
+        const pos=getSeatPos(i,nOpp);
+        const fc=p.heroRevealed||Cfg.mode!=='national'?p.heroFaction:'unknown';
+        const fn=p.heroRevealed||Cfg.mode!=='national'?(SGS.HeroData.factionName[p.heroFaction]||'?'):'?';
+        const fctCls=fc==='魏'?'fct-wei':fc==='蜀'?'fct-shu':fc==='吴'?'fct-wu':'fct-qun';
+        const showName=p.heroRevealed||Cfg.mode!=='national'?p.heroName:'???';
+        const heroId=p.heroId||'';
+        // 构造图片路径
+        const imgPath=heroId?`assets/images/heroes/${heroId}.jpg`:'';
+        const eqList=[];
+        if(p.equipment.weapon)eqList.push(p.equipment.weapon.name);
+        if(p.equipment.armor)eqList.push(p.equipment.armor.name);
+        if(p.equipment.horseMinus)eqList.push('-1马');
+        if(p.equipment.horsePlus)eqList.push('+1马');
+        const hpShow=Math.max(0,p.hp);
+        const hpStr='<span class="hc-hp-icon full">'+'♥'.repeat(hpShow)+'</span>'+'<span class="hc-hp-icon empty">'+'♡'.repeat(Math.max(0,p.maxHp-hpShow))+'</span>';
+        // 立绘图片或占位符
+        const portraitHtml=imgPath
+            ?`<img class="hc-portrait" src="${imgPath}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="${showName}"><div class="hc-portrait-placeholder" style="display:none">${showName.charAt(0)}</div>`
+            :`<div class="hc-portrait-placeholder">${showName.charAt(0)}</div>`;
+        const isCur=cp&&p.id===cp.id;
+        topH+=`<div class="hero-card${isCur?' cur':''}${!p.isAlive?' dead':''}${p.isChained?' chained':''}${p.isFlipped?' flipped':''}" data-pid="${p.id}" style="position:absolute; left:${pos.x.toFixed(1)}%; top:${pos.y.toFixed(1)}%; margin-left:-38px; margin-top:-54px;" onclick="clickP(${p.id})">
+            <div class="hc-faction ${fctCls}">${fn}</div>
+            ${p.judgmentCards.length?`<div class="hc-judge-badges">${p.judgmentCards.map(c=>{
+                const cls=c.subtype==='lebusi'?'lebu':c.subtype==='bingliang'?'bing':c.subtype==='shandian'?'shandian':'';
+                const txt=c.subtype==='lebusi'?'乐':c.subtype==='bingliang'?'兵':c.subtype==='shandian'?'闪':'?';
+                return `<span class="hc-judge-badge ${cls}">${txt}</span>`;
+            }).join('')}</div>`:''}
+            ${p.drunk?`<div class="hc-status-badges"><span class="hc-status-badge drunk">酒</span></div>`:''}
+            ${portraitHtml}
+            <div class="hc-info">
+                <div class="hc-name">${showName}${p.isAmbitious?'(野)':''}</div>
+                <div class="hc-hp-row">${hpStr}</div>
+                <div class="hc-hand">牌${p.handCount}</div>
+            </div>
+            ${eqList.length?`<div class="hc-equip-mini">${eqList.map(e=>`<span class="eq-tag">${e}</span>`).join('')}</div>`:''}
+            ${!p.isAlive?'<div class="dead-stamp">阵亡</div>':''}
+        </div>`;
+    }
+    document.getElementById('playersTop').innerHTML=topH;
+
+    // 自己信息
+    const hs=human;
+    // 设置自己的 data-pid 供光束定位
+    const myLeft=document.querySelector('.myinfo-left');
+    if(myLeft) myLeft.setAttribute('data-pid',hs.id);
+    document.getElementById('mhn').textContent=hs.hero.name;
+    const myHpShow=Math.max(0,hs.hp);
+    document.getElementById('mhp').innerHTML=`<span class="h-full">${'❤'.repeat(myHpShow)}</span><span class="h-empty">${'♡'.repeat(Math.max(0,hs.maxHp-myHpShow))}</span> <span style="font-size:10px;color:#a0a0b0">(${hs.hp}/${hs.maxHp})</span>`;
+    // 自己的小头像
+    const myHeroId=hs.hero.id||'';
+    const myImgPath=myHeroId?`assets/images/heroes/${myHeroId}.jpg`:'';
+    const myAvatar=document.getElementById('myAvatar');
+    if(myAvatar){
+        if(myImgPath){
+            myAvatar.innerHTML=`<img src="${myImgPath}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="${hs.hero.name}"><div class="hc-portrait-placeholder" style="display:none;width:100%;height:100%">${hs.hero.name.charAt(0)}</div>`;
+        }else{
+            myAvatar.innerHTML=`<div class="hc-portrait-placeholder" style="width:100%;height:100%">${hs.hero.name.charAt(0)}</div>`;
+        }
+    }
+    if(Cfg.mode==='national'){
+        document.getElementById('midBadge').innerHTML=
+            `<span class="id-bdg" style="background:${SGS.HeroData.factionColor[hs.faction]}">${SGS.HeroData.factionName[hs.faction]}</span>`;
+    }else{
+        const ic={lord:'id-lord',loyal:'id-loyal',rebel:'id-rebel',spy:'id-spy'};
+        document.getElementById('midBadge').innerHTML=
+            `<span class="id-bdg ${ic[hs.identity]||''}">${SGS.Config.identityName[hs.identity]||''}</span>`;
+    }
+    // 装备区
+    let ez='';
+    for(const [slot,card] of Object.entries(hs.equipment)){
+        if(card)ez+=`<span class="eqi">${card.name}</span>`;
+    }
+    document.getElementById('equipZone').innerHTML=ez;
+
+    // 手牌
+    renderHand(hs, state);
+
+    // 技能栏
+    renderSkills(hs, state);
+
+    // 操作栏
+    renderActions(hs, state);
+
+    // 提示文字
+    updatePrompt(hs, state);
+}
+
+function renderHand(human, state){
+    const isMyTurn=state.currentPlayerIdx===human.id && state.phase==='play';
+    const hc=document.getElementById('handCards');
+    let cardsHtml='';
+    for(let ci=0;ci<human.handCards.length;ci++){
+        const c=human.handCards[ci];
+        const suitC=c.suit==='heart'||c.suit==='diamond'?'red':'blk';
+        const suitChar={spade:'♠',heart:'♥',club:'♣',diamond:'♦'}[c.suit];
+        const numStr={1:'A',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K'}[c.number];
+        const nm=(c.element==='fire'?'火':c.element==='thunder'?'雷':'')+c.name;
+        const tp=c.type==='basic'?'基本':c.type==='trick'?'锦囊':c.type==='delay'?'延时':'装备';
+        const canUse=isMyTurn && canUseCard(human,c);
+        const isSelected=selectedCardIdx===ci;
+        const typeCls=c.type==='trick'?'trick':c.type==='delay'?'delay':c.type==='equip'?'equip':'';
+        const elemCls=c.element==='fire'?'fire':c.element==='thunder'?'thunder':'';
+        // 卡牌图片路径
+        const cardImg=getCardImagePath(c);
+        cardsHtml+=`<div class="card ${suitC} ${typeCls} ${elemCls}${isSelected?' sel':''}${canUse?' ok':''}"
+                         onclick="clickCard(${ci})">
+            <span class="cs ${suitC}">${suitChar}</span>
+            <span class="cn">${numStr}</span>
+            ${cardImg?`<img class="card-img" src="${cardImg}" onerror="this.style.display='none'" alt="${nm}">`:''}
+            <span class="cname ${suitC==='red'?'r':'b'}">${nm}</span>
+            <span class="ctype">${tp}</span>
+        </div>`;
+    }
+    hc.innerHTML=cardsHtml;
+}
+
+// 根据卡牌数据获取图片路径
+function getCardImagePath(c){
+    if(!c)return '';
+    // 基本牌和锦囊牌用 subtype
+    const subMap={
+        'sha':'sha','shan':'shan','tao':'tao','jiu':'jiu',
+        'juedou':'juedou','jiedao':'jiedao','wuzhong':'wuzhong',
+        'guohe':'guohe','shunshou':'shunshou','wuxie':'wuxie',
+        'nanman':'nanman','wanjian':'wanjian','taoyuan':'taoyuan',
+        'huogong':'huogong','tiesuo':'tiesuo',
+        'lebusi':'lebusi','bingliang':'bingliang','shandian':'shandian',
+    };
+    // 装备牌用 subtype 映射到图片名
+    const equipMap={
+        'zhuge':'zhuge','cixiong':'cixiong','qinggang':'qinggang','hanbing':'hanbing',
+        'guanshi':'guanshi','qinglong':'qinglong','zhangba':'zhangba','fangtian':'fangtian',
+        'qilin':'qilin','guding':'guding','zhuque':'zhuque',
+        'bagua':'bagua','renwang':'renwang','tengjia':'tengjia','baiyin':'baiyin',
+        'horse_minus':'chitu','horse_plus':'dawan',
+    };
+    let imgName=subMap[c.subtype]||equipMap[c.subtype]||'';
+    if(!imgName)return '';
+    return `assets/images/cards/${imgName}.png`;
+}
+
+function canUseCard(player,c){
+    if(c.subtype==='shan')return false;
+    if(c.subtype==='tao'&&player.hp>=player.maxHp)return false;
+    if(c.subtype==='wuxie')return false; // 无懈可击不能主动使用，只能响应
+    if(c.subtype==='sha'){
+        if(player.shaUsedThisTurn>=1){
+            if(!(player.equipment.weapon&&player.equipment.weapon.subtype==='zhuge')
+               &&!player.skills.some(s=>s.name==='咆哮'))return false;
+        }
+        return engine.getAttackTargets(player).length>0;
+    }
+    return true;
+}
+
+function renderSkills(human,state){
+    const sb=document.getElementById('skillBar');
+    if(!human.hero||!human.hero.skills){sb.innerHTML='';return;}
+    const isMyTurn=state.currentPlayerIdx===human.id;
+    let skHtml='';
+    for(const s of human.hero.skills){
+        const isLocked = s.type==='locked';
+        const usable=!isLocked && isSkillOk(human,s,isMyTurn);
+        if(isLocked){
+            // 锁定技：显示灰色文本（不可点击），鼠标悬停显示描述
+            skHtml+=`<span class="skb-locked" title="${s.desc || '锁定技，自动生效'}">${s.name}</span>`;
+        } else {
+            // 主动技：显示可点击按钮
+            skHtml+=`<button class="skb${usable?' on':''}" ${usable?'':'disabled'}
+                         onclick="clickSkill('${s.name}')">${s.name}</button>`;
+        }
+    }
+    sb.innerHTML=skHtml;
+}
+function isSkillOk(player,skill,isTurn){
+    // 被动技能不需要手动点击
+    if(skill.type==='passive'||skill.type==='locked'||!skill.type) return false;
+    if(!isTurn) return false;
+    // 主公技：需要是主公且有同势力角色
+    if(skill.type==='lord') return player.isLord;
+    // 通用检查：是否已经使用过
+    const used = player.skillStates[skill.name.replace(/·/g,'')+'Used'];
+    if(used) return false;
+    // 主动技能的通用条件检查
+    switch(skill.name){
+        case '制衡': return player.handCards.length>0;
+        case '苦肉': return player.hp>1;
+        case '反间': return player.handCards.length>0;
+        case '青囊': return player.handCards.length>0;
+        case '仁德': return player.handCards.length>=2;
+        case '结姻': return player.handCards.length>=2 && player.gender==='female';
+        case '离间': return player.handCards.length>=1 && player.gender==='female';
+        case '强袭': return true;
+        case '据守': return true;
+        case '挑衅': return engine.getAlivePlayers().filter(p=>p.id!==player.id).length>0;
+        case '天义': return !player.skillStates.tianyiUsed;
+        case '乱击': return player.handCards.length>=2;
+        // 未明确列出的主动技能，默认允许点击（服务端会二次校验）
+        default: return true;
+    }
+}
+
+function renderActions(human,state){
+    const ab=document.getElementById('actionBar');
+    const isMy=state.currentPlayerIdx===human.id;
+    // 日志按钮始终显示
+    let logBtn='<button class="log-toggle-btn" onclick="toggleGameLog()">📜 牌局记录</button>';
+    if(isMy && state.phase==='play'){
+        ab.innerHTML=logBtn+'<button class="btn-sm end-turn" onclick="endTurn()">结束出牌</button>';
+    }else if(isMy && state.phase==='discard'){
+        const need=human.handCards.length-human.hp;
+        ab.innerHTML=logBtn+`<button class="btn-sm danger" id="discardBtn" disabled onclick="doDiscard()">弃牌(${need})</button>`;
+        window._discarding=true; window._discSel=[]; selectedCardIdx=-1;
+    }else if(!isMy){
+        // 非自己的回合：显示等待提示 + 日志按钮
+        const cp=engine.players[state.currentPlayerIdx];
+        ab.innerHTML=`<span style="color:var(--text-secondary);font-size:11px;flex:1">⏳ 等待 ${cp?cp.hero.name:''} 出牌...</span>`+logBtn;
+    }else{ab.innerHTML=logBtn;}
+}
+window._discarding=false;
+window._discSel=[];
+
+function updatePrompt(human,state){
+    const pt=document.getElementById('prompt');
+    if(state.gameOver){pt.textContent='游戏结束';return;}
+    const isMy=state.currentPlayerIdx===human.id;
+    if(isMy){
+        const ph={
+            begin:'回合开始...', judge:'判定阶段...',
+            draw:'摸牌阶段...', play:selectedCardIdx>=0?
+                `已选择【${human.handCards[selectedCardIdx]?.name}】，请选择目标`:'出牌阶段：点击卡牌使用',
+            discard:`弃牌阶段：需弃${Math.max(0,human.handCards.length-human.hp)}张牌`,
+            end:'回合结束...'
+        };
+        pt.textContent=ph[state.phase]||'';
+    }else{
+        const cp=engine.players[state.currentPlayerIdx];
+        pt.textContent=cp?`${cp.hero.name}的回合中...`:'...';
+    }
+}
+
+// ---- 交互事件 ----
+function clickCard(idx){
+    const human=engine.getHumanPlayer(); if(!human){Logger.warn('clickCard失败: 无人类玩家');return;}
+    const st=engine.getState();
+
+    // 弃牌模式
+    if(st.phase==='discard' && st.currentPlayerIdx===human.id){
+        const di=window._discSel.indexOf(idx);
+        if(di>=0){window._discSel.splice(di,1);}else{window._discSel.push(idx);}
+        document.querySelectorAll('#handCards .card').forEach((el,i)=>{
+            el.classList.toggle('sel',window._discSel.includes(i));
+        });
+        const need=human.handCards.length-human.hp;
+        const db=document.getElementById('discardBtn');
+        if(db){db.disabled=window._discSel.length!==need;db.textContent=`弃牌(${window._discSel.length}/${need})`;}
+        return;
+    }
+    // 出牌模式
+    if(st.phase!=='play'||st.currentPlayerIdx!==human.id){return;}
+    const c=human.handCards[idx];
+    if(!c){Logger.warn('clickCard失败: 无此牌 idx=' + idx);return;}
+    if(!canUseCard(human,c)){Logger.action('尝试使用不可用的牌: ' + c.name);return;}
+    if(selectedCardIdx===idx){selectedCardIdx=-1;}else{selectedCardIdx=idx;Logger.action('选中卡牌: ' + c.name + ' (idx=' + idx + ')');}
+
+    const needTarget=c.subtype==='sha'||c.subtype==='juedou'||c.subtype==='guohe'
+        ||c.subtype==='shunshou'||c.subtype==='huogong'||c.subtype==='jiedao'
+        ||c.subtype==='lebusi'||c.subtype==='bingliang'||c.subtype==='tiesuo';
+    if(selectedCardIdx>=0 && needTarget){
+        openTargetPicker(c);
+    }else if(selectedCardIdx>=0){
+        doUseCard(c,[]);
+    }
+    updateBoard(engine.getState());
+}
+function clickP(pid){
+    if(document.querySelector('.target-sel')){
+        toggleTgt(pid);return;
+    }
+    const p=engine.players[pid]; if(!p)return;
+    const facN=SGS.HeroData.factionName[p.faction]||'?';
+    const facC=SGS.HeroData.factionColor[p.faction]||'#888';
+    const heroId=p.hero?p.hero.id:'';
+    const imgPath=heroId?`assets/images/heroes/${heroId}.jpg`:'';
+    let skillHtml='';
+    if(p.hero&&p.hero.skills){
+        skillHtml=p.hero.skills.map(s=>`<div style="background:rgba(0,0,0,0.3);border-left:3px solid #e6c84d;padding:6px 10px;margin:5px 0;border-radius:4px">
+            <b style="color:#e6c84d;font-size:13px">${s.name}</b>
+            <p style="font-size:11px;color:#c0c0d0;margin-top:3px;line-height:1.5">${s.desc}</p></div>`).join('');
+    }
+    const eqList=Object.values(p.equipment).filter(e=>e).map(e=>`<span class="eqi">${e.name}</span>`).join('')||'<span style="color:#666;font-size:11px">无</span>';
+    const portraitHtml=imgPath
+        ?`<img src="${imgPath}" onerror="this.style.display='none'" style="width:100%;border-radius:4px;border:1px solid #5c4a28" alt="${p.hero.name}">`
+        :'';
+    const overlay=document.createElement('div');
+    overlay.className='overlay';
+    overlay.onclick=function(){this.remove();};
+    overlay.innerHTML=`<div class="modal" onclick="event.stopPropagation()">
+        ${portraitHtml}
+        <h4 style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <span style="display:inline-block;width:22px;height:22px;border-radius:50%;background:${facC};border:1px solid rgba(255,255,255,0.3);text-align:center;line-height:22px;font-size:11px">${facN}</span>
+            ${p.hero.name}
+        </h4>
+        <p style="font-size:12px;color:#a0a0b0;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:8px">
+            体力 ${p.hp}/${p.maxHp} · 手牌 ${p.handCards.length} · ${p.isAlive?'存活':'阵亡'}
+        </p>
+        <div style="font-size:12px;color:#e6c84d;margin:8px 0 4px">装备</div>
+        <div style="margin-bottom:8px">${eqList}</div>
+        <div style="font-size:12px;color:#e6c84d;margin:8px 0 4px">技能</div>
+        ${skillHtml||'<span style="color:#666;font-size:11px">无技能</span>'}
+        <button class="btn-sm" style="display:block;margin:12px auto 0" onclick="this.closest('.overlay').remove()">关闭</button></div>`;
+    document.body.appendChild(overlay);
+}
+// 点击自己头像查看技能
+function clickSelf(){
+    const human=engine.getHumanPlayer(); if(!human){return;}
+    clickP(human.id);
+}
+function clickSkill(name){
+    const human=engine.getHumanPlayer(); if(!human){return;}
+    Logger.action('点击技能: ' + name);
+    try{
+        // 需要特殊UI的技能
+        const specialUI = ['制衡','仁德','反间','结姻','离间','挑衅','天义','乱击','英魂','反馈','刚烈','遗计','观星','虚鲲','挥泪'];
+        if(specialUI.includes(name)){
+            switch(name){
+                case '制衡':openZhiheng();break;
+                case '仁德':openRende();break;
+                case '反间':openFanjian();break;
+                case '观星':openGuanxing();break;
+                case '洛神':openLuoshen();break;
+                case '鬼才':openGuicai();break;
+                case '鬼道':openGuidao();break;
+                default:
+                    Logger.warn('技能UI未实现: ' + name);
+                    alert(`技能"${name}"的UI开发中，敬请期待！`);
+            }
+        } else {
+            // 通用技能：直接调用引擎
+            engine.useSkill(human, name, {});
+        }
+        updateBoard(engine.getState());
+    }catch(e){Logger.error('技能执行失败: ' + name + ' - ' + e.message, e.stack);}
+}
+function endTurn(){
+    Logger.action('结束回合');
+    engine.processAction({type:'endTurn'});
+}
+function doDiscard(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const cards=window._discSel.map(i=>human.handCards[i]).filter(Boolean);
+    Logger.action('弃牌', cards.map(c=>c.name));
+    engine.processAction({type:'discard',cards});
+    window._discSel=[]; window._discarding=false; selectedCardIdx=-1;
+}
+function showLogFromGame(){
+    // 从游戏界面跳到日志面板，记录之前在哪个屏幕
+    window._returnScreen = 'gameScreen';
+    const el = document.getElementById('logContent');
+    if(el) el.textContent = Logger.exportText();
+    showScreen('logScreen');
+}
+function quitToMenu(){
+    gameStarted=false;engine=null;aiPlayer=null;showScreen('mainMenu');
+}
+function restartGame(){
+    gameStarted=false;engine=null;aiPlayer=null;goHeroSelect();
+}
+
+// ---- 目标选择弹窗 ----
+let _pendingCard = null; // 缓存正在选目标的卡牌
+function openTargetPicker(card){
+    _pendingCard = card;
+    selectedTargets=[];
+    let targets=[];
+    const human=engine.getHumanPlayer();
+    switch(card.subtype){
+        case 'sha':targets=engine.getAttackTargets(human);break;
+        case'shunshou':case'bingliang':
+            targets=engine.getAlivePlayers().filter(p=>p.id!==human.id&&engine.getDistance(human,p)<=1);break;
+        case'juedou':case'guohe':case'huogong':case'jiedao':
+            targets=engine.getAlivePlayers().filter(p=>p.id!==human.id);break;
+        case'lebusi':targets=engine.getAlivePlayers().filter(p=>p.id!==human.id&&!p.judgmentCards.some(c=>c.subtype==='lebusi'));break;
+        case'tiesuo':targets=engine.getAlivePlayers().filter(p=>p.id!==human.id);break;
+        default:targets=[];
+    }
+    const mt=card.subtype==='tiesuo'?2:1;
+    window._mt = mt; // 同步到全局供 toggleTgt 使用
+
+    const ov=document.createElement('div');
+    ov.className='target-sel';
+    ov.id='targetPicker';
+    ov.innerHTML=`<div class="ts-box">
+        <div class="ts-title">选择目标 (${selectedTargets.length}/${mt})</div>
+        <div id="tList">${targets.map(t=>`<div class="titem" data-tid="${t.id}">
+            <span>${t.hero.name}</span><span style="color:var(--accent-red)">${'❤'.repeat(t.hp)}</span>
+        </div>`).join('')}</div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="closeTarget()">取消</button>
+            <button class="btn-sm btn-primary" id="cfTgtBtn" disabled onclick="confirmTarget()">确认</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelectorAll('.titem').forEach(item=>{
+        item.onclick=function(){toggleTgt(parseInt(this.dataset.tid));};
+    });
+}
+function closeTarget(){
+    const tp=document.getElementById('targetPicker');
+    if(tp)tp.remove();selectedTargets=[];selectedCardIdx=-1;_pendingCard=null;
+    if(engine) updateBoard(engine.getState());
+}
+function toggleTgt(tid){
+    const item=document.querySelector(`[data-tid="${tid}"]`);
+    const mt=window._mt||1;
+    const si=selectedTargets.indexOf(tid);
+    if(si>=0){selectedTargets.splice(si,1);if(item)item.classList.remove('sel');}
+    else{
+        if(selectedTargets.length<mt){selectedTargets.push(tid);if(item)item.classList.add('sel');}
+        else{
+            const oldId=selectedTargets[selectedTargets.length-1];
+            const oi=document.querySelector(`.titem[data-tid="${oldId}"]`);
+            if(oi)oi.classList.remove('sel');
+            selectedTargets[mt-1]=tid;if(item)item.classList.add('sel');
+        }
+    }
+    const title=document.querySelector('.ts-title');
+    if(title)title.textContent=`选择目标 (${selectedTargets.length}/${mt})`;
+    const btn=document.getElementById('cfTgtBtn');
+    if(btn)btn.disabled=selectedTargets.length===0;
+}
+function confirmTarget(){
+    const card = _pendingCard;
+    const tids = selectedTargets.slice();
+    closeTarget();
+    if(card) doUseCard(card, tids);
+    selectedCardIdx=-1;
+}
+function humanHand(){return engine?engine.getHumanPlayer():null;}
+function cards(){return humanHand()?humanHand().handCards:[];}
+
+function doUseCard(card,tids){
+    if(!engine)return;
+    Logger.action('使用卡牌: ' + card.name + ' → 目标' + (tids.length?tids.join(','):'(无)'), {card:card.name, subtype:card.subtype, targets:tids});
+    // 出牌动画
+    showCardAction(card, engine.getHumanPlayer().id, tids);
+    try {
+        engine.processAction({type:'useCard',cardId:card.instanceId,targetIds:tids});
+    } catch(e) {
+        Logger.error('使用卡牌失败: ' + card.name + ' - ' + e.message, e.stack);
+        alert('使用卡牌失败: ' + e.message);
+    }
+    selectedCardIdx=-1;
+}
+window._mt=1;
+
+// ---- 制衡弹窗 ----
+function openZhiheng(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const ov=document.createElement('div');
+    ov.className='overlay';
+    ov.innerHTML=`<div class="modal" style="max-height:75vh;overflow-y:auto">
+        <h4>制衡：选择要弃的牌</h4>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px" id="zhCards">
+            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
+                data-i="${i}" onclick="this.classList.toggle('sel')">
+                <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+                <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="this.closest('.overlay').remove()">取消</button>
+            <button class="btn-sm btn-primary" onclick="confirmZhiheng()">确认</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+}
+// ---- 观星弹窗 ----
+function openGuanxing(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    if(engine.phase !== 'begin'){alert('观星只能在回合开始阶段使用');return;}
+    // AI自动执行观星（简化版）
+    const n = Math.min(5, engine.deck.length);
+    if(n > 0){
+        const stars = engine.deck.slice(-n);
+        engine.deck = engine.deck.slice(0, -n);
+        shuffleId(stars);
+        engine.deck = engine.deck.concat(stars);
+        engine.log(`${human.name}发动【观星】，观看了牌堆顶的${n}张牌并调整顺序`, 'highlight');
+    }
+    updateBoard(engine.getState());
+}
+
+// ---- 鬼才弹窗 ----
+function openGuicai(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    if(!engine._waitingForGuicai){alert('当前不是鬼才发动时机');return;}
+    
+    const judgeCard = engine._guicaiJudgeCard;
+    const originalResult = engine._guicaiOriginalResult;
+    const cardInfo = `${SGS.CardData.suitName[originalResult.suit]}${SGS.CardData.numberName[originalResult.number]}`;
+    
+    const ov=document.createElement('div');
+    ov.id='guicaiOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)cancelGuicai();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>鬼才：是否替换判定牌？</h4>
+        <div style="text-align:center;margin:8px 0">
+            <div style="font-size:12px;color:#a0a0b0;margin-bottom:4px">当前判定结果（${judgeCard.name}）：</div>
+            <div class="card ${originalResult.suit==='heart'||originalResult.suit==='diamond'?'red':'blk'}" style="display:inline-block">
+                <span class="cs ${originalResult.suit==='heart'||originalResult.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(originalResult.suit)]}</span>
+                <span class="cname ${originalResult.suit==='heart'||originalResult.suit==='diamond'?'r':'b'}">${originalResult.name}</span>
+            </div>
+        </div>
+        <div style="font-size:12px;color:#e6c84d;margin:8px 0">你可以打出一张牌替换判定结果</div>
+        <div id="guicaiHand" style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px;margin-bottom:10px"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="cancelGuicai()">不替换</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+    
+    // 显示手牌供选择
+    const handDiv=document.getElementById('guicaiHand');
+    handDiv.innerHTML = human.handCards.map((c,i)=>`
+        <div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}" 
+            data-i="${i}" 
+            onclick="selectGuicaiCard(this)">
+            <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+            <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span>
+        </div>
+    `).join('');
+}
+
+function selectGuicaiCard(el){
+    const card = engine.getHumanPlayer().handCards[parseInt(el.dataset.i)];
+    if(!card)return;
+    
+    const ov=document.getElementById('guicaiOverlay');
+    if(ov)ov.remove();
+    
+    engine.processAction({type:'finishGuicai', card});
+    updateBoard(engine.getState());
+}
+
+// ---- 鬼道弹窗 ----
+function openGuidao(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    if(!engine._waitingForGuidao){alert('当前不是鬼道发动时机');return;}
+    
+    const judgeCard = engine._guidaoJudgeCard;
+    const originalResult = engine._guidaoOriginalResult;
+    const cardInfo = `${SGS.CardData.suitName[originalResult.suit]}${SGS.CardData.numberName[originalResult.number]}`;
+    
+    const ov=document.createElement('div');
+    ov.id='guidaoOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)cancelGuidao();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>鬼道：是否替换判定牌？（需打出黑色牌）</h4>
+        <div style="text-align:center;margin:8px 0">
+            <div style="font-size:12px;color:#a0a0b0;margin-bottom:4px">当前判定结果（${judgeCard.name}）：</div>
+            <div class="card ${originalResult.suit==='heart'||originalResult.suit==='diamond'?'red':'blk'}" style="display:inline-block">
+                <span class="cs ${originalResult.suit==='heart'||originalResult.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(originalResult.suit)]}</span>
+                <span class="cname ${originalResult.suit==='heart'||originalResult.suit==='diamond'?'r':'b'}">${originalResult.name}</span>
+            </div>
+        </div>
+        <div style="font-size:12px;color:#e6c84d;margin:8px 0">你需要打出一张黑色牌（♠♣）来替换判定结果</div>
+        <div id="guidaoHand" style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px;margin-bottom:10px"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="cancelGuidao()">不替换</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+    
+    // 显示黑色手牌供选择
+    const handDiv=document.getElementById('guidaoHand');
+    const blackCards = human.handCards.filter(c => c.suit === 'spade' || c.suit === 'club');
+    if(blackCards.length === 0){
+        handDiv.innerHTML = '<span style="color:#666;font-size:12px">没有黑色牌可出</span>';
+    } else {
+        handDiv.innerHTML = blackCards.map((c,i)=>`
+            <div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}" 
+                data-i="${human.handCards.indexOf(c)}" 
+                onclick="selectGuidaoCard(this)">
+                <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
+                <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span>
+            </div>
+        `).join('');
+    }
+}
+
+function selectGuidaoCard(el){
+    const card = engine.getHumanPlayer().handCards[parseInt(el.dataset.i)];
+    if(!card)return;
+    
+    const ov=document.getElementById('guidaoOverlay');
+    if(ov)ov.remove();
+    
+    engine.processAction({type:'finishGuidao', card});
+    updateBoard(engine.getState());
+}
+
+// ---- 洛神弹窗 ----
+// 供引擎自动调用
+function openLuoshenUI(){
+    if(!engine || !engine._waitingForLuoshen) return;
+    // 防止重复弹出（检查确认框和判定框）
+    if(document.getElementById('luoshenOverlay')) return;
+    if(document.getElementById('luoshenConfirmOverlay')) return;
+    openLuoshen();
+}
+
+function openLuoshen(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    if(engine.phase !== 'begin'){return;}
+    if(!engine._waitingForLuoshen){return;}
+
+    // 防止重复弹出确认框
+    if(document.getElementById('luoshenConfirmOverlay')) return;
+
+    const ov=document.createElement('div');
+    ov.id='luoshenConfirmOverlay';
+    ov.className='overlay';
+    ov.onclick=function(){cancelLuoshen();};
+    ov.innerHTML=`<div class="modal" onclick="event.stopPropagation()">
+        <h4>洛神：是否发动？</h4>
+        <p>发动洛神将进行判定，如果判定牌为黑色则获得该牌并可以继续判定。</p>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="cancelLuoshen()">取消</button>
+            <button class="btn-sm btn-primary" onclick="startLuoshen()">发动洛神</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+}
+
+// 取消洛神
+function cancelLuoshen() {
+    // 移除所有洛神相关的弹窗
+    const ov = document.getElementById('luoshenOverlay');
+    if (ov) ov.remove();
+    const confirmOv = document.getElementById('luoshenConfirmOverlay');
+    if (confirmOv) confirmOv.remove();
+    if (engine && engine._waitingForLuoshen) {
+        engine.processAction({type:'finishLuoshen'});
+        updateBoard(engine.getState());
+    }
+}
+
+// 取消鬼才
+function cancelGuicai() {
+    const ov = document.getElementById('guicaiOverlay');
+    if (ov) ov.remove();
+    if (engine && engine._waitingForGuicai) {
+        engine.processAction({type:'finishGuicai', card: null});
+        updateBoard(engine.getState());
+    }
+}
+
+// 取消鬼道
+function cancelGuidao() {
+    const ov = document.getElementById('guidaoOverlay');
+    if (ov) ov.remove();
+    if (engine && engine._waitingForGuidao) {
+        engine.processAction({type:'finishGuidao', card: null});
+        updateBoard(engine.getState());
+    }
+}
+
+// 开始洛神判定
+function startLuoshen(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    if(!engine._waitingForLuoshen){return;}
+
+    // 关闭确认弹窗
+    const confirmOv = document.getElementById('luoshenConfirmOverlay');
+    if (confirmOv) confirmOv.remove();
+
+    engine.log(`${human.name}发动【洛神】`, 'highlight');
+
+    // 创建洛神判定界面
+    const ov=document.createElement('div');
+    ov.id='luoshenOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)this.remove();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>洛神判定</h4>
+        <div id="luoshenResult"></div>
+        <div id="luoshenButtons" style="display:flex;gap:8px;margin-top:10px;justify-content:center"></div></div>`;
+    document.body.appendChild(ov);
+
+    // 执行一次洛神判定
+    performLuoshenJudge();
+}
+
+// 执行一次洛神判定
+function performLuoshenJudge(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const resultDiv=document.getElementById('luoshenResult');
+    const btnDiv=document.getElementById('luoshenButtons');
+    
+    if(!engine._waitingForLuoshen){return;}
+    
+    const judgeCard = engine.revealTopCard();
+    if(!judgeCard){
+        engine.log(`${human.name}洛神判定：牌堆已空，洛神结束`, 'normal');
+        engine.processAction({type:'finishLuoshen'});
+        ov=document.getElementById('luoshenOverlay');
+        if(ov)ov.remove();
+        updateBoard(engine.getState());
+        return;
+    }
+    
+    const cardInfo = `${SGS.CardData.suitName[judgeCard.suit]}${SGS.CardData.numberName[judgeCard.number]}`;
+    engine.log(`${human.name}洛神判定：${cardInfo}`, 'normal');
+    
+    const isBlack = judgeCard.suit === 'spade' || judgeCard.suit === 'club';
+    
+    if(isBlack){
+        human.handCards.push(judgeCard);
+        engine.log(`${human.name}获得♠/♣${cardInfo}，可以继续洛神`, 'highlight');
+        
+        // 显示获得的牌
+        const cardHtml = `<div style="text-align:center;margin:8px 0">
+            <div style="font-size:12px;color:#e6c84d;margin-bottom:4px">判定结果：黑色，获得此牌</div>
+            <div class="card ${judgeCard.suit==='heart'||judgeCard.suit==='diamond'?'red':'blk'}" style="display:inline-block">
+                <span class="cs ${judgeCard.suit==='heart'||judgeCard.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(judgeCard.suit)]}</span>
+                <span class="cname ${judgeCard.suit==='heart'||judgeCard.suit==='diamond'?'r':'b'}">${judgeCard.name}</span>
+            </div>
+        </div>`;
+        resultDiv.insertAdjacentHTML('beforeend', cardHtml);
+        
+        // 显示继续按钮
+        btnDiv.innerHTML = `
+            <button class="btn-sm" onclick="this.parentElement.parentElement.parentElement.closest('.overlay').remove();engine.processAction({type:'finishLuoshen'});updateBoard(engine.getState())">结束洛神</button>
+            <button class="btn-sm btn-primary" onclick="performLuoshenJudge()">继续判定</button>
+        `;
+        updateBoard(engine.getState());
+    } else {
+        engine.discardPile.push(judgeCard);
+        engine.log(`${human.name}洛神判定结果为红色，洛神结束`, 'normal');
+        
+        // 显示红色牌
+        const cardHtml = `<div style="text-align:center;margin:8px 0">
+            <div style="font-size:12px;color:#a0a0b0;margin-bottom:4px">判定结果：红色，洛神结束</div>
+            <div class="card ${judgeCard.suit==='heart'||judgeCard.suit==='diamond'?'red':'blk'}" style="display:inline-block">
+                <span class="cs ${judgeCard.suit==='heart'||judgeCard.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(judgeCard.suit)]}</span>
+                <span class="cname ${judgeCard.suit==='heart'||judgeCard.suit==='diamond'?'r':'b'}">${judgeCard.name}</span>
+            </div>
+        </div>`;
+        resultDiv.insertAdjacentHTML('beforeend', cardHtml);
+        
+        // 洛神结束 - 先关闭弹窗，再结束洛神
+        const overlay = document.getElementById('luoshenOverlay');
+        if(overlay) overlay.remove();
+        
+        // 调用引擎结束洛神
+        if(engine && engine._waitingForLuoshen) {
+            engine.finishLuoshen();
+        }
+        updateBoard(engine.getState());
+    }
+}
+
+function confirmZhiheng(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const sel=document.querySelectorAll('#zhCards .card.sel');
+    const cards=[...sel].map(el=>human.handCards[parseInt(el.dataset.i)]).filter(Boolean);
+    if(cards.length>0) engine.useSkill(human,'制衡',{cards});
+    const ov=document.querySelector('.overlay');
+    if(ov)ov.remove();
+    updateBoard(engine.getState());
+}
+
+// ---- 日志 ----
+function toggleGameLog(){
+    const wrap=document.getElementById('logPanelWrap');
+    if(!wrap)return;
+    if(wrap.style.display==='none' || wrap.style.display===''){
+        wrap.style.display='flex';
+        const gl=document.getElementById('glog');
+        if(gl) gl.scrollTop=gl.scrollHeight;
+    }else{
+        wrap.style.display='none';
+    }
+}
+function addLog(msg,type){
+    const gl=document.getElementById('glog');
+    if(!gl)return;
+    // 替换日志中的AI名字为武将真名
+    if(engine && engine.players){
+        for(const p of engine.players){
+            if(p.isAI && p.hero && p.name !== p.hero.name){
+                // 先替换 "名字(武将)" 格式 → "武将"
+                const fullName = p.name + '(' + p.hero.name + ')';
+                msg = msg.split(fullName).join(p.hero.name);
+                // 再替换纯名字格式 → 武将
+                msg = msg.split(p.name).join(p.hero.name);
+            }
+        }
+    }
+    const d=document.createElement('div');
+    d.className=(type==='danger'?'log-danger':type==='success'?'log-success':type==='highlight'?'log-highlight':'');
+    d.textContent=msg;
+    gl.appendChild(d);
+    gl.scrollTop=gl.scrollHeight;
+    while(gl.children.length>60)gl.removeChild(gl.firstChild);
+}
+
+// ---- 游戏结束 ----
+function showGameOver(result){
+    gameStarted=false;
+    const human=engine?engine.getHumanPlayer():null;
+    let win=false;
+    if(result.winner){
+        if(Cfg.mode==='national'){
+            win=result.winner.includes(human?.id+'')||(human?.heroRevealed&&result.winner.includes(human?.faction));
+        }else{
+            win=result.winner.includes(human?.identity);
+        }
+    }
+    document.getElementById('goTitle').textContent=win?'胜利！':'失败...';
+    document.getElementById('goTitle').className='go-title '+(win?'go-win':'go-lose');
+
+    const wn=Cfg.mode==='national'?
+        (result.winner&&result.winner.length===1&&result.winner[0].startsWith?'野心家获胜':result.winner?(SGS.HeroData.factionName[result.winner[0]]||'')+'势力获胜':''):
+        result.winner?(SGS.Config.identityName[result.winner[0]]||result.winner[0])+'方获胜':'';
+    document.getElementById('goInfo').innerHTML=wn+'<br><br>'+(win?'恭喜你取得了胜利！':'再接再厉！');
+    
+    // 添加查看日志按钮
+    let tableHtml='<div style="margin-bottom:10px;font-size:13px;color:var(--accent-gold)">对局结果</div>';
+    if(result.players){
+        for(const p of result.players){
+            const status = p.isAlive ? '✅存活' : '❌阵亡';
+            tableHtml+=`<div class="go-id-row">
+                <span>${p.hero} ${status}</span>
+                <span class="id-bdg ${p.identity||(p.faction?'fct-'+p.faction:'')}">${SGS.Config.identityName[p.identity]||p.faction||''}</span>
+            </div>`;
+        }
+    }
+    // 添加查看完整日志按钮
+    tableHtml+=`<div style="margin-top:12px;text-align:center">
+        <button class="btn-sm" onclick="showScreen('logScreen');window._returnScreen='gameOverScreen';" style="background:rgba(230,200,77,0.2);border:1px solid #8b6914;color:#e6c84d">
+            📜 查看完整牌局记录
+        </button>
+    </div>`;
+    document.getElementById('goIdTable').innerHTML=tableHtml;
+    showScreen('gameOverScreen');
+}
+
+// ---- 引擎适配器桥接 ----
+class BridgeAdapter{
+    constructor(){this.mode='local';}
+    async sendAction(a){try{return engine.processAction(a);}catch(e){console.error('action err:',e);}}
+    async requestChoice(cr){return null;}
+    notifyState(st){updateBoard(st);}
+    notifyEvent(ev){
+        if(ev.type==='log'){addLog(ev.msg,ev._type||'normal');}
+        // 卡牌使用事件 → 飞行动画
+        if(ev.type==='cardUsed' && ev.detail){
+            showCardAction(ev.detail.card, ev.detail.fromId, ev.detail.targetIds||[]);
+        }
+        // 伤害事件 → 飘字+震动
+        if(ev.type==='damage' && ev.detail){
+            showDamageAnimation(ev.detail.playerId, ev.detail.damage, ev.detail.element);
+        }
+        // 回血事件 → 绿色飘字
+        if(ev.type==='heal' && ev.detail){
+            showHealAnimation(ev.detail.playerId, ev.detail.amount);
+        }
+        // 闪避事件
+        if(ev.type==='shan' && ev.detail){
+            showShanAnimation(ev.detail.playerId);
+        }
+    }
+    notifyGameOver(r){showGameOver(r);}
+    isConnected(){return true;}
+}
+
+// ======== 出牌动画系统（正版三国杀风格） ========
+
+// 出牌动画：光线从来源射向目标 + 卡牌图标在中间闪现
+function showCardAction(card, fromId, targetIds){
+    if(!card)return;
+    try{
+        const fromEl = getPlayerElement(fromId) || document.getElementById('handCards');
+        const cardImg = getCardImagePath(card);
+        const fromRect = fromEl.getBoundingClientRect();
+        const startX = fromRect.left + fromRect.width/2;
+        const startY = fromRect.top + fromRect.height/2;
+        
+        // 0. 卡牌从手牌位置飞到中央（新增动画）
+        showCardFly(card, fromId);
+        
+        for(const tid of (targetIds||[])){
+            const targetEl = getPlayerElement(tid);
+            if(!targetEl) continue;
+            const toRect = targetEl.getBoundingClientRect();
+            const endX = toRect.left + toRect.width/2;
+            const endY = toRect.top + toRect.height/2;
+            
+            // 1. 光线/光束效果（从来源到目标的发光线）
+            showAttackBeam(startX, startY, endX, endY, card.element);
+            
+            // 2. 中间闪现卡牌图标
+            setTimeout(() => {
+                showCardFlash(card, (startX+endX)/2, (startY+endY)/2, cardImg);
+            }, 150);
+            
+            // 3. 到达目标后：受击效果
+            setTimeout(() => {
+                targetEl.classList.add('hit-shake');
+                setTimeout(() => targetEl.classList.remove('hit-shake'), 400);
+            }, 400);
+        }
+    }catch(e){ /* 忽略 */ }
+}
+
+// 攻击光束：一条发光的线从来源射向目标
+function showAttackBeam(x1, y1, x2, y2, element){
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    
+    const beam = document.createElement('div');
+    beam.className = 'attack-beam';
+    const color = element === 'fire' ? '#ff6600' : element === 'thunder' ? '#cc00ff' : '#ffdd44';
+    beam.style.cssText = `
+        position:fixed; left:${x1}px; top:${y1}px;
+        width:${len}px; height:4px;
+        transform-origin: 0 50%;
+        transform: rotate(${angle}deg) scaleX(0);
+        background: linear-gradient(90deg, transparent 0%, ${color} 30%, ${color} 70%, transparent 100%);
+        box-shadow: 0 0 12px ${color}, 0 0 24px ${color};
+        z-index: 300; pointer-events: none;
+        border-radius: 2px;
+        opacity: 0;
+    `;
+    document.body.appendChild(beam);
+    
+    // 光束延伸动画
+    requestAnimationFrame(() => {
+        beam.style.transition = 'transform 0.15s ease-out, opacity 0.1s';
+        beam.style.transform = `rotate(${angle}deg) scaleX(1)`;
+        beam.style.opacity = '1';
+    });
+    
+    // 光束消失
+    setTimeout(() => {
+        beam.style.transition = 'opacity 0.2s';
+        beam.style.opacity = '0';
+    }, 200);
+    setTimeout(() => { if(beam.parentNode) beam.remove(); }, 400);
+}
+
+// 卡牌飞到中央并消失动画
+function showCardFly(card, fromId){
+    if(!card) return;
+    try {
+        const fromEl = getPlayerElement(fromId) || document.getElementById('handCards');
+        const cardImg = getCardImagePath(card);
+        const fromRect = fromEl.getBoundingClientRect();
+        const startX = fromRect.left + fromRect.width/2;
+        const startY = fromRect.top + fromRect.height/2;
+        const cx = window.innerWidth/2;
+        const cy = window.innerHeight/2;
+
+        // 创建飞行卡牌元素
+        const fly = document.createElement('div');
+        fly.className = 'card ' + ((card.suit==='heart'||card.suit==='diamond')?'red':'blk') + (card.element==='fire'?' fire':card.element==='thunder'?' thunder':'');
+        fly.style.cssText = `position:fixed; left:${startX}px; top:${startY}px; z-index:300; pointer-events:none; transform:translate(-50%,-50%) scale(0.5) rotate(-5deg); opacity:0.9; transition:none;`;
+        fly.innerHTML = cardImg
+            ? `<img src="${cardImg}" onerror="this.style.display='none'" style="width:44px;height:62px;object-fit:contain;opacity:0.85">`
+            : `<span style="font-size:16px;font-weight:bold;color:#1a1a2e;text-shadow:0 1px 2px rgba(255,255,255,0.4);">${card.name}</span>`;
+        document.body.appendChild(fly);
+
+        // 强制回流后开始飞行动画
+        requestAnimationFrame(() => {
+            fly.style.transition = `left 0.3s cubic-bezier(0.2,0.8,0.3,1), top 0.3s cubic-bezier(0.2,0.8,0.3,1), transform 0.3s ease-out, opacity 0.5s ease-out`;
+            fly.style.left = cx + 'px';
+            fly.style.top = cy + 'px';
+            fly.style.transform = 'translate(-50%,-50%) scale(1.1) rotate(3deg)';
+            fly.style.opacity = '1';
+        });
+
+        // 到达中央后闪烁然后消失
+        setTimeout(() => {
+            fly.style.transition = 'transform 0.4s ease-in, opacity 0.4s ease-in';
+            fly.style.transform = 'translate(-50%,-50%) scale(0.6) rotate(10deg)';
+            fly.style.opacity = '0';
+        }, 350);
+
+        setTimeout(() => { if(fly.parentNode) fly.remove(); }, 900);
+    } catch(e) { /* 忽略 */ }
+}
+
+// 卡牌图标闪现（在指定位置）
+function showCardFlash(card, x, y, cardImg){
+    if(!card) return;
+    try {
+        const flash = document.createElement('div');
+        flash.className = 'card-flash';
+        flash.style.cssText = `position:fixed; left:${x}px; top:${y}px; transform:translate(-50%,-50%) scale(0.3); z-index:301; pointer-events:none; opacity:0;`;
+        flash.innerHTML = cardImg
+            ? `<img src="${cardImg}" onerror="this.style.display='none'" alt="${card.name}"><span>${card.name}</span>`
+            : `<span class="cf-name">${card.name}</span>`;
+        document.body.appendChild(flash);
+
+        requestAnimationFrame(() => {
+            flash.style.transition = 'all 0.3s ease-out';
+            flash.style.transform = 'translate(-50%,-50%) scale(1)';
+            flash.style.opacity = '1';
+        });
+        setTimeout(() => {
+            flash.style.transition = 'all 0.2s';
+            flash.style.transform = 'translate(-50%,-50%) scale(1.3)';
+            flash.style.opacity = '0';
+        }, 300);
+        setTimeout(() => { if(flash.parentNode) flash.remove(); }, 500);
+    } catch(e) { /* 忽略 */ }
+}
+
+// 获取玩家DOM元素（通过 data-pid 精确查找）
+function getPlayerElement(pid){
+    // 通用查找：对手在 playersTop，自己在 player-bottom，都有 data-pid
+    const el=document.querySelector('[data-pid="'+pid+'"]');
+    if(el) return el;
+    // 兜底：自己
+    if(engine && engine.getHumanPlayer && engine.getHumanPlayer().id===pid){
+        return document.querySelector('.myinfo-left');
+    }
+    return null;
+}
+
+// 伤害飘字动画
+function showDamageAnimation(playerId, damage, element){
+    const el = getPlayerElement(playerId);
+    if(!el) return;
+    const rect = el.getBoundingClientRect();
+    const floater = document.createElement('div');
+    floater.className = 'damage-float';
+    const color = element === 'fire' ? '#ff6600' : element === 'thunder' ? '#9933ff' : '#ff0000';
+    floater.style.color = color;
+    floater.textContent = '-' + damage;
+    floater.style.left = (rect.left + rect.width/2) + 'px';
+    floater.style.top = (rect.top + rect.height/2) + 'px';
+    document.body.appendChild(floater);
+    // 触发飘升动画
+    requestAnimationFrame(() => {
+        floater.style.transition = 'all 1s ease-out';
+        floater.style.top = (rect.top - 40) + 'px';
+        floater.style.opacity = '0';
+        floater.style.transform = 'translateX(-50%) scale(1.8)';
+    });
+    setTimeout(() => { if(floater.parentNode) floater.remove(); }, 1000);
+    
+    // 红色闪烁
+    el.classList.add('hit-flash');
+    setTimeout(() => el.classList.remove('hit-flash'), 400);
+}
+
+// 回血飘字动画
+function showHealAnimation(playerId, amount){
+    const el = getPlayerElement(playerId);
+    if(!el) return;
+    const rect = el.getBoundingClientRect();
+    const floater = document.createElement('div');
+    floater.className = 'damage-float heal-float';
+    floater.textContent = '+' + amount;
+    floater.style.left = (rect.left + rect.width/2) + 'px';
+    floater.style.top = (rect.top + rect.height/2) + 'px';
+    document.body.appendChild(floater);
+    requestAnimationFrame(() => {
+        floater.style.transition = 'all 1s ease-out';
+        floater.style.top = (rect.top - 40) + 'px';
+        floater.style.opacity = '0';
+        floater.style.transform = 'translateX(-50%) scale(1.5)';
+    });
+    setTimeout(() => { if(floater.parentNode) floater.remove(); }, 1000);
+    
+    // 绿色闪烁
+    el.classList.add('heal-flash');
+    setTimeout(() => el.classList.remove('heal-flash'), 400);
+}
+
+// 闪避动画
+function showShanAnimation(playerId){
+    const el = getPlayerElement(playerId);
+    if(!el) return;
+    const rect = el.getBoundingClientRect();
+    // 显示"闪"字
+    const floater = document.createElement('div');
+    floater.className = 'shan-float';
+    floater.textContent = '闪!';
+    floater.style.left = (rect.left + rect.width/2) + 'px';
+    floater.style.top = (rect.top + rect.height/2) + 'px';
+    document.body.appendChild(floater);
+    requestAnimationFrame(() => {
+        floater.style.transition = 'all 0.6s ease-out';
+        floater.style.top = (rect.top - 30) + 'px';
+        floater.style.opacity = '0';
+    });
+    setTimeout(() => { if(floater.parentNode) floater.remove(); }, 600);
+    
+    // 左右闪避
+    el.classList.add('shan-dodge');
+    setTimeout(() => el.classList.remove('shan-dodge'), 400);
+}
+
+// ---- 启动 ----
+function boot(){
+    console.log('三国杀 v2 启动');
+    // 全局错误捕获
+    // 双击缩放防护
+    let lt=0;
+    document.addEventListener('touchend',function(e){var n=Date.now();if(n-lt<300)e.preventDefault();lt=n;},{passive:false});
+
+    // ---- 卡牌选择弹窗 ----
+    // 使用全局变量存储Promise的resolve函数，避免闭包问题
+    window._cardSelResolve = null;
+    window._cardSelIsOpponent = false; // 是否是对手牌（需要显示背面）
+
+    // 显示卡牌选择器的Promise版本（推荐）
+    // 也保留回调版本供现有代码使用
+    window.showCardSelector = function(cards, promptText, hideInfo) {
+        return new Promise((resolve) => {
+            const overlay = document.getElementById('cardSelOverlay');
+            const title = document.getElementById('cardSelTitle');
+            const list = document.getElementById('cardSelList');
+            title.textContent = promptText;
+            window._cardSelResolve = resolve;
+            window._cardSelIsOpponent = !!hideInfo;
+
+            list.innerHTML = cards.map(c => {
+                const suitChar = {spade:'♠',heart:'♥',club:'♣',diamond:'♦'}[c.suit];
+                const numStr = {1:'A',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K'}[c.number] || c.number;
+                const suitC = (c.suit==='heart'||c.suit==='diamond')?'red':'blk';
+                if (hideInfo) {
+                    // 对手牌：显示卡牌背面（暗牌）
+                    return `<div class="card-back-sel" onclick="window.doSelectCard('${c.instanceId}')" style="cursor:pointer;flex-shrink:0;width:64px;height:90px;">
+                        <div class="card-back-inner">🂠</div>
+                    </div>`;
+                } else {
+                    return `<div class="card ${suitC}" onclick="window.doSelectCard('${c.instanceId}')" style="cursor:pointer;flex-shrink:0;width:64px;height:90px;">
+                        <span class="cs ${suitC}">${suitChar}</span>
+                        <span class="cn">${numStr}</span>
+                        <span class="cname ${suitC==='red'?'r':'b'}">${c.name}</span>
+                    </div>`;
+                }
+            }).join('');
+            overlay.style.display = 'flex';
+        });
+    };
+
+    // 全局可访问的卡牌选择点击处理
+    window.doSelectCard = function(cardId) {
+        const overlay = document.getElementById('cardSelOverlay');
+        overlay.style.display = 'none';
+        if (window._cardSelResolve) {
+            window._cardSelResolve(cardId);
+            window._cardSelResolve = null;
+        }
+    };
+
+    // 在 updateBoard 中检查卡牌选择（使用Promise方式）
+    const _origUpdateBoard = updateBoard;
+    window.updateBoard = function(state) {
+        if (engine && engine._pendingCardChoice) {
+            const pc = engine._pendingCardChoice;
+            const hideInfo = pc.hideInfo || false;
+            // 不清空 _pendingCardChoice，让 chooseCard 中的 Promise 继续等待
+            // 直接显示选择UI，并通过Promise resolve回调
+            window.showCardSelector(pc.cards, pc.prompt, hideInfo).then((cardId) => {
+                const chosen = pc.cards.find(c => c.instanceId === cardId);
+                pc.resolve(chosen || null);
+            });
+            engine._pendingCardChoice = null;
+        }
+        // 调用原始 updateBoard
+        if (_origUpdateBoard) _origUpdateBoard(state);
+    };
+}
+
+// AI速度控制
+const aiSpeedPresets = [0.5, 1, 2, 3];
+let aiSpeedIndex = 1; // 默认1x
+
+function toggleAiSpeed() {
+    aiSpeedIndex = (aiSpeedIndex + 1) % aiSpeedPresets.length;
+    const speed = aiSpeedPresets[aiSpeedIndex];
+    if (engine) {
+        engine.setAiSpeed(speed);
+    }
+    const btn = document.getElementById('aiSpeedBtn');
+    if (btn) {
+        btn.textContent = speed + 'x';
+    }
+}
+
+boot();
+console.log('三国杀 v3 就绪 - 全局函数模式');
+</script>
+    <!-- 卡牌选择弹窗 -->
+    <div id="cardSelOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:100;justify-content:center;align-items:center;flex-direction:column;">
+        <div style="background:linear-gradient(180deg,#2a2218,#1a1410);border:2px solid #8b6914;border-radius:12px;padding:16px 20px;max-width:88%;max-height:85%;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.7);">
+            <div id="cardSelTitle" style="color:#e6c84d;font-size:15px;font-weight:bold;text-align:center;margin-bottom:12px;text-shadow:0 1px 3px #000;"></div>
+            <div id="cardSelList" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:4px;"></div>
+        </div>
+    </div>
+</body>
+</html>

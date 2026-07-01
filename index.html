@@ -238,14 +238,15 @@
             padding: 10px 10px 4px;
             flex-wrap: nowrap;  /* 不换行，保持一行排列 */
             z-index: 2;
-            min-height: 110px;  /* 必须有足够高度才能显示弧形 */
+            min-height: 160px;  /* 必须有足够高度才能显示弧形 (hero-card 100px + 弧形偏移 50px + 间距) */
             overflow: visible;
         }
-        .players-arc-area .player-mini {
+        .players-arc-area .hero-card {
             /* 弧形布局中的玩家卡片基础样式 */
             transform-origin: bottom center;
             transition: transform 0.3s ease;
             flex-shrink: 0;
+            position: relative;
         }
         /* 弧形偏移量：通过 inline style 设置 margin-bottom 来控制高度 */
         /* 中间最高 (margin-bottom 最大)，两边逐渐降低 */
@@ -1639,7 +1640,7 @@ function _updateBoardImpl(state){
             // 只创建一次
         })();
 
-    // 对手列表 - 弧形凸型布局（中间高两边低）
+    // 对手列表 - 弧形凸型布局（中间高两边低）带立绘
     const oppList=state.players.filter(p=>p.id!==human.id);
     const nOpp=oppList.length;
     const arcArea = document.getElementById('playersArcArea');
@@ -1669,16 +1670,44 @@ function _updateBoardImpl(state){
             const fc = p.heroFaction || 'unknown';
             const fn = p.heroRevealed || Cfg.mode !== 'national' ? (SGS.HeroData.factionName[p.heroFaction] || '?') : '?';
             const showName = p.heroRevealed || Cfg.mode !== 'national' ? p.heroName : '???';
+            const heroId = p.heroId || (p.hero && p.hero.id) || '';
+            const imgPath = heroId ? `assets/images/heroes/${heroId}.jpg` : '';
             const hpShow = Math.max(0, p.hp);
-            arcHtml += `<div class="player-mini${isCur ? ' current' : ''}${!p.isAlive ? ' dead' : ''}"
+            const isDead = !p.isAlive;
+            // 装备列表
+            const eqList = [];
+            if (p.equipment && p.equipment.weapon) eqList.push(p.equipment.weapon.name);
+            if (p.equipment && p.equipment.armor) eqList.push(p.equipment.armor.name);
+            if (p.equipment && p.equipment.horseMinus) eqList.push('-1马');
+            if (p.equipment && p.equipment.horsePlus) eqList.push('+1马');
+            // 立绘HTML
+            const portraitHtml = imgPath
+                ? `<img class="hc-portrait" src="${imgPath}" onerror="this.style.display='none';this.nextElementSibling&&(this.nextElementSibling.style.display='flex')" alt="${showName}">`
+                : '';
+            const portraitPlaceholder = `<div class="hc-portrait-placeholder" style="${imgPath?'display:none':''}">${showName.charAt(0)}</div>`;
+            // 势力颜色
+            const fctCls = (fc === 'wei' || fc === '魏') ? 'fct-wei'
+                         : (fc === 'shu' || fc === '蜀') ? 'fct-shu'
+                         : (fc === 'wu' || fc === '吴') ? 'fct-wu'
+                         : 'fct-qun';
+            arcHtml += `<div class="hero-card${isCur ? ' cur' : ''}${isDead ? ' dead' : ''}${p.isChained ? ' chained' : ''}${p.isFlipped ? ' flipped' : ''}"
                               data-pid="${p.id}"
                               onclick="clickP(${p.id})"
                               style="margin-bottom: ${arcOffset}px; transform: scale(${arcScale});">
-                <div class="pm-name">${p.name}</div>
-                <div class="pm-hero">${showName}</div>
-                <div class="pm-hp">${'❤'.repeat(hpShow)}</div>
-                <div class="pm-cards">手牌:${p.handCount}</div>
-                <div class="pm-faction faction-${fc}">${fn}</div>
+                <div class="hc-faction ${fctCls}">${fn}</div>
+                ${p.judgmentCards && p.judgmentCards.length ? `<div class="hc-judge-badges">${p.judgmentCards.map(c=>{
+                    const cls=c.subtype==='lebusi'?'lebu':c.subtype==='bingliang'?'bing':c.subtype==='shandian'?'shandian':'';
+                    const txt=c.subtype==='lebusi'?'乐':c.subtype==='bingliang'?'兵':c.subtype==='shandian'?'闪':'?';
+                    return `<span class="hc-judge-badge ${cls}">${txt}</span>`;
+                }).join('')}</div>` : ''}
+                ${portraitHtml}${portraitPlaceholder}
+                <div class="hc-info">
+                    <div class="hc-name">${showName}${p.isAmbitious ? '(野)' : ''}</div>
+                    <div class="hc-hp-row"><span class="hc-hp-icon full">${'♥'.repeat(hpShow)}</span><span class="hc-hp-icon empty">${'♡'.repeat(Math.max(0, p.maxHp - hpShow))}</span></div>
+                    <div class="hc-hand">牌${p.handCount}</div>
+                </div>
+                ${eqList.length ? `<div class="hc-equip-mini">${eqList.map(e=>`<span class="eq-tag">${e}</span>`).join('')}</div>` : ''}
+                ${isDead ? '<div class="dead-stamp">阵亡</div>' : ''}
             </div>`;
         }
         arcArea.innerHTML = arcHtml;

@@ -147,15 +147,6 @@
         .topbar span { color:#d4b86a; text-shadow:0 1px 2px rgba(0,0,0,0.9); }
         .topbar .btn-sm { background:linear-gradient(180deg,#3a3020,#251e12); color:#d4b86a; border-color:#5c4a28; font-size:11px; }
 
-        /* 圆桌区域 - 对手围绕椭圆排列（横屏） */
-        .table-area { flex:1; width:100%; position: relative; overflow: visible; min-height:0; display:flex; flex-direction:column; justify-content:center; align-items:center; }
-        .table-area::after {
-            content: ''; position: absolute; top: 40%; left: 50%;
-            width: 60%; height: 50%; transform: translate(-50%,-50%);
-            border-radius: 50%;
-            background: radial-gradient(ellipse, rgba(139,105,20,0.05) 0%, transparent 70%);
-            pointer-events: none; z-index: 0;
-        }
 
         /* 日志面板包裹层 - 桌面右上角悬浮（参考官方三国杀） */
         .log-panel-wrap {
@@ -223,12 +214,6 @@
         .btn-submit-log:hover { background: linear-gradient(180deg, rgba(80,40,70,0.85), rgba(40,20,40,0.95)); color: #e6c84d; }
         .btn-submit-log:active { transform: scale(0.95); }
         
-        #playersTop {
-            position:absolute; top:34px; left:0; right:0;
-            z-index: 2; margin:0; padding:6px 10px;
-            display:flex; justify-content:center; gap:8px;
-            flex-wrap: wrap;
-        }
         /* 上方对手区域 - 弧形凸型布局（中间在顶，两边逐渐降低） */
         .players-arc-area {
             display: flex;
@@ -248,15 +233,6 @@
             flex-shrink: 0;
             position: relative;
         }
-        /* 弧形偏移量：通过 inline style 设置 margin-bottom 来控制高度 */
-        /* 中间最高 (margin-bottom 最大)，两边逐渐降低 */
-        /* 圆桌上的武将牌 - 绝对定位（位置由 inline style 控制） */
-        #playersTop .hero-card {
-            position: absolute;
-            z-index: 10;
-            flex: none;
-        }
-
         /* 武将牌（正版风格）- 带立绘的卡片 */
         .hero-card {
             width:72px; height:100px; cursor:pointer;
@@ -847,8 +823,8 @@
         </div>
         <div class="topbar-info">
             <span id="deckInfo"></span>
-            <button class="topbar-btn" onclick="SGS.UI.Board.toggleLog()">日志</button>
-            <button class="topbar-btn" onclick="SGS.UI.Board.confirmQuit()">退出</button>
+            <button class="topbar-btn" onclick="toggleGameLog()">日志</button>
+            <button class="topbar-btn" onclick="confirmQuit()">退出</button>
         </div>
     </div>
     <!-- 弧形对手区域 - 渲染后由JS填充 -->
@@ -947,11 +923,8 @@
 <script src="js/data/cards.js"></script>
 <script src="js/data/heroes.js"></script>
 <script src="js/data/config.js"></script>
-<script src="js/net/interface.js"></script>
 <script src="js/core/game.js"></script>
 <script src="js/core/ai.js"></script>
-<script src="js/ui/board.js"></script>
-<script src="js/ui/menu.js"></script>
 
 <script>
 // ============================================================
@@ -1661,16 +1634,6 @@ function updateBoard(state){
         console.error('渲染失败:', e);
     }
 }
-// 座位计算 - 对手沿抛物线弧线均匀分布（横屏2:1比例适配）
-function getSeatPos(i, nOpp){
-    if(nOpp<=1) return {x:50, y:10};
-    // 线性映射到水平位置 [8%, 92%]，避免贴边
-    const t=i/(nOpp-1);
-    const x=8 + t*84;
-    // y用二次抛物线：两边低、中间高，形成自然的弧线
-    const y=10 + 35*(4*t*(1-t));
-    return {x, y};
-}
 
 function _updateBoardImpl(state){
     if(!state || !gameStarted) return;
@@ -2091,6 +2054,9 @@ function showLogFromGame(){
 }
 function quitToMenu(){
     gameStarted=false;engine=null;aiPlayer=null;showScreen('mainMenu');
+}
+function confirmQuit(){
+    if(confirm('确定退出当前对局吗？')) quitToMenu();
 }
 function restartGame(){
     gameStarted=false;engine=null;aiPlayer=null;goHeroSelect();

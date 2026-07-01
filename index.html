@@ -811,13 +811,16 @@
             <div class="action-prompt" id="actionPrompt">游戏开始...</div>
         </div>
         <div class="hand-area">
-            <div class="my-info">
-                <div class="my-info-left">
-                    <span class="my-hero-name" id="myHeroName"></span>
-                    <span class="my-hp" id="myHp"></span>
-                    <span id="myIdentity"></span>
+            <div class="myinfo">
+                <div class="myinfo-left" data-pid="" onclick="clickSelf()" style="cursor:pointer">
+                    <div class="my-avatar" id="myAvatar"></div>
+                    <div class="my-name-hp">
+                        <span class="mhn" id="mhn"></span>
+                        <span class="mhp" id="mhp"></span>
+                    </div>
+                    <span id="midBadge"></span>
                 </div>
-                <div class="equip-zone" id="myEquips"></div>
+                <div class="equip-zone" id="equipZone"></div>
             </div>
             <div class="skill-bar" id="skillBar"></div>
             <div class="hand-cards" id="handCards"></div>
@@ -1711,6 +1714,45 @@ function _updateBoardImpl(state){
 
     // 自己信息
     const hs=human;
+    // 自己的小头像
+    const myHeroId=hs.hero.id||hs.heroId||'';
+    const myImgPath=myHeroId?`assets/images/heroes/${myHeroId}.jpg`:'';
+    const myAvatar=document.getElementById('myAvatar');
+    if(myAvatar){
+        if(myImgPath){
+            myAvatar.innerHTML=`<img src="${myImgPath}" onerror="this.style.display='none';this.nextElementSibling&&(this.nextElementSibling.style.display='flex')" alt="${hs.hero.name}"><div class="hc-portrait-placeholder" style="display:none;width:100%;height:100%">${hs.hero.name.charAt(0)}</div>`;
+        }else{
+            myAvatar.innerHTML=`<div class="hc-portrait-placeholder" style="width:100%;height:100%">${hs.hero.name.charAt(0)}</div>`;
+        }
+    }
+    // 名字和体力
+    const mhn=document.getElementById('mhn');
+    if(mhn) mhn.textContent=hs.hero.name;
+    const mhp=document.getElementById('mhp');
+    if(mhp){
+        const myHpShow=Math.max(0,hs.hp);
+        mhp.innerHTML=`<span class="h-full">${'❤'.repeat(myHpShow)}</span><span class="h-empty">${'♡'.repeat(Math.max(0,hs.maxHp-myHpShow))}</span> <span style="font-size:10px;color:#a0a0b0">(${hs.hp}/${hs.maxHp})</span>`;
+    }
+    // 身份
+    const midBadge=document.getElementById('midBadge');
+    if(midBadge){
+        if(Cfg.mode==='national'){
+            midBadge.innerHTML=`<span class="id-bdg" style="background:${SGS.HeroData.factionColor[hs.faction]}">${SGS.HeroData.factionName[hs.faction]}</span>`;
+        }else{
+            const ic={lord:'id-lord',loyal:'id-loyal',rebel:'id-rebel',spy:'id-spy'};
+            midBadge.innerHTML=`<span class="id-bdg ${ic[hs.identity]||''}">${SGS.Config.identityName[hs.identity]||''}</span>`;
+        }
+    }
+    // 装备区
+    const equipZone=document.getElementById('equipZone');
+    if(equipZone){
+        let ez='';
+        for(const [slot,card] of Object.entries(hs.equipment||{})){
+            if(card)ez+=`<span class="eqi">${card.name}</span>`;
+        }
+        equipZone.innerHTML=ez;
+    }
+
     // 手牌
     renderHand(hs, state);
 

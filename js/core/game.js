@@ -282,27 +282,6 @@ SGS.GameEngine = (function() {
                 this._logUploadTimer = null;
             }
         }
-                    title: `📊 实时日志 - ${chunkId} (${date.toLocaleTimeString('zh-CN')})`,
-                    body: body,
-                    labels: ['auto-submit', 'debug-log']
-                };
-                
-                await fetch('https://api.github.com/repos/cjh-98/sanguosha-data/issues', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(issueData)
-                });
-                
-                console.log('实时日志已上传:', chunkId);
-            } catch(e) {
-                // 静默失败，不影响游戏
-                console.debug('实时日志上传失败:', e);
-            }
-        }
 
         // ========== 事件系统 ==========
         on(event, callback) {

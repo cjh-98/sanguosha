@@ -4190,11 +4190,17 @@ function showBugReportModal() {
     // 给提交按钮绑定事件，使用闭包捕获textarea元素
     const textarea = document.getElementById('bugDescription');
     const btn = document.getElementById('submitBugBtn');
-    btn.onclick = () => {
+    btn.onclick = async () => {
         const bugDesc = textarea.value || '';
+        btn.disabled = true;
+        btn.textContent = '⏳ 提交中...';
+        try {
+            await sgsSubmitBugLog(bugDesc);
+        } catch(e) {
+            // sgsSubmitBugLog 内部已有错误处理
+        }
         const modal = document.getElementById('bugReportModal');
         if (modal) modal.remove();
-        sgsSubmitBugLog(bugDesc);
     };
     
     // 更新游戏状态摘要
@@ -4296,6 +4302,7 @@ async function sgsSubmitBugLog(bugDesc = '') {
         alert('提交失败: ' + e.message);
     }
 }
+window.sgsSubmitBugLog = sgsSubmitBugLog;
 
 // 显示提交成功提示
 function showBugSubmitSuccess(issueUrl) {
@@ -4311,101 +4318,6 @@ function showBugSubmitSuccess(issueUrl) {
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 5000);
 }
-
-// 全局可访问的提交函数（用于游戏卡死时）
-window.sgsSubmitBugLog = async function(bugDesc) {
-    try {
-        const state = _sgsCollectGameState();
-        if (!state) {
-            console.log('无法获取游戏状态，尝试从localStorage读取...');
-            // 尝试从localStorage读取
-            const history = JSON.parse(localStorage.getItem('sgsMatchHistory') || '[]');
-            if (history.length > 0) {
-                const latest = history[0];
-                console.log('找到最近对局:', latest.matchId);
-                // 这里可以手动构造state
-                state = {
-                    matchId: latest.matchId,
-                    userId: _sgsGetUserId(),
-                    userName: _sgsGetUserName(),
-                    timestamp: new Date().toISOString(),
-                    turnCount: 0,
-                    phase: 'unknown',
-                    currentPlayer: 'unknown',
-                    deckCount: 0,
-                    discardCount: 0,
-                    players: [],
-                    matchLog: latest.log || [],
-                    loggerEntries: Logger.entries ? Logger.entries.slice(-100) : []  // 添加用户操作日志
-                };
-            } else {
-                console.log('没有找到任何对局记录');
-                return;
-            }
-        }
-        
-        const userName = state.userName;
-        const date = new Date();
-        const title = `🐛 Bug报告 - ${userName} - ${date.toLocaleTimeString('zh-CN')} (控制台提交)`;
-        
-        let body = `**用户**: ${userName}\n**ID**: \`${state.userId}\`\n**对局ID**: \`${state.matchId || '无'}\`\n\n`;
-        body += `**提交方式**: 控制台手动提交（游戏可能卡死）\n\n`;
-        body += `\`\`\`json\n${JSON.stringify({
-            ts: state.timestamp,
-            tc: state.turnCount,
-            ph: state.phase,
-            cp: state.currentPlayer
-        }, null, 2)}\n\`\`\`\n\n`;
-        
-        if (state.matchLog && state.matchLog.length > 0) {
-            body += `### 对局日志\n<details><summary>点击展开 (${state.matchLog.length}条)</summary>\n\n`;
-            state.matchLog.slice(-50).forEach(evt => {
-                const time = new Date(evt.time).toLocaleTimeString('zh-CN');
-                body += `**[${time}]** ${JSON.stringify(evt.data)}\n\n`;
-            });
-            body += `</details>\n`;
-        }
-        
-        // 添加用户操作日志
-        if (state.loggerEntries && state.loggerEntries.length > 0) {
-            body += `### 用户操作日志\n<details><summary>点击展开 (${state.loggerEntries.length}条)</summary>\n\n`;
-            state.loggerEntries.forEach(entry => {
-                const icon = entry.type==='error'?'❌':entry.type==='action'?'👉':entry.type==='warn'?'⚠️':'ℹ️';
-                body += `${icon} **[${entry.t}]** [${entry.screen}] ${entry.msg}`;
-                if (entry.detail) body += `\n    详情: ${entry.detail}`;
-                body += `\n\n`;
-            });
-            body += `</details>\n`;
-        }
-        
-        const response = await fetch('https://api.github.com/repos/' + _sgsDataConfig.repo + '/issues', {
-            method: 'POST',
-            headers: {
-                'Authorization': 'token ' + _sgsDataConfig.token,
-                'Accept': 'application/vnd.github+json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                title: title,
-                body: body,
-                labels: ['bug-report', 'auto-submit', 'debug-log']
-            })
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || '提交失败: ' + response.status);
-        }
-        
-        const result = await response.json();
-        _sgsUploadedCount++;
-        console.log('✅ Bug日志已提交！Issue #' + result.number);
-        console.log('查看Issue:', result.html_url);
-        
-    } catch(e) {
-        console.error('提交失败:', e);
-    }
-};
 
 // 提交Bug报告的入口函数
 function submitBugLog() {

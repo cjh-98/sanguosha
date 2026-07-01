@@ -890,10 +890,100 @@ SGS.UI.Board = (function() {
         window._discardMode = false;
     }
 
+    // ========== 出牌动画 ==========
+    let cardAnimationId = 0;
+    const activeAnimations = new Set();
+    
+    function showCardAnimation(card, fromId, targetIds, duration = 2500) {
+        const cardId = ++cardAnimationId;
+        
+        // 如果有相同类型的动画正在播放，先让它快速淡出
+        const sameTypeAnim = [...activeAnimations].find(id => {
+            const el = document.getElementById('cardAnim_' + id);
+            return el && el.dataset.cardType === card.type;
+        });
+        
+        if (sameTypeAnim) {
+            const oldEl = document.getElementById('cardAnim_' + sameTypeAnim);
+            if (oldEl) {
+                oldEl.style.transition = 'opacity 0.3s, transform 0.3s';
+                oldEl.style.opacity = '0';
+                oldEl.style.transform = 'translate(-50%, -50%) scale(0.5)';
+                setTimeout(() => {
+                    oldEl.remove();
+                    activeAnimations.delete(sameTypeAnim);
+                }, 300);
+            }
+        }
+        
+        // 创建动画元素
+        const overlay = document.createElement('div');
+        overlay.id = 'cardAnim_' + cardId;
+        overlay.className = 'card-animation';
+        overlay.dataset.cardType = card.type;
+        
+        const suit = card.suit || 'spade';
+        const colorClass = SGS.CardData ? SGS.CardData.suitColor[suit] : 'black';
+        const elementClass = card.element === 'fire' ? 'fire' : card.element === 'thunder' ? 'thunder' : '';
+        const nameDisplay = elementClass ? `${card.element === 'fire' ? '火' : '雷'}${card.name}` : card.name;
+        
+        overlay.innerHTML = `
+            <div class="card ${colorClass} ${elementClass} anim-card">
+                <span class="card-name">${nameDisplay}</span>
+                <span class="card-type">${card.type === 'basic' ? '基本' : card.type === 'trick' ? '锦囊' : '装备'}</span>
+            </div>
+        `;
+        
+        // 定位到出牌玩家位置
+        const fromPlayer = engine.players[fromId];
+        const targetPlayer = targetIds && targetIds.length > 0 ? engine.players[targetIds[0]] : null;
+        
+        if (fromPlayer && fromPlayer.id === engine.getHumanPlayer()?.id) {
+            // 是自己出牌，显示在手牌区域上方
+            const handEl = document.getElementById('handCards');
+            if (handEl) {
+                const rect = handEl.getBoundingClientRect();
+                overlay.style.left = (rect.left + rect.width / 2) + 'px';
+                overlay.style.top = (rect.top - 80) + 'px';
+            }
+        } else if (fromPlayer) {
+            // 其他玩家出牌，显示在对应玩家位置
+            const playerMini = document.querySelector(`.player-mini[data-player-id="${fromPlayer.id}"]`);
+            if (playerMini) {
+                const rect = playerMini.getBoundingClientRect();
+                overlay.style.left = (rect.left + rect.width / 2) + 'px';
+                overlay.style.top = (rect.top + rect.height / 2) + 'px';
+            } else {
+                overlay.style.left = '50%';
+                overlay.style.top = '30%';
+            }
+        } else {
+            overlay.style.left = '50%';
+            overlay.style.top = '30%';
+        }
+        
+        document.body.appendChild(overlay);
+        activeAnimations.add(cardId);
+        
+        // 动画结束后移除
+        setTimeout(() => {
+            overlay.style.transition = 'opacity 0.8s, transform 0.8s';
+            overlay.style.opacity = '0';
+            overlay.style.transform = 'translate(-50%, -50%) scale(0.3) rotate(15deg)';
+            setTimeout(() => {
+                overlay.remove();
+                activeAnimations.delete(cardId);
+            }, 800);
+        }, duration);
+    }
+    
     // ========== 事件处理 ==========
     function handleGameEvent(event) {
         if (event.type === 'log') {
             appendLog(event.msg, event.type === 'log' ? event._type || 'normal' : 'normal');
+        } else if (event.type === 'cardUsed') {
+            // 显示出牌动画
+            showCardAnimation(event.detail.card, event.detail.fromId, event.detail.targetIds, 2500);
         } else if (event.type === 'needDiscard') {
             // 已在updateGameBoard中处理
         }

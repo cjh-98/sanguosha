@@ -3878,7 +3878,7 @@ function showSkillConfirmModal(skillName, desc, playerId, resolve) {
     };
     const onNo = () => {
         if (settled) return;
-        settled = false;
+        settled = true;
         cleanup();
         resolve(false);
     };

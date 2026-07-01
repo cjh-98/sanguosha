@@ -2183,7 +2183,8 @@ SGS.GameEngine = (function() {
         // ========== 伤害系统 ==========
         async dealDamage(player, damage, opts = {}) {
             if (!player.isAlive) return;
-            const { source = null, element = 'normal', card = null } = opts;
+            const { source = null, element = 'normal', card = null, chainProcessed = null } = opts;
+            if (chainProcessed) chainProcessed.add(player.id);
 
             // 藤甲：免疫普通杀
             if (player.equipment.armor && player.equipment.armor.subtype === 'tengjia') {
@@ -2251,7 +2252,7 @@ SGS.GameEngine = (function() {
                                 : await this.chooseTarget(player, otherTargets, '天香：选择伤害转移的目标');
                             if (target) {
                                 this.log(`${player.name}发动天香，将伤害转移给${target.name}`, 'highlight');
-                                await this.dealDamage(target, damage, { source: player, element, card });
+                                await this.dealDamage(target, damage, { source: player, element, card, chainProcessed: opts.chainProcessed || null });
                                 this.drawCard(target, 1);
                                 return;
                             }
@@ -2414,7 +2415,7 @@ SGS.GameEngine = (function() {
             // 悲歌 (蔡文姬) — 主动技，有角色受【杀】伤害后，蔡文姬可弃牌令其判定
             if (card && card.subtype === 'sha' && source && source.isAlive) {
                 const beiGePlayer = this.getAlivePlayers().find(p =>
-                    p.skills.some(s => s.name === '悲歌') && p.handCards.length > 0
+                    p.id !== player.id && p.skills.some(s => s.name === '悲歌') && p.handCards.length > 0
                 );
                 if (beiGePlayer) {
                     const wantBeiGe = await this.askSkillConfirm(beiGePlayer, '悲歌',
@@ -2467,14 +2468,14 @@ SGS.GameEngine = (function() {
 
         async propagateChain(player, damage, element, source) {
             const chained = this.getAlivePlayers().filter(p => p.isChained && p.id !== player.id);
+            // 先全部解除连环，再逐个结算，使被传导的玩家也能触发受伤技能（天香/反馈/遗计等）
+            const processed = new Set();
+            for (const p of chained) p.isChained = false;
             for (const p of chained) {
+                if (processed.has(p.id)) continue;
+                processed.add(p.id);
                 this.log(`铁索连环传导！${p.name}受到${damage}点${element === 'fire' ? '火焰' : '雷电'}伤害`, 'danger');
-                p.isChained = false;
-                p.hp -= damage;
-                this.emit('onDamaged', { player: p, damage, source, element, engine: this });
-                if (p.hp <= 0) {
-                    await this.handleDying(p, source);
-                }
+                await this.dealDamage(p, damage, { source, element, chainProcessed: processed });
             }
         }
 
@@ -2618,14 +2619,15 @@ SGS.GameEngine = (function() {
                 if (player.equipment[slot]) deadCards.push(player.equipment[slot]);
             }
 
-            // 行殇 (曹丕): 其他角色死亡时，可获得其所有牌
+            // 行殇 (曹丕): 其他角色死亡时，曹丕可获得其所有牌
             let xingshangUsed = false;
-            if (killer && killer.skills.some(s => s.name === '行殇') && deadCards.length > 0) {
-                const want = killer.isAI ? true : await this.askSkillConfirm(killer, '行殇', '有角色死亡，是否发动【行殇】获得其所有牌？');
+            const xingshangOwner = this.getAlivePlayers().find(p => p.skills.some(s => s.name === '行殇'));
+            if (xingshangOwner && deadCards.length > 0 && xingshangOwner.id !== player.id) {
+                const want = xingshangOwner.isAI ? true : await this.askSkillConfirm(xingshangOwner, '行殇', `${player.name}死亡，是否发动【行殇】获得其所有牌？`);
                 if (want) {
-                    for (const c of deadCards) killer.handCards.push(c);
+                    for (const c of deadCards) xingshangOwner.handCards.push(c);
                     xingshangUsed = true;
-                    this.log(`${killer.name}发动行殇，获得了${deadCards.length}张牌`, 'highlight');
+                    this.log(`${xingshangOwner.name}发动行殇，获得了${deadCards.length}张牌`, 'highlight');
                 }
             }
 
@@ -2639,12 +2641,6 @@ SGS.GameEngine = (function() {
 
             // 触发死亡事件
             this.emit('onPlayerDeath', { player, killer, engine: this });
-
-            // 断肠
-            if (player.skills.some(s => s.name === '断肠') && killer) {
-                this.log(`${killer.name}受到断肠影响，失去所有技能！`, 'danger');
-                killer.hero = { ...killer.hero, skills: [] };
-            }
 
             // 断肠
             if (player.skills.some(s => s.name === '断肠') && killer) {

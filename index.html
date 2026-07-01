@@ -29,7 +29,8 @@
         }
         #app { width: 100%; height: 100%; position: relative; overflow: hidden; }
         .screen { display: none; width: 100%; height: 100%;
-                  flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 40px 20px; }
+                  flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 40px 20px;
+                  position: relative; }  /* 为日志面板absolute定位提供上下文 */
         .screen.active { display: flex !important; }
 
         /* 主菜单 */

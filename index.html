@@ -506,15 +506,17 @@
                     background:transparent; font-weight:normal; }
 
         /* 中央信息区 - 日志靠底，减少空白 */
-        .players-area { flex:1; display:flex; flex-direction:column; overflow:hidden; position:relative; }
-        .center-area { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding:1vh; gap:1vh; overflow:hidden; }
-        .action-prompt { font-size:15px; color:#e6c84d; text-align:center; padding:6px; }
-        /* 底部手牌区域 - 水平布局：玩家信息-技能-手牌 */        
+        .players-area { flex:1; display:flex; flex-direction:column; overflow:hidden; position:relative; min-height:0; }
+        .center-area { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding:0.8vh 1vh; gap:0.8vh; overflow:hidden; min-height:0; }
+        .action-prompt { font-size:15px; color:#e6c84d; text-align:center; padding:4px; }
+        /* 底部手牌区域 - 水平布局：玩家信息-技能-手牌，贴底不留空 */        
         .hand-area {
             flex-shrink:0; width:100%; box-sizing:border-box;
             background:linear-gradient(180deg, rgba(0,0,0,0.7), rgba(0,0,0,0.5));
             border-top:2px solid #8b6914; padding:5px 8px;
             display:flex; align-items:center; gap:6px;
+            margin-bottom: 0;
+            padding-bottom: calc(5px + env(safe-area-inset-bottom, 0px));
         }
 
         /* 卡牌（正版三国杀卡牌风格 - 参考官方手牌设计） */
@@ -554,55 +556,71 @@
         .phase-dot.active { background:#e6c84d; box-shadow:0 0 6px #e6c84d; }
         .phase-indicator { display:flex; gap:.2vw; align-items:center; }
         .card {
-            flex-shrink:0; width:74px;height:104px;border-radius:7px;
-            border:2.5px solid #8b6914;
-            background:linear-gradient(160deg, #f7f1e0 0%, #e8d8b0 40%, #d8c898 100%);
+            flex-shrink:0; width:76px;height:108px;border-radius:8px;
+            border:2px solid #4a3520;
+            background:linear-gradient(160deg, #f5eed8 0%, #e8d8a8 25%, #d4b896 55%, #c4a070 100%);
             display:flex;flex-direction:column;align-items:center;
             cursor:pointer;transition:all 0.18s ease;position:relative;overflow:hidden;color:#1a1a2e;
             -webkit-tap-highlight-color:transparent;
-            box-shadow:0 3px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.5);
+            box-shadow:0 3px 10px rgba(0,0,0,0.55), 0 0 0 1px #2a1a0a, inset 0 0 0 1.5px rgba(180,140,80,0.4);
             user-select: none;
         }
-        .card:active { transform:scale(0.95) translateY(2px); }
-        .card.sel { transform:translateY(-18px) scale(1.08); box-shadow:0 10px 24px rgba(230,200,77,0.8), inset 0 0 0 2.5px #e6c84d; border-color:#e6c84d; border-width:2.5px; z-index:10; }
-        .card.ok { box-shadow:0 0 10px rgba(46,204,113,0.7), 0 2px 5px rgba(0,0,0,0.45); border-color:#2ecc71; }
-        .card.ok:hover { box-shadow:0 0 14px rgba(46,204,113,0.9), 0 4px 10px rgba(0,0,0,0.5); }
-        .card.trick { background:linear-gradient(160deg, #dceef7 0%, #a8cce4 40%, #88b8d4 100%); }
-        .card.delay { background:linear-gradient(160deg, #f5e0d8 0%, #e8b8b0 40%, #d89890 100%); }
-        .card.equip { background:linear-gradient(160deg, #d8f0d8 0%, #a8dda8 40%, #88cc88 100%); }
-        .card.fire { box-shadow:0 0 10px rgba(231,76,60,0.6), 0 2px 5px rgba(0,0,0,0.45); border-color:#e74c3c; }
-        .card.thunder { box-shadow:0 0 10px rgba(155,89,182,0.6), 0 2px 5px rgba(0,0,0,0.45); border-color:#9b59b6; }
-
-        /* 卡牌顶部：花色 + 点数 */
-        .cs { position:absolute;top:3px;left:4px;font-size:14px;font-weight:bold;z-index:2;
-              text-shadow:0 1px 2px rgba(255,255,255,0.6), 0 0 3px rgba(0,0,0,0.15);
-              line-height:1; }
-        .cs.red{color:#c41e3a} .cs.blk{color:#1a1a2e}
-        .cn { position:absolute;top:3px;right:4px;font-size:11px;font-weight:bold;
-              text-shadow:0 1px 1px rgba(255,255,255,0.5);z-index:2;line-height:1; }
-
-        /* 卡牌图片区域（中间主体） */
-        .card-img {
-            position:absolute;top:20px;left:3px;right:3px;bottom:28px;
-            object-fit:contain;object-position:center; opacity:0.55;
-            pointer-events:none; transition:opacity 0.2s;
+        /* 卡牌内纹理 */
+        .card::before {
+            content:''; position:absolute; inset:2px;
+            background:linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.08) 100%);
+            border:1px solid rgba(180,140,80,0.35); border-radius:3px; z-index:0; pointer-events:none;
         }
-        .card:hover .card-img { opacity:0.75; }
-        .card.sel .card-img { opacity:0.85; }
+        .card:active { transform:scale(0.95) translateY(2px); }
+        .card.sel { transform:translateY(-18px) scale(1.08); box-shadow:0 10px 24px rgba(230,200,77,0.8), 0 0 0 3px #e6c84d; border-color:#e6c84d; z-index:10; }
+        .card.ok { box-shadow:0 0 12px rgba(46,204,113,0.7), 0 2px 5px rgba(0,0,0,0.45); border-color:#2ecc71; }
+        .card.ok:hover { box-shadow:0 0 16px rgba(46,204,113,0.9), 0 4px 10px rgba(0,0,0,0.5); }
+        .card.trick { background:linear-gradient(160deg, #d8eef8 0%, #b8d4e8 25%, #90b4cc 55%, #6c94b0 100%); }
+        .card.delay { background:linear-gradient(160deg, #f0e0d4 0%, #e4c8b8 25%, #cca898 55%, #b48878 100%); }
+        .card.equip { background:linear-gradient(160deg, #d8efdc 0%, #b8dcbc 25%, #90c098 55%, #6ca878 100%); }
+        .card.fire { box-shadow:0 0 12px rgba(231,76,60,0.65), 0 2px 5px rgba(0,0,0,0.45); border-color:#e74c3c; }
+        .card.thunder { box-shadow:0 0 12px rgba(155,89,182,0.65), 0 2px 5px rgba(0,0,0,0.45); border-color:#9b59b6; }
 
-        /* 卡牌底部：名称 + 类型 */
+        /* 卡牌顶部：花色 + 点数 —— 背景半透明徽章风格 */
+        .cs { position:absolute;top:5px;left:5px;font-size:15px;font-weight:bold;z-index:3;
+              text-shadow:0 1px 2px rgba(0,0,0,0.3), 0 0 3px rgba(255,255,255,0.4);
+              line-height:1; padding:0 2px; border-radius:3px;
+              background:rgba(255,255,255,0.35); }
+        .cs.red{color:#b8142a} .cs.blk{color:#1a1218}
+        .cn { position:absolute;top:5px;right:5px;font-size:12px;font-weight:bold;
+              text-shadow:0 1px 1px rgba(0,0,0,0.3), 0 0 2px rgba(255,255,255,0.4);
+              z-index:3;line-height:1; padding:0 2px; border-radius:3px;
+              background:rgba(255,255,255,0.35); }
+
+        /* 卡牌图片区域（中间主体）—— 占更大面积，仿原版卡牌大立绘 */
+        .card-img {
+            position:absolute;top:10px;left:3px;right:3px;bottom:30px;
+            object-fit:cover;object-position:center top; opacity:0.80;
+            pointer-events:none; transition:opacity 0.2s;
+            border-radius:3px; z-index:1;
+        }
+        .card:hover .card-img { opacity:0.92; }
+        .card.sel .card-img { opacity:0.95; }
+
+        /* 卡牌底部：名称放在深色横条上（仿原版三国杀卡牌下方铭牌） */
+        .card::after {
+            content:''; position:absolute; bottom:2px; left:2px; right:2px; height:24px;
+            background:linear-gradient(180deg, rgba(30,18,6,0.55) 0%, rgba(20,10,2,0.80) 100%);
+            border-radius:0 0 4px 4px; z-index:1; pointer-events:none;
+        }
         .cname { position:absolute;bottom:2px;left:0;right:0;text-align:center;
-                 font-size:11px;font-weight:bold;line-height:1.2;padding:0 2px;
-                 white-space:nowrap;overflow:hidden;text-overflow:ellipsis; z-index:2;
-                 text-shadow:0 1px 1px rgba(255,255,255,0.4), 0 0 2px rgba(0,0,0,0.08); }
-        .cname.r{color:#c41e3a} .cname.b{color:#1a1a2e}
-        .ctype { position:absolute;bottom:0;right:2px;font-size:6px;color:#777; z-index:2; opacity:0.65; letter-spacing:-0.5px; }
+                 font-size:12px;font-weight:bold;line-height:24px;padding:0 2px;
+                 white-space:nowrap;overflow:hidden;text-overflow:ellipsis; z-index:3;
+                 letter-spacing:0.5px;
+                 text-shadow:0 1px 2px rgba(0,0,0,0.8); }
+        .cname.r{color:#f5d8b8} .cname.b{color:#d8e8f8}
+        .ctype { position:absolute;bottom:3px;right:4px;font-size:7px;color:rgba(200,180,150,0.6); z-index:3; opacity:0.7; letter-spacing:-0.5px; }
 
         /* ======== 出牌动画系统（正版三国杀风格） ======== */
         /* 卡牌闪现 */
         .card-flash {
             display: flex; flex-direction: column; align-items: center; gap: 2px;
-            background: linear-gradient(160deg, #f7f1e0 0%, #e8d8b0 50%, #d8c898 100%);
+            background: linear-gradient(160deg, #f5eed8 0%, #e0d0a0 50%, #c4a070 100%);
             border: 2px solid #e6c84d; border-radius: 6px; padding: 4px;
             box-shadow: 0 0 20px rgba(230,200,77,0.6), 0 4px 16px rgba(0,0,0,0.5);
         }
@@ -779,35 +797,45 @@
             .topbar .btn-sm { font-size: 10px; padding: 2px 6px; }
 
             /* 对手武将牌区：进一步缩小，保证一行放下所有对手 */
-            .players-arc-area { gap: 0.4vw; padding: 4px 0.5vw 2px; }
+            .players-arc-area { gap: 0.4vw; padding: 2px 0.5vw 2px; }
             /* 武将牌走基类 flex:1 1 0 平均铺满，不再单独写 width */
-            .hero-card { max-width: 110px; }
+            .hero-card { max-width: 100px; }
             .hc-name { font-size: 10px; }
             .hc-hp-icon { font-size: 8px; }
             .hc-hand { font-size: 8px; }
             .hc-info { padding: 2px 3px; }
 
             /* 中央提示区压缩，把空间让给上下两区 */
-            .center-area { padding: 0.5vh; gap: 0.5vh; }
-            .action-prompt { font-size: 12px; padding: 3px; }
+            .center-area { padding: 0.4vh 0.5vh; gap: 0.4vh; }
+            .action-prompt { font-size: 12px; padding: 2px; }
 
-            /* 底部手牌区：固定不被压缩，始终可见可操作 */
-            .hand-area { padding: 4px 4px; gap: 4px; }
-            .my-avatar { width: 62px; height: 86px; }
+            /* 底部手牌区：固定贴底不被压缩，padding 尽量紧凑 */
+            .hand-area { padding: 3px 4px 3px 4px; gap: 4px; 
+                         padding-bottom: calc(3px + env(safe-area-inset-bottom, 0px)); }
+            .my-avatar { width: 56px; height: 78px; }
             .mhn { font-size: 12px; }
             .mhp { font-size: 11px; }
-            .card { width: 68px; height: 96px; }
-            .hand-cards { min-height: 100px; gap: 2px; padding: 2px; }
+            .card { width: 64px; height: 92px; }
+            .hand-cards { min-height: 96px; gap: 2px; padding: 2px; }
             .skb { padding: 2px 4px; font-size: 10px; border-radius:6px; }
+
+            /* 横屏：手牌区贴底，顶部压缩 */
+            #gameScreen { justify-content: flex-start; }
         }
 
         /* 竖屏专项：横屏圆桌游戏在竖屏下极窄，需要极致压缩 */
         @media (orientation: portrait) and (max-width: 640px) {
             /* 武将牌走基类的 flex:1 1 0 平均铺满整行，不再单独写 width 干扰 */
             .hc-faction { width: 13px; height: 13px; font-size: 7px; }
-            .my-avatar { width: 54px; height: 76px; }
-            .card { width: 58px; height: 82px; }
-            .hand-cards { min-height: 86px; }
+            .my-avatar { width: 48px; height: 68px; }
+            .card { width: 52px; height: 74px; }
+            .hand-cards { min-height: 78px; padding: 2px; gap: 1px; }
+            .hand-area { padding: 3px 3px; gap: 3px;
+                         padding-bottom: calc(3px + env(safe-area-inset-bottom, 0px)); }
+            .cname { font-size: 10px; }
+            .cs { font-size: 12px; top:3px; left:3px; }
+            .cn { font-size: 10px; top:3px; right:3px; }
+            .card-img { top:8px; bottom:24px; }
             .action-bar .log-toggle-btn, .action-bar .btn-submit-log { font-size: 10px; padding: 3px 6px; }
         }
     </style>

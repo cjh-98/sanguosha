@@ -6,6 +6,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a2e">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%231a1a2e'/><text x='50' y='66' font-size='60' text-anchor='middle' fill='%23e6c84d' font-family='serif'>三</text></svg>">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -696,6 +698,15 @@
             html, body, #app, .screen, #gameScreen { height: 100dvh !important; }
         }
 
+        /* 处理 iPhone 刘海/安全区（横屏时被状态栏/底部条遮挡的区域） */
+        @supports (padding: env(safe-area-inset-top)) {
+            .topbar {
+                padding-top:    calc(4px  + env(safe-area-inset-top,    0px));
+                padding-left:   calc(10px + env(safe-area-inset-left,   0px));
+                padding-right:  calc(10px + env(safe-area-inset-right,  0px));
+            }
+        }
+
         @media (max-width: 900px) {
             /* 顶部栏更紧凑 */
             .topbar { height: 30px; padding: 3px 6px; font-size: 10px; }
@@ -858,6 +869,7 @@
         </div>
         <div class="topbar-info">
             <span id="deckInfo"></span>
+            <button class="topbar-btn" id="fullscreenBtn" onclick="toggleFullscreen()" title="全屏游戏（隐藏浏览器顶部地址栏/底部导航栏）">⛶</button>
             <button class="topbar-btn" onclick="confirmQuit()">退出</button>
         </div>
     </div>
@@ -1236,6 +1248,43 @@ window.addEventListener('orientationchange', function(){
     // 旋转后延迟一帧，等浏览器完成布局再重算缩放比例
     setTimeout(function(){ if(document.getElementById('gameScreen').classList.contains('active')){ enforceGameAspect(); } }, 250);
 });
+
+// ===== 全屏切换：消除手机浏览器的地址栏/导航栏遮挡 =====
+function toggleFullscreen(){
+    const el = document.documentElement;
+    const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    if(!isFs){
+        const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+        if(req){
+            try { req.call(el); } catch(e){}
+        } else {
+            // iOS Safari / 微信内置等不支持 Fullscreen API，给出"添加到主屏幕"提示
+            const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+            const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+            let msg;
+            if(isWeChat) msg = '微信内不支持网页全屏\n请点击右上角 ··· → 在浏览器中打开\n再选择"添加到主屏幕"';
+            else if(isIOS) msg = 'iOS 暂不支持网页内全屏\n请点击底部分享按钮 → 添加到主屏幕';
+            else msg = '当前浏览器不支持全屏 API\n请用浏览器菜单将页面添加到主屏幕';
+            if(typeof showToast==='function'){ try{ showToast(msg, 6000); }catch(e){ alert(msg); } }
+            else { alert(msg); }
+        }
+    } else {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+        if(exit){
+            try { exit.call(document); } catch(e){}
+        }
+    }
+    setTimeout(updateFullscreenBtn, 120);
+}
+function updateFullscreenBtn(){
+    const btn = document.getElementById('fullscreenBtn');
+    if(!btn) return;
+    const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    btn.textContent = isFs ? '⛶✓' : '⛶';
+    btn.title = isFs ? '退出全屏' : '全屏游戏（隐藏浏览器顶部/底部 UI）';
+}
+document.addEventListener('fullscreenchange', updateFullscreenBtn);
+document.addEventListener('webkitfullscreenchange', updateFullscreenBtn);
 
 // ---- 导航函数（被HTML按钮调用） ----
 function goSetup(){ 

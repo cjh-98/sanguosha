@@ -1,0 +1,11 @@
+{
+    "name": "三国杀",
+    "short_name": "三国杀",
+    "description": "三国杀 H5 单机版",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "orientation": "any",
+    "background_color": "#0d0a06",
+    "theme_color": "#1a1a2e"
+}

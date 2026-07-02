@@ -87,6 +87,9 @@ SGS.GameEngine = (function() {
             this.winner = null;
             this.logs = [];
             this.eventSubscribers = {};
+            // 注册与事件挂钩的武将技能监听（象兵/烈刃）
+            this.on('onLoseEquip', (d) => { this._onLoseEquip(d); });
+            this.on('onShaTarget', (d) => { this._onShaTarget(d); });
             this.adapter = null;
             this.ai = null;
             this.bannedHeroes = [];
@@ -346,6 +349,60 @@ SGS.GameEngine = (function() {
             return true;
         }
 
+        // 象兵 (祝融, 限定技): 失去坐骑时摸3张牌
+        _onLoseEquip(data) {
+            try {
+                const p = data && data.player;
+                const card = data && data.card;
+                if (!p || !p.isAlive || !card) return;
+                if (!p.skills.some(s => s.name === '象兵')) return;
+                if (card.subtype !== 'horse_plus' && card.subtype !== 'horse_minus') return;
+                p.tokens = p.tokens || {};
+                if (p.tokens['象兵used']) return;
+                if (p.isAI) {
+                    p.tokens['象兵used'] = true;
+                    this.drawCard(p, 3);
+                    this.log(`${p.name}发动【象兵】，失去坐骑，摸3张牌`, 'highlight');
+                } else {
+                    this.askSkillConfirm(p, '象兵', '你失去了坐骑，是否发动【象兵】摸3张牌？')
+                        .then((want) => {
+                            if (want && !p.tokens['象兵used']) {
+                                p.tokens['象兵used'] = true;
+                                this.drawCard(p, 3);
+                                this.log(`${p.name}发动【象兵】，摸3张牌`, 'highlight');
+                            }
+                        }).catch(() => {});
+                }
+            } catch (e) { console.error('象兵:', e); }
+        }
+
+        // 烈刃 (祝融): 使用【杀】指定目标后，可与其拼点，赢则获得其一张牌
+        _onShaTarget(data) {
+            try {
+                const source = data && data.source;
+                const target = data && data.target;
+                const card = data && data.card;
+                if (!source || !source.isAlive || !target || !target.isAlive) return;
+                if (!source.skills.some(s => s.name === '烈刃')) return;
+                if (!card || card.subtype !== 'sha') return;
+                const myCard = source.handCards[Math.floor(Math.random() * source.handCards.length)];
+                const tCard = target.handCards[Math.floor(Math.random() * target.handCards.length)];
+                if (!myCard || !tCard) return;
+                this.log(`${source.name}(${myCard.number}) vs ${target.name}(${tCard.number}) 发动【烈刃】拼点`, 'normal');
+                this.discardCard(source, myCard);
+                this.discardCard(target, tCard);
+                if (myCard.number > tCard.number) {
+                    const taken = target.handCards.pop();
+                    if (taken) {
+                        source.handCards.push(taken);
+                        this.log(`${source.name}【烈刃】拼点获胜，获得${target.name}一张牌`, 'success');
+                    }
+                } else {
+                    this.log(`${source.name}【烈刃】拼点失败`, 'normal');
+                }
+            } catch (e) { console.error('烈刃:', e); }
+        }
+
         // ========== 初始化游戏 ==========
         init() {
             try {
@@ -518,7 +575,22 @@ SGS.GameEngine = (function() {
             }
             // 人类玩家：等待UI选择
             return new Promise((resolve) => {
-                this._pendingCardChoice = { player, cards, prompt, resolve, hideInfo };
+                let settled = false;
+                let timer = null;
+                // 保险：幂等 resolve + 30s 安全超时，确保引擎不会因 UI 未回调而永久挂起
+                const safeResolve = (value) => {
+                    if (settled) return;
+                    settled = true;
+                    if (timer) clearTimeout(timer);
+                    this._pendingCardChoice = null;
+                    resolve(value);
+                };
+                this._pendingCardChoice = { player, cards, prompt, resolve: safeResolve, hideInfo };
+                timer = setTimeout(() => {
+                    safeResolve(null);
+                    const overlay = (typeof document !== 'undefined') ? document.getElementById('cardSelOverlay') : null;
+                    if (overlay) overlay.style.display = 'none';
+                }, 30000);
                 // 立即通知UI更新，显示卡牌选择界面
                 this.notifyState();
             });
@@ -541,7 +613,22 @@ SGS.GameEngine = (function() {
                 return targets[Math.floor(Math.random() * targets.length)];
             }
             return new Promise((resolve) => {
-                this._pendingTargetChoice = { player, targets, prompt, resolve };
+                let settled = false;
+                let timer = null;
+                // 保险：幂等 resolve + 30s 安全超时，确保引擎不会因 UI 未回调而永久挂起
+                const safeResolve = (value) => {
+                    if (settled) return;
+                    settled = true;
+                    if (timer) clearTimeout(timer);
+                    this._pendingTargetChoice = null;
+                    resolve(value);
+                };
+                this._pendingTargetChoice = { player, targets, prompt, resolve: safeResolve };
+                timer = setTimeout(() => {
+                    safeResolve(null);
+                    const overlay = (typeof document !== 'undefined') ? document.getElementById('targetSelOverlay') : null;
+                    if (overlay) overlay.style.display = 'none';
+                }, 30000);
                 this.notifyState();
             });
         }
@@ -560,11 +647,27 @@ SGS.GameEngine = (function() {
             }
             // 人类玩家：弹出确认对话框，等待用户点击
             return new Promise((resolve) => {
-                if (typeof window !== 'undefined' && window.showSkillConfirmModal) {
-                    window.showSkillConfirmModal(skillName, desc, player.id, resolve);
+                let settled = false;
+                let timer = null;
+                // 保险：幂等 resolve + 30s 安全超时 + 弹窗缺失兜底，确保引擎不会死锁
+                const safeResolve = (value) => {
+                    if (settled) return;
+                    settled = true;
+                    if (timer) clearTimeout(timer);
+                    resolve(value);
+                };
+                if (typeof window !== 'undefined' && typeof window.showSkillConfirmModal === 'function') {
+                    window.showSkillConfirmModal(skillName, desc, player.id, safeResolve);
                 } else {
-                    resolve(false);
+                    // UI 不可用：立即按"不发动"处理，绝不挂起
+                    safeResolve(false);
+                    return;
                 }
+                timer = setTimeout(() => {
+                    safeResolve(false);
+                    const overlay = (typeof document !== 'undefined') ? document.getElementById('skillConfirmOverlay') : null;
+                    if (overlay) overlay.style.display = 'none';
+                }, 30000);
             });
         }
 
@@ -827,7 +930,14 @@ SGS.GameEngine = (function() {
         // 回合开始阶段：觉醒技（AWAKENING），对所有玩家均触发
         doBeginAwakeningSkills(player) {
             for (const skill of player.skills) {
-                if (skill.type === SGS.HeroData.SKILL_TYPE.AWAKENING && player.hp === 1) {
+                if (skill.type !== SGS.HeroData.SKILL_TYPE.AWAKENING) continue;
+                // 默认觉醒条件：体力为1
+                let canTrigger = (player.hp === 1);
+                // 神威（神吕布）：觉醒条件为"狂暴"标记达到6
+                if (skill.name === '神威') {
+                    canTrigger = (player.tokens['狂暴'] || 0) >= 6;
+                }
+                if (canTrigger) {
                     try {
                         this.log(`${player.name}满足了觉醒技【${skill.name}】的条件`, 'highlight');
                         this.useSkill(player, skill.name, {});
@@ -1578,8 +1688,9 @@ SGS.GameEngine = (function() {
                         if (hasKongcheng) return false;
                     }
                     // 距离检查
-                    // 武神第二效果：使用红桃杀无距离限制
-                    if (card.suit !== 'heart' || !hasWushen) {
+                    // 武神第二效果：使用红桃杀无距离限制；神力：使用杀无视距离
+                    const hasShenli = player.skills.some(s => s.name === '神力');
+                    if (!hasShenli && (card.suit !== 'heart' || !hasWushen)) {
                         if (!this.canAttack(player, target)) return false;
                     }
                     break;
@@ -1607,6 +1718,35 @@ SGS.GameEngine = (function() {
                     break;
                 case 'jiu':
                     if (player.jiuUsedThisTurn) return false;
+                    break;
+                // === 锦囊目标合法性校验（避免出牌后因引擎内部距离/条件限制而白白浪费） ===
+                case 'juedou':
+                    if (targetIds.length === 0) return false;
+                    const jt = this.players[targetIds[0]];
+                    if (!jt || !jt.isAlive) return false;
+                    // 空城：不能成为决斗的目标
+                    if (jt.handCards.length === 0 && jt.skills.some(s => s.name === '空城')) return false;
+                    break;
+                case 'guohe': // 过河拆桥
+                    if (targetIds.length === 0) return false;
+                    const gt = this.players[targetIds[0]];
+                    if (!gt || !gt.isAlive) return false;
+                    if (gt.skills.some(s => s.name === '谦逊')) return false; // 谦逊：不能被过河拆桥
+                    if (gt.skills.some(s => s.name === '帷幕') && (card.suit === 'spade' || card.suit === 'club')) return false; // 帷幕：黑色锦囊无效
+                    if (!player.skills.some(s => s.name === '奇才') && this.getDistance(player, gt) > 1) return false;
+                    break;
+                case 'shunshou': // 顺手牵羊
+                    if (targetIds.length === 0) return false;
+                    const sst = this.players[targetIds[0]];
+                    if (!sst || !sst.isAlive) return false;
+                    if (sst.skills.some(s => s.name === '谦逊')) return false;
+                    if (sst.skills.some(s => s.name === '帷幕') && (card.suit === 'spade' || card.suit === 'club')) return false;
+                    if (!player.skills.some(s => s.name === '奇才') && this.getDistance(player, sst) > 1) return false;
+                    break;
+                case 'huogong': // 火攻：目标必须有手牌
+                    if (targetIds.length === 0) return false;
+                    const ht = this.players[targetIds[0]];
+                    if (!ht || !ht.isAlive || ht.handCards.length === 0) return false;
                     break;
             }
             return true;
@@ -1903,10 +2043,12 @@ SGS.GameEngine = (function() {
                     const others = this.getAlivePlayers().filter(p => p.id !== player.id);
                     for (const p of others) {
                         if (!p.isAlive) continue;
-                        const sha = await this.requestResponse(p, 'sha', player);
+                        // 祸首 (孟获)：被【南蛮入侵】造成伤害时，伤害来源视为孟获本人
+                        const src = (p.skills.some(s => s.name === '祸首') && player.id !== p.id) ? p : player;
+                        const sha = await this.requestResponse(p, 'sha', src);
                         if (!sha) {
                             this.log(`${p.name}受到1点伤害`, 'danger');
-                            await this.dealDamage(p, 1, { source: player, card });
+                            await this.dealDamage(p, 1, { source: src, card });
                         } else {
                             this.discardPile.push(sha);
                         }
@@ -2433,6 +2575,15 @@ SGS.GameEngine = (function() {
                 damage += 1;
                 this.log(`${source.name}裸衣加成，伤害+1`, 'highlight');
             }
+            // 狂暴 (神吕布 锁定技): 使用【杀】或【决斗】造成的伤害 + "狂暴"标记数
+            if (source && source.skills.some(s => s.name === '狂暴') &&
+                card && (card.subtype === 'sha' || card.subtype === 'juedou')) {
+                const marks = source.tokens['狂暴'] || 0;
+                if (marks > 0) {
+                    damage += marks;
+                    this.log(`${source.name}的【狂暴】生效，伤害额外+${marks}`, 'highlight');
+                }
+            }
 
             // 天香 (小乔) — 主动技，人类弹窗询问是否发动
             if (player.skills.some(s => s.name === '天香') && source && source.isAlive) {
@@ -2464,8 +2615,36 @@ SGS.GameEngine = (function() {
                 }
             }
 
+            // 狂暴 (神吕布 锁定技): 每受到1点伤害获得1枚"狂暴"标记
+            if (damage > 0 && player.skills.some(s => s.name === '狂暴')) {
+                player.tokens['狂暴'] = (player.tokens['狂暴'] || 0) + damage;
+                this.log(`${player.name}获得${damage}枚【狂暴】标记（共${player.tokens['狂暴']}枚）`, 'highlight');
+            }
+
             player.hp -= damage;
             this.log(`${player.name}受到${damage}点${element === 'fire' ? '火焰' : element === 'thunder' ? '雷电' : ''}伤害（剩余${player.hp}体力）`, 'danger');
+
+            // 放逐 (曹丕): 受到伤害后，可令一名角色翻面并摸X张牌(X为伤害值)
+            if (player.skills.some(s => s.name === '放逐') && player.isAlive) {
+                try {
+                    const fzTargets = this.getAlivePlayers().filter(p => p.id !== player.id);
+                    if (fzTargets.length > 0) {
+                        const wantFangqu = player.isAI
+                            ? true
+                            : await this.askSkillConfirm(player, '放逐', `受到伤害，是否发动【放逐】令一名角色翻面并摸${damage}张牌？`);
+                        if (wantFangqu) {
+                            const fzTarget = player.isAI
+                                ? fzTargets[Math.floor(Math.random() * fzTargets.length)]
+                                : await this.chooseTarget(player, fzTargets, `放逐：选择要翻面的角色`);
+                            if (fzTarget) {
+                                fzTarget.isFlipped = true;
+                                this.drawCard(fzTarget, damage);
+                                this.log(`${player.name}发动【放逐】，令${fzTarget.name}翻面并摸${damage}张牌`, 'highlight');
+                            }
+                        }
+                    }
+                } catch (e) { console.error('放逐:', e); }
+            }
 
             // 通知UI显示伤害动画
             try {
@@ -3535,6 +3714,16 @@ SGS.GameEngine = (function() {
                         // 持久标记：每回合开始摸1张牌（不能用 skillStates，因其每回合被重置）
                         player.hasZaoXianTuntian = true;
                         this.log(`${player.name}凿险觉醒！减1点体力上限，获得屯田`, 'highlight');
+                    }
+                    break;
+                case '神威':
+                    // 神吕布觉醒技：狂暴标记达到6时减1点体力上限，获得"神力"
+                    if (!player.skills.some(s => s.name === '神威觉醒') && (player.tokens['狂暴'] || 0) >= 6) {
+                        player.skills.push({ name: '神威觉醒', type: 'locked', desc: '觉醒技，狂暴标记达到6时减1点体力上限，获得"神力"' });
+                        player.skills.push({ name: '神力', type: 'locked', desc: '锁定技，你使用【杀】无视距离' });
+                        player.maxHp -= 1;
+                        if (player.hp > player.maxHp) player.hp = player.maxHp;
+                        this.log(`${player.name}神威觉醒！减1点体力上限，获得"神力"（使用杀无视距离）`, 'highlight');
                     }
                     break;
                 case '若愚':

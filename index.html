@@ -2597,30 +2597,32 @@ function openGuanxing(){
         <div style="text-align:center;margin:8px 0">
             <div style="font-size:12px;color:#a0a0b0;margin-bottom:4px">调整顺序后放回牌堆顶或牌堆底</div>
         </div>
+        <div style="font-size:11px;color:#a0a0b0;margin:4px 0;text-align:center">
+            <span style="color:#e6c84d;font-weight:bold">点击每张牌</span> 切换放牌堆顶（亮）或牌堆底（暗），可拖动调整顺序
+        </div>
         <div id="guanxingCards" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0"></div>
         <div style="display:flex;gap:8px;margin-top:10px;justify-content:center;align-items:center">
             <button class="btn-sm" onclick="skipGuanxing()">不发动</button>
-            <div style="flex:1"></div>
-            <span style="font-size:12px;color:#a0a0b0">放回：</span>
-            <button class="btn-sm btn-primary" onclick="confirmGuanxing('top')">牌堆顶</button>
-            <button class="btn-sm" onclick="confirmGuanxing('bottom')">牌堆底</button>
+            <button class="btn-sm btn-primary" onclick="confirmGuanxing()">确认观星</button>
         </div></div>`;
     document.body.appendChild(ov);
     
-    // 显示星牌供选择
+    // 显示星牌供选择——每张牌默认"放牌堆底"（暗），点击切换为"放牌堆顶"（亮）
     const cardsDiv=document.getElementById('guanxingCards');
-    // 按牌堆顺序显示（牌堆顶→牌堆底），玩家可以拖动调整顺序
     const displayOrder = [...Array(n).keys()];
     window._guanxingDisplayOrder = displayOrder;
     window._guanxingCards = stars;
-    window._guanxingOriginalOrder = [...Array(n).keys()];
+    window._guanxingTopSet = new Set();  // 被标记为"顶"的牌 index 集合
     
     cardsDiv.innerHTML = displayOrder.map(idx => {
         const card = stars[idx];
         const suitClass = card.suit === 'heart' || card.suit === 'diamond' ? 'red' : 'blk';
-        return `<div class="card ${suitClass}" data-idx="${idx}" style="cursor:grab;user-select:none" onmousedown="startGuanxingDrag(event)" ondragstart="return false">
+        return `<div class="card ${suitClass}" data-idx="${idx}"
+                     style="cursor:grab;user-select:none;opacity:0.55"
+                     onmousedown="startGuanxingDrag(event)" onclick="toggleGuanxingCard('${idx}')" ondragstart="return false">
             <span class="cs ${suitClass}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(card.suit)]}</span>
             <span class="cname ${suitClass}">${card.name}</span>
+            <span class="gx-badge" style="font-size:9px;display:block;color:#a0a0b0;margin-top:1px">牌堆底</span>
         </div>`;
     }).join('');
 }
@@ -2631,6 +2633,7 @@ let _guanxingDragState = null;
 function startGuanxingDrag(e){
     const card = e.currentTarget;
     const idx = parseInt(card.dataset.idx);
+    window._guanxingDragOccurred = false;  // 重置拖动标记
     
     // 创建拖动元素
     const dragImg = card.cloneNode(true);
@@ -2666,6 +2669,7 @@ function startGuanxingDrag(e){
 
 function onGuanxingDragMove(e){
     if(!_guanxingDragState) return;
+    window._guanxingDragOccurred = true;  // 发生了拖动，阻止后续点击 toggle
     const state = _guanxingDragState;
     state.dragImg.style.left = (e.clientX - state.offsetX) + 'px';
     state.dragImg.style.top = (e.clientY - state.offsetY) + 'px';
@@ -2718,25 +2722,51 @@ function skipGuanxing(){
     finishGuanxing(false);
 }
 
-function confirmGuanxing(position = 'top'){
+// 观星：点击卡片切换"放牌堆顶" / "放牌堆底"
+function toggleGuanxingCard(idx){
+    if(window._guanxingDragOccurred){ window._guanxingDragOccurred=false; return; }
+    idx = parseInt(idx);
+    const set = window._guanxingTopSet || new Set();
+    if(set.has(idx)){
+        set.delete(idx);
+    } else {
+        set.add(idx);
+    }
+    window._guanxingTopSet = set;
+    // 更新 UI
+    const cardsDiv = document.getElementById('guanxingCards');
+    if(!cardsDiv) return;
+    [...cardsDiv.children].forEach(el => {
+        const i = parseInt(el.dataset.idx);
+        const badge = el.querySelector('.gx-badge');
+        if(set.has(i)){
+            el.style.opacity = '1';
+            el.style.boxShadow = '0 0 8px rgba(230,200,77,0.6)';
+            if(badge){ badge.textContent = '牌堆顶'; badge.style.color = '#e6c84d'; }
+        } else {
+            el.style.opacity = '0.55';
+            el.style.boxShadow = '';
+            if(badge){ badge.textContent = '牌堆底'; badge.style.color = '#a0a0b0'; }
+        }
+    });
+}
+
+function confirmGuanxing(){
     const ov=document.getElementById('guanxingOverlay');
     if(ov)ov.remove();
     
     const cards = window._guanxingCards || [];
     const displayOrder = window._guanxingDisplayOrder || [];
+    const topSet = window._guanxingTopSet || new Set();
     
-    // 按显示顺序整理牌
-    const orderedCards = displayOrder.map(idx => cards[idx]);
+    // 按显示顺序分组：topSet 中的放牌堆顶，其余放牌堆底
+    const topCards = displayOrder.filter(i => topSet.has(i)).map(i => cards[i]);
+    const bottomCards = displayOrder.filter(i => !topSet.has(i)).map(i => cards[i]);
     
-    if(position === 'top'){
-        // 放回牌堆顶（牌堆顶是数组尾部，因为摸牌用slice(-n)从尾部取）
-        engine.deck = [...engine.deck, ...orderedCards];
-        engine.log(`你发动【观星】，调整了${cards.length}张牌的顺序并置于牌堆顶`, 'highlight');
-    } else {
-        // 放回牌堆底（数组头部）
-        engine.deck = [...orderedCards, ...engine.deck];
-        engine.log(`你发动【观星】，调整了${cards.length}张牌的顺序并置于牌堆底`, 'highlight');
-    }
+    // 牌堆顶 = 先放底部的再加顶部的（摸牌从尾部取）
+    engine.deck = [...engine.deck, ...bottomCards, ...topCards];
+    
+    engine.log(`你发动【观星】: 牌堆顶${topCards.length}张、牌堆底${bottomCards.length}张`, 'highlight');
     
     finishGuanxing(true);
 }

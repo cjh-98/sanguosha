@@ -1118,6 +1118,7 @@ SGS.GameEngine = (function() {
                     if (finalResult.suit === 'spade' && finalResult.number >= 2 && finalResult.number <= 9) {
                     this.log(`${player.name}被闪电击中！3点雷伤害`, 'danger');
                     await this.dealDamage(player, 3, { source: null, element: 'thunder', card: judgeCard });
+                    this.discardPile.push(judgeCard);
                     } else {
                         const nextPlayer = this.getNextPlayer(player);
                         if (nextPlayer) {
@@ -1338,6 +1339,7 @@ SGS.GameEngine = (function() {
                     if (finalResult.suit === 'spade' && finalResult.number >= 2 && finalResult.number <= 9) {
                     this.log(`${player.name}被闪电击中！3点雷伤害`, 'danger');
                     await this.dealDamage(player, 3, { source: null, element: 'thunder', card: judgeCard });
+                    this.discardPile.push(judgeCard);
                     } else {
                         const nextPlayer = this.getNextPlayer(player);
                         if (nextPlayer && nextPlayer.isAlive) {
@@ -1346,6 +1348,11 @@ SGS.GameEngine = (function() {
                         }
                     }
                     break;
+            }
+
+            // 非闪电的判定牌（乐不思蜀/兵粮寸断）经鬼才/鬼道结算后需置入弃牌堆
+            if (judgeCard.subtype !== 'shandian') {
+                this.discardPile.push(judgeCard);
             }
 
             // 天妒 (郭嘉)：获得判定牌
@@ -2049,27 +2056,28 @@ SGS.GameEngine = (function() {
 
         async resolveDuel(source, target, card) {
             this.log(`${source.name}对${target.name}使用了决斗！`, 'highlight');
+            // 无双：吕布参与的决斗，双方每轮需各出两张【杀】
+            const wushuang = source.skills.some(s => s.name === '无双') || target.skills.some(s => s.name === '无双');
             let current = target; // 目标先出杀
             let other = source;
             while (true) {
                 const sha = await this.requestResponse(current, 'sha', other);
                 if (!sha) {
-                    // 无双：需要两张杀
-                    if (other.skills.some(s => s.name === '无双')) {
-                        const sha2 = await this.requestResponse(current, 'sha', other);
-                        if (!sha2) {
-                            this.log(`${current.name}决斗失败，受到1点伤害`, 'danger');
-                            await this.dealDamage(current, 1, { source: other, card });
-                            break;
-                        }
-                        this.discardPile.push(sha2);
-                    } else {
-                        this.log(`${current.name}决斗失败，受到1点伤害`, 'danger');
+                    this.log(`${current.name}决斗失败，受到1点伤害`, 'danger');
+                    await this.dealDamage(current, 1, { source: other, card });
+                    break;
+                }
+                this.discardPile.push(sha);
+                // 无双：需再出一张【杀】
+                if (wushuang) {
+                    const sha2 = await this.requestResponse(current, 'sha', other);
+                    if (!sha2) {
+                        this.log(`${current.name}因无双需出两张杀，决斗失败，受到1点伤害`, 'danger');
                         await this.dealDamage(current, 1, { source: other, card });
                         break;
                     }
+                    this.discardPile.push(sha2);
                 }
-                this.discardPile.push(sha);
                 [current, other] = [other, current];
             }
         }
@@ -2683,8 +2691,9 @@ SGS.GameEngine = (function() {
         }
 
         async killPlayer(player, killer) {
-            // 涅槃 (庞统)
-            if (player.skills.some(s => s.name === '涅槃') && player.isAlive) {
+            // 涅槃 (庞统) — 限定技，仅能发动一次
+            if (player.skills.some(s => s.name === '涅槃') && player.isAlive && !player.niepanUsed) {
+                player.niepanUsed = true;
                 player.hp = 3;
                 // 弃置所有牌
                 for (const c of [...player.handCards]) {
@@ -3069,6 +3078,13 @@ SGS.GameEngine = (function() {
                             player.equipment.weapon = null;
                         } else {
                             player.hp -= 1;
+                            if (player.hp <= 0) {
+                                await this.handleDying(player, player);
+                                if (!player.isAlive) {
+                                    this.log(`${player.name}发动强袭后濒死身亡`, 'danger');
+                                    break;
+                                }
+                            }
                         }
                         await this.dealDamage(target, 1, { source: player });
                         this.log(`${player.name}对${target.name}发动强袭`, 'highlight');

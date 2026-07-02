@@ -2376,12 +2376,15 @@ function openGuanxing(){
     ov.innerHTML=`<div class="modal" style="max-height:80vh;overflow-y:auto" onclick="event.stopPropagation()">
         <h4>观星：观看牌堆顶${n}张牌</h4>
         <div style="text-align:center;margin:8px 0">
-            <div style="font-size:12px;color:#a0a0b0;margin-bottom:4px">调整顺序后放回牌堆顶</div>
+            <div style="font-size:12px;color:#a0a0b0;margin-bottom:4px">调整顺序后放回牌堆顶或牌堆底</div>
         </div>
         <div id="guanxingCards" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0"></div>
-        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center;align-items:center">
             <button class="btn-sm" onclick="skipGuanxing()">不发动</button>
-            <button class="btn-sm btn-primary" onclick="confirmGuanxing()">确认顺序</button>
+            <div style="flex:1"></div>
+            <span style="font-size:12px;color:#a0a0b0">放回：</span>
+            <button class="btn-sm btn-primary" onclick="confirmGuanxing('top')">牌堆顶</button>
+            <button class="btn-sm" onclick="confirmGuanxing('bottom')">牌堆底</button>
         </div></div>`;
     document.body.appendChild(ov);
     
@@ -2496,20 +2499,25 @@ function skipGuanxing(){
     finishGuanxing(false);
 }
 
-function confirmGuanxing(){
+function confirmGuanxing(position = 'top'){
     const ov=document.getElementById('guanxingOverlay');
     if(ov)ov.remove();
     
     const cards = window._guanxingCards || [];
     const displayOrder = window._guanxingDisplayOrder || [];
     
-    // 按显示顺序放回牌堆顶
-    // 显示顺序是拖动后的视觉顺序，直接按此顺序放回牌堆顶
-    const newDeckTop = displayOrder.map(idx => cards[idx]);
+    // 按显示顺序整理牌
+    const orderedCards = displayOrder.map(idx => cards[idx]);
     
-    // 将调整后的牌放到牌堆顶（牌堆顶是数组尾部，因为摸牌用slice(-n)从尾部取）
-    engine.deck = [...engine.deck, ...newDeckTop];
-    engine.log(`你发动【观星】，调整了${cards.length}张牌的顺序`, 'highlight');
+    if(position === 'top'){
+        // 放回牌堆顶（牌堆顶是数组尾部，因为摸牌用slice(-n)从尾部取）
+        engine.deck = [...engine.deck, ...orderedCards];
+        engine.log(`你发动【观星】，调整了${cards.length}张牌的顺序并置于牌堆顶`, 'highlight');
+    } else {
+        // 放回牌堆底（数组头部）
+        engine.deck = [...orderedCards, ...engine.deck];
+        engine.log(`你发动【观星】，调整了${cards.length}张牌的顺序并置于牌堆底`, 'highlight');
+    }
     
     finishGuanxing(true);
 }

@@ -274,7 +274,7 @@ SGS.HeroData = (function() {
         hero('liushan', '刘禅', FACTION.SHU, 3, [
             { name:'享乐', type:SKILL_TYPE.LOCKED, trigger:'onShaTarget', desc:'锁定技，其他角色对你使用【杀】需额外弃一张牌', pack:'mountain' },
             { name:'放权', type:SKILL_TYPE.ACTIVE, trigger:'turnBegin', desc:'你可以跳过本回合出牌阶段，然后回合结束时弃一张牌令一名角色进行一个额外回合', pack:'mountain' },
-            { name:'若愚', type:SKILL_TYPE.LORD, trigger:'any', desc:'主公技，觉醒技，当你体力为1时，回复1点并增加1点体力上限', pack:'mountain' },
+            { name:'若愚', type:SKILL_TYPE.AWAKENING, trigger:'any', desc:'主公技，觉醒技，当你体力为1时，回复1点并增加1点体力上限', pack:'mountain' },
         ], { pack:'mountain' }),
 
         hero('dengai', '邓艾', FACTION.WEI, 4, [

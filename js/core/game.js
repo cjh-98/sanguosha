@@ -395,8 +395,10 @@ SGS.GameEngine = (function() {
         // 设置玩家武将
         setPlayerHero(playerIdx, hero, nationalHero = null) {
             const player = this.players[playerIdx];
-            player.hero = hero;
-            player.nationalHero = nationalHero;
+            // 克隆武将对象，避免觉醒技等运行时对 player.skills 的修改污染全局 HeroData 定义
+            // （否则同一页面内重开第二局时，武将会带着上一局已觉醒追加的技能）。
+            player.hero = (hero && typeof hero === 'object') ? JSON.parse(JSON.stringify(hero)) : hero;
+            player.nationalHero = (nationalHero && typeof nationalHero === 'object') ? JSON.parse(JSON.stringify(nationalHero)) : nationalHero;
 
             if (this.gameMode === 'national' && nationalHero) {
                 // 国战体力 = 两将阴阳鱼之和取整
@@ -816,16 +818,24 @@ SGS.GameEngine = (function() {
                     this.log(`${player.name}发动【英魂】`, 'highlight');
                 }
             }
-            // 再起：翻牌堆顶，若为红色则回1体力
+            // 再起：翻牌堆顶，若为红色则回1体力并获取该牌，否则置入弃牌堆
             if (player.skills.some(s => s.name === '再起') && player.hp < player.maxHp) {
                 const card = this.revealTopCard();
                 if (card) {
                     if (card.suit === 'heart' || card.suit === 'diamond') {
                         this.heal(player, 1);
-                        this.log(`${player.name}【再起】回1体力`, 'success');
+                        player.handCards.push(card);
+                        this.log(`${player.name}【再起】，翻到红牌，回1体力并获得该牌`, 'success');
+                    } else {
+                        this.discardPile.push(card);
+                        this.log(`${player.name}【再起】，翻到黑牌，牌置入弃牌堆`, 'normal');
                     }
-                    player.handCards.push(card);
                 }
+            }
+            // 凿险觉醒赐予的"屯田"：每回合开始摸1张牌（持久标记，不受 skillStates 重置影响）
+            if (player.hasZaoXianTuntian) {
+                this.drawCard(player, 1);
+                this.log(`${player.name}【屯田】摸了1张牌`, 'highlight');
             }
         }
 
@@ -1646,12 +1656,16 @@ SGS.GameEngine = (function() {
             let unavoidable = false;
             if (source.skills.some(s => s.name === '铁骑')) {
                 const judge = this.revealTopCard();
-                this.log(`${source.name}铁骑判定：${SGS.CardData.suitName[judge.suit]}${SGS.CardData.numberName[judge.number]}`, 'normal');
-                if (judge.suit === 'heart' || judge.suit === 'diamond') {
-                    unavoidable = true;
-                    this.log(`铁骑生效，此杀不可被闪避！`, 'danger');
+                if (!judge) {
+                    this.log(`${source.name}铁骑：牌堆已空，无法判定`, 'normal');
+                } else {
+                    this.log(`${source.name}铁骑判定：${SGS.CardData.suitName[judge.suit]}${SGS.CardData.numberName[judge.number]}`, 'normal');
+                    if (judge.suit === 'heart' || judge.suit === 'diamond') {
+                        unavoidable = true;
+                        this.log(`铁骑生效，此杀不可被闪避！`, 'danger');
+                    }
+                    this.discardPile.push(judge);
                 }
-                this.discardPile.push(judge);
             }
             // 烈弓
             if (source.skills.some(s => s.name === '烈弓') && source.handCards.length >= target.handCards.length) {
@@ -1665,6 +1679,18 @@ SGS.GameEngine = (function() {
                 if (shan) {
                     this.log(`${target.name}打出了闪`, 'success');
                     this.discardPile.push(shan);
+                    // 无双 (吕布)：需要打出两张闪
+                    if (source.skills.some(s => s.name === '无双')) {
+                        const shan2 = await this.requestResponse(target, 'shan', source);
+                        if (shan2) {
+                            this.discardPile.push(shan2);
+                            this.log(`${target.name}无双：打出了第二张闪`, 'success');
+                        } else {
+                            this.log(`${target.name}无双：未能打出第二张闪，杀命中！`, 'danger');
+                            await this.dealDamage(target, baseDamage, { source, element: card.element, card });
+                            return;
+                        }
+                    }
                     // 通知UI显示闪避动画
                     try {
                         this.adapter && this.adapter.notifyEvent({ type: 'shan', detail: { playerId: target.id } });
@@ -1682,14 +1708,18 @@ SGS.GameEngine = (function() {
                                 if (chosen) {
                                     this.log(`${target.name}发动雷击`, 'highlight');
                                     const judge = this.revealTopCard();
-                                    this.log(`雷击判定：${SGS.CardData.suitName[judge.suit]}${SGS.CardData.numberName[judge.number]}`, 'normal');
-                                    if (judge.suit === 'spade') {
-                                        await this.dealDamage(chosen, 2, { source: target, element: 'thunder', card: shan });
-                                        this.log(`${target.name}雷击成功，${chosen.name}受到2点雷伤害！`, 'danger');
+                                    if (!judge) {
+                                        this.log(`雷击：牌堆已空，无法判定`, 'normal');
                                     } else {
-                                        this.log(`雷击失败，判定不是♠`, 'normal');
+                                        this.log(`雷击判定：${SGS.CardData.suitName[judge.suit]}${SGS.CardData.numberName[judge.number]}`, 'normal');
+                                        if (judge.suit === 'spade') {
+                                            await this.dealDamage(chosen, 2, { source: target, element: 'thunder', card: shan });
+                                            this.log(`${target.name}雷击成功，${chosen.name}受到2点雷伤害！`, 'danger');
+                                        } else {
+                                            this.log(`雷击失败，判定不是♠`, 'normal');
+                                        }
+                                        this.discardPile.push(judge);
                                     }
-                                    this.discardPile.push(judge);
                                 }
                             }
                         }
@@ -2108,14 +2138,18 @@ SGS.GameEngine = (function() {
             // 八阵 (卧龙): 锁定技，无防具时视为装备八卦阵
             if (cardType === 'shan' && player.skills.some(s => s.name === '八阵') && !player.equipment.armor) {
                 const judge = this.revealTopCard();
-                this.log(`${player.name}八阵判定：${SGS.CardData.suitName[judge.suit]}`, 'normal');
-                this.emit('onJudge', { player, judgeCard: null, judgeResult: judge, engine: this });
-                if (judge.suit === 'heart' || judge.suit === 'diamond') {
-                    this.log(`八阵生效，视为打出闪！`, 'success');
+                if (!judge) {
+                    this.log(`${player.name}八阵：牌堆已空，无法判定`, 'normal');
+                } else {
+                    this.log(`${player.name}八阵判定：${SGS.CardData.suitName[judge.suit]}`, 'normal');
+                    this.emit('onJudge', { player, judgeCard: null, judgeResult: judge, engine: this });
+                    if (judge.suit === 'heart' || judge.suit === 'diamond') {
+                        this.log(`八阵生效，视为打出闪！`, 'success');
+                        this.discardPile.push(judge);
+                        return { name: '闪(八阵)', subtype: 'shan', suit: judge.suit, number: judge.number };
+                    }
                     this.discardPile.push(judge);
-                    return { name: '闪(八阵)', subtype: 'shan', suit: judge.suit, number: judge.number };
                 }
-                this.discardPile.push(judge);
             }
 
             // 检查防具
@@ -2124,14 +2158,18 @@ SGS.GameEngine = (function() {
                     case 'bagua':
                         if (cardType === 'shan') {
                             const judge = this.revealTopCard();
-                            this.log(`${player.name}八卦阵判定：${SGS.CardData.suitName[judge.suit]}`, 'normal');
-                            this.emit('onJudge', { player, judgeCard: null, judgeResult: judge, engine: this });
-                            if (judge.suit === 'heart' || judge.suit === 'diamond') {
-                                this.log(`八卦阵生效，视为打出闪！`, 'success');
+                            if (!judge) {
+                                this.log(`${player.name}八卦阵：牌堆已空，无法判定`, 'normal');
+                            } else {
+                                this.log(`${player.name}八卦阵判定：${SGS.CardData.suitName[judge.suit]}`, 'normal');
+                                this.emit('onJudge', { player, judgeCard: null, judgeResult: judge, engine: this });
+                                if (judge.suit === 'heart' || judge.suit === 'diamond') {
+                                    this.log(`八卦阵生效，视为打出闪！`, 'success');
+                                    this.discardPile.push(judge);
+                                    return { name: '闪(八卦阵)', subtype: 'shan', suit: judge.suit, number: judge.number };
+                                }
                                 this.discardPile.push(judge);
-                                return { name: '闪(八卦阵)', subtype: 'shan', suit: judge.suit, number: judge.number };
                             }
-                            this.discardPile.push(judge);
                         }
                         break;
                     case 'tengjia':
@@ -2185,6 +2223,15 @@ SGS.GameEngine = (function() {
                     return sha;
                 }
             }
+            // 武神 (神关羽)：锁定技，红桃牌视为杀，可被动打出
+            if (cardType === 'sha' && player.skills.some(s => s.name === '武神')) {
+                const hongtao = player.handCards.find(c => c.suit === 'heart');
+                if (hongtao) {
+                    this.discardCard(player, hongtao);
+                    this.log(`${player.name}发动武神，将红桃牌当杀打出`, 'success');
+                    return hongtao;
+                }
+            }
             // 武圣
             if (cardType === 'sha' && player.skills.some(s => s.name === '武圣')) {
                 const redCard = player.handCards.find(c => c.suit === 'heart' || c.suit === 'diamond');
@@ -2215,17 +2262,10 @@ SGS.GameEngine = (function() {
                     }
                     return null;
                 }
-                // 人类玩家：若没有可发动的技能转化（倾国/龙胆/武圣/急救），则自动打出
-                // 否则交给下方的技能触发流程由玩家确认是否发动技能
-                const canSkillConvert =
-                    (cardType === 'shan' && player.skills.some(s => s.name === '倾国')) ||
-                    (cardType === 'shan' && player.skills.some(s => s.name === '龙胆')) ||
-                    (cardType === 'sha' && player.skills.some(s => s.name === '武圣')) ||
-                    (cardType === 'tao' && player.skills.some(s => s.name === '急救'));
-                if (!canSkillConvert) {
-                    this.discardCard(player, card);
-                    return card;
-                }
+                // 人类玩家：技能转化（倾国/龙胆/武圣/急救）的弹窗已在上方询问过，
+                // 若玩家未发动技能转化，则自动打出对应的手牌（闪/杀/桃）。
+                this.discardCard(player, card);
+                return card;
             }
 
             // 无闪/杀时，检查技能转化
@@ -2369,6 +2409,9 @@ SGS.GameEngine = (function() {
             // 刚烈 (夏侯惇) — 被动技，强制判定，人类选择弃置的牌
             if (player.skills.some(s => s.name === '刚烈') && source && source.isAlive) {
                 const judge = this.revealTopCard();
+                if (!judge) {
+                    this.log(`${player.name}刚烈：牌堆已空，无法判定`, 'normal');
+                } else {
                 this.log(`${player.name}刚烈判定：${SGS.CardData.suitName[judge.suit]}${SGS.CardData.numberName[judge.number]}`, 'normal');
                 if (judge.suit !== 'heart') {
                     const sourceCards = [...source.handCards];
@@ -2403,6 +2446,7 @@ SGS.GameEngine = (function() {
                     this.log(`刚烈失败，判定为♥`, 'normal');
                 }
                 this.discardPile.push(judge);
+                }
             }
             // 遗计 (郭嘉) — 被动技(可)，人类弹窗询问是否发动
             if (player.skills.some(s => s.name === '遗计')) {
@@ -2479,6 +2523,9 @@ SGS.GameEngine = (function() {
                         if (discarded) {
                             this.discardCard(beiGePlayer, discarded);
                             const judge = this.revealTopCard();
+                            if (!judge) {
+                                this.log(`${beiGePlayer.name}发动悲歌，但牌堆已空，无法判定`, 'normal');
+                            } else {
                             this.log(`${beiGePlayer.name}发动悲歌，判定：${SGS.CardData.suitName[judge.suit]}`, 'highlight');
                             switch (judge.suit) {
                                 case 'heart': // 红桃：回复1体力
@@ -2506,6 +2553,7 @@ SGS.GameEngine = (function() {
                                     break;
                             }
                             this.discardPile.push(judge);
+                            }
                         }
                     }
                 }
@@ -3230,12 +3278,14 @@ SGS.GameEngine = (function() {
                     }
                     break;
                 case '魂姿':
-                    // 孙策觉醒技：体力=1时觉醒
+                    // 孙策觉醒技：体力=1时减1点体力上限，获得"英姿"和"英魂"
                     if (player.hp === 1 && !player.skills.some(s => s.name === '魂姿觉醒')) {
                         player.skills.push({ name: '魂姿觉醒', type: 'locked', desc: '觉醒技，体力=1时获得"英姿"和"英魂"' });
-                        // 英姿效果：本回合立即额外摸1张牌
-                        this.drawCard(player, 1);
-                        this.log(`${player.name}觉醒！获得英姿效果，本回合摸1张牌`, 'highlight');
+                        player.skills.push({ name: '英姿', type: 'locked', trigger: 'drawPhase', desc: '摸牌阶段多摸一张牌' });
+                        player.skills.push({ name: '英魂', type: 'active', trigger: 'turnBegin', desc: '回合开始时若已受伤，令一名角色摸X弃Y' });
+                        player.maxHp -= 1;
+                        if (player.hp > player.maxHp) player.hp = player.maxHp;
+                        this.log(`${player.name}觉醒！减1点体力上限，获得英姿与英魂`, 'highlight');
                     }
                     break;
                 case '直谏':
@@ -3342,34 +3392,34 @@ SGS.GameEngine = (function() {
                     }
                     break;
                 case '志继':
-                    // 姜维觉醒技：体力=1时觉醒，获得观星
+                    // 姜维觉醒技：体力=1时减1点体力上限，获得"观星"
                     if (player.hp === 1 && !player.skills.some(s => s.name === '志继觉醒')) {
                         player.skills.push({ name: '志继觉醒', type: 'locked', desc: '觉醒技，体力=1时获得"观星"' });
+                        player.skills.push({ name: '观星', type: 'active', trigger: 'turnBegin', desc: '回合开始时观看牌堆顶的牌并调整顺序' });
                         player.maxHp -= 1;
                         if (player.hp > player.maxHp) player.hp = player.maxHp;
                         this.drawCard(player, 3);
-                        this.log(`${player.name}志继觉醒！获得观星，摸3张牌`, 'highlight');
+                        this.log(`${player.name}志继觉醒！减1点体力上限，获得观星，摸3张牌`, 'highlight');
                     }
                     break;
                 case '凿险':
-                    // 邓艾觉醒技：体力=1时觉醒，获得屯田
+                    // 邓艾觉醒技：体力=1时减1点体力上限，获得"屯田"（每回合开始摸1张）
                     if (player.hp === 1 && !player.skills.some(s => s.name === '凿险觉醒')) {
                         player.skills.push({ name: '凿险觉醒', type: 'locked', desc: '觉醒技，体力=1时获得"屯田"' });
                         player.maxHp -= 1;
                         if (player.hp > player.maxHp) player.hp = player.maxHp;
-                        // 获得屯田效果：每回合开始时摸一张牌
-                        player.skillStates = player.skillStates || {};
-                        player.skillStates['屯田'] = true;
-                        this.log(`${player.name}凿险觉醒！获得屯田`, 'highlight');
+                        // 持久标记：每回合开始摸1张牌（不能用 skillStates，因其每回合被重置）
+                        player.hasZaoXianTuntian = true;
+                        this.log(`${player.name}凿险觉醒！减1点体力上限，获得屯田`, 'highlight');
                     }
                     break;
                 case '若愚':
-                    // 刘禅觉醒技：体力=1时觉醒，获得享乐
+                    // 刘禅觉醒技：体力=1时回复1点并增加1点体力上限，获得享乐
                     if (player.hp === 1 && !player.skills.some(s => s.name === '若愚觉醒')) {
                         player.skills.push({ name: '若愚觉醒', type: 'locked', desc: '觉醒技，体力=1时获得"享乐"' });
-                        player.maxHp -= 1;
-                        if (player.hp > player.maxHp) player.hp = player.maxHp;
-                        this.log(`${player.name}若愚觉醒！获得享乐`, 'highlight');
+                        player.hp += 1;
+                        player.maxHp += 1;
+                        this.log(`${player.name}若愚觉醒！回复1点体力并增加1点体力上限，获得享乐`, 'highlight');
                     }
                     break;
                 case '屯田':

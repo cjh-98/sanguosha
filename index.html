@@ -217,20 +217,6 @@
         }
         .corner-top-right #plusMenuBtn:active { transform: scale(0.92); }
 
-        /* 全局全屏悬浮按钮（每页可见，右下角） */
-        .fab-fs {
-            position: fixed; bottom: 20px; right: 16px; z-index: 999;
-            width: 40px; height: 40px; border-radius: 50%;
-            background: linear-gradient(180deg, rgba(42,34,24,0.85), rgba(26,20,16,0.95));
-            border: 1.5px solid #8b6914; color: #e6c84d;
-            font-size: 18px;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-            -webkit-tap-highlight-color: transparent;
-        }
-        .fab-fs:active { transform: scale(0.9); }
-        .fab-fs.fullscreen-active { content: '⊠'; }  /* 全屏状态下显示退出图标 */
-
 
         /* 日志面板包裹层 - 右下角悬浮，在用户UI上方 */
         .log-panel-wrap {
@@ -491,6 +477,7 @@
         .myinfo { display:flex; align-items:center; padding:0 6px; gap:8px; flex-shrink:0; }
         /* 自己角色+血条：垂直堆叠在同一栏，宽度跟武将牌一致（血条在武将正下方） */
         .myinfo-left { display:flex; flex-direction:column; align-items:stretch; gap:3px; font-size:12px; cursor:pointer; }
+        #midBadge { display:none; }  /* 身份标记去掉，不占空间 */
         .my-name-hp { width:100%; text-align:center; }
         .mhn { color:#e6c84d; font-weight:bold; font-size:13px; text-shadow:0 1px 3px #000; line-height:1.2; }
         .mhp { font-size:13px; letter-spacing:1.5px; line-height:1.2; }
@@ -500,20 +487,22 @@
         .eqi { font-size:9px; padding:1px 6px; border-radius:4px; background:linear-gradient(135deg,rgba(0,0,0,0.5),rgba(0,0,0,0.3));
                border:1px solid #8b6914; color:#e6c84d; box-shadow:0 1px 2px rgba(0,0,0,0.3); }
 
-        /* 技能按钮（古风/篆刻风格） */
-        .skill-bar { display:flex; gap:6px; padding:3px; overflow-x:auto; flex-shrink:0; }
-        .skb { padding:4px 12px; font-size:12px; border:1px solid #8b6914; border-radius:14px;
+        /* 技能按钮（竖排，放在自己武将牌下方，不占横屏空间） */
+        .skill-bar { display:flex; flex-direction:column; gap:3px; padding:0; overflow-y:auto;
+            flex-shrink:1; max-height:calc(100vh - 320px); }
+        .skb { padding:3px 6px; font-size:11px; border:1px solid #8b6914; border-radius:8px;
                 background:linear-gradient(180deg,rgba(139,105,20,0.25),rgba(139,105,20,0.05));
                 color:#e6c84d; cursor:pointer; white-space:nowrap; flex-shrink:0;
                 text-shadow:0 1px 1px #000; transition:all 0.2s; font-weight:bold;
                 box-shadow:inset 0 1px 0 rgba(230,200,77,0.2), 0 1px 3px rgba(0,0,0,0.3);
-        }
+                text-overflow:ellipsis; overflow:hidden; text-align:center; }
         .skb.on { background:linear-gradient(180deg,rgba(230,200,77,0.35),rgba(230,200,77,0.15)); box-shadow:0 0 8px rgba(230,200,77,0.4), inset 0 1px 0 rgba(230,200,77,0.4); }
         .skb.on:active { transform:scale(0.95); }
         .skb:disabled { opacity:0.3; }
-        .skb-locked { padding:4px 10px; font-size:11px; color:#8b6914;
+        .skb-locked { padding:3px 6px; font-size:11px; color:#8b6914;
                     opacity:0.6; cursor:default; white-space:nowrap; flex-shrink:0;
-                    border:1px dashed rgba(139,105,20,0.3); border-radius:10px;
+                    border:1px dashed rgba(139,105,20,0.3); border-radius:8px;
+                    text-align:center; }
                     background:transparent; font-weight:normal; }
 
         /* 中央信息区 - 日志靠底，减少空白 */
@@ -809,7 +798,7 @@
             .mhp { font-size: 11px; }
             .card { width: 68px; height: 96px; }
             .hand-cards { min-height: 100px; gap: 2px; padding: 2px; }
-            .skb { padding: 3px 8px; font-size: 10px; }
+            .skb { padding: 2px 4px; font-size: 10px; border-radius:6px; }
         }
 
         /* 竖屏专项：横屏圆桌游戏在竖屏下极窄，需要极致压缩 */
@@ -960,11 +949,11 @@
                         <span class="mhn" id="mhn"></span>
                         <span class="mhp" id="mhp"></span>
                     </div>
+                    <div class="skill-bar" id="skillBar"></div>
                     <span id="midBadge"></span>
                 </div>
                 <div class="equip-zone" id="equipZone"></div>
             </div>
-            <div class="skill-bar" id="skillBar"></div>
             <div class="hand-cards" id="handCards"></div>
         </div>
     </div>
@@ -1043,22 +1032,23 @@
     </div>
 </div>
 
-    <!-- 四角浮按钮（仿官方三国杀移动版）——放在 #app 内保证 position:fixed 真正脱离游戏区文档流 -->
-    <button class="corner-help" onclick="showRoleHelp()" title="身份说明">?</button>
-    <div class="corner-top-right">
-        <span id="deckInfo"></span>
-        <div class="plus-wrap">
-            <button id="plusMenuBtn" onclick="togglePlusMenu(event)" title="菜单">+</button>
-            <div class="plus-menu" id="plusMenu">
-                <button class="plus-menu-item" onclick="toggleGameLog();togglePlusMenu()">📜&nbsp;牌局记录</button>
-                <button class="plus-menu-item" onclick="submitBugLog();togglePlusMenu()">🐛&nbsp;提交Bug</button>
-                <button class="plus-menu-item" onclick="toggleFullscreen();togglePlusMenu()">⛶&nbsp;全屏 / 退出全屏</button>
-                <button class="plus-menu-item" onclick="confirmQuit();togglePlusMenu()">退出当前对局</button>
-                <button class="plus-menu-item" onclick="if(confirm('确定返回主菜单？')){quitToMenu();togglePlusMenu()}">←&nbsp;返回主菜单</button>
+    <!-- 四角浮按钮（仿官方三国杀移动版）——开局隐藏，进游戏才显示 -->
+    <div id="cornerWrap" style="display:none">
+        <button class="corner-help" onclick="showRoleHelp()" title="身份说明">?</button>
+        <div class="corner-top-right">
+            <span id="deckInfo"></span>
+            <div class="plus-wrap">
+                <button id="plusMenuBtn" onclick="togglePlusMenu(event)" title="菜单">+</button>
+                <div class="plus-menu" id="plusMenu">
+                    <button class="plus-menu-item" onclick="toggleGameLog();togglePlusMenu()">📜&nbsp;牌局记录</button>
+                    <button class="plus-menu-item" onclick="submitBugLog();togglePlusMenu()">🐛&nbsp;提交Bug</button>
+                    <button class="plus-menu-item" onclick="toggleFullscreen();togglePlusMenu()">⛶&nbsp;全屏 / 退出全屏</button>
+                    <button class="plus-menu-item" onclick="confirmQuit();togglePlusMenu()">退出当前对局</button>
+                    <button class="plus-menu-item" onclick="if(confirm('确定返回主菜单？')){quitToMenu();togglePlusMenu()}">←&nbsp;返回主菜单</button>
+                </div>
             </div>
         </div>
     </div>
-    <button class="fab-fs" id="fabFullscreen" onclick="toggleFullscreen()" title="全屏">⛶</button>
 
 </div><!-- end app -->
 
@@ -1265,6 +1255,11 @@ function showScreen(id){
     }
     Logger.currentScreen = id;
     Logger.action('切换屏幕 → ' + id);
+    // 角按钮只在游戏内显示
+    const cw = document.getElementById('cornerWrap');
+    if(cw) cw.style.display = (id==='gameScreen') ? '' : 'none';
+    const fab = document.getElementById('fabFullscreen');
+    if(fab) fab.style.display = 'none';  // 去掉了右下角悬浮全屏，用 + 菜单代替
     if(id==='gameScreen'){
         enforceGameAspect();
         // 手机上进入游戏时自动尝试全屏（必须在用户点击手势的同步调用栈内——不能 setTimeout，否则会断手势链）
@@ -1362,10 +1357,8 @@ function toggleFullscreen(){
 }
 function updateFullscreenBtn(){
     const btn = document.getElementById('fullscreenBtn');
-    const fab = document.getElementById('fabFullscreen');
     const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
-    if(btn){ btn.textContent = isFs ? '⛶✓' : '⛶'; btn.title = isFs ? '退出全屏' : '全屏游戏'; }
-    if(fab){ fab.textContent = isFs ? '⊠' : '⛶'; fab.title = isFs ? '退出全屏' : '全屏'; }
+    if(btn){ btn.textContent = isFs ? '⊠' : '⛶'; btn.title = isFs ? '退出全屏' : '全屏游戏'; }
 }
 document.addEventListener('fullscreenchange', updateFullscreenBtn);
 document.addEventListener('webkitfullscreenchange', updateFullscreenBtn);
@@ -1385,22 +1378,35 @@ document.addEventListener('click', function(e){
     m.classList.remove('open');
 });
 
-// 左上「?」按钮：弹出身份/阵营说明（仿官方三国杀移动版）
+// 左上「?」按钮：弹出身份/阵营说明（不用 alert，避免退出全屏）——仿三方杀官方面板
 function showRoleHelp(){
-    let msg = '主公 ×1　忠臣 ×2　反贼 ×4　内奸 ×1\n\n找出反贼队友，全力击败忠公。';
+    const old = document.getElementById('roleHelpBox');
+    if(old){ old.remove(); return; }
+    let msg = '主公 ×1　忠臣 ×2　反贼 ×4　内奸 ×1\n找出反贼队友，全力击败忠公。';
     try{
         if(typeof engine!=='undefined' && engine.getHumanPlayer){
             const me = engine.getHumanPlayer();
             if(me && me.identity){
                 const id = me.identity;
-                if(id==='lord')  msg = '你是【主公】\n找出忠臣，击败反贼和内奸。';
-                else if(id==='loyal') msg = '你是【忠臣】\n保护主公，击败反贼和内奸。';
-                else if(id==='rebel') msg = '你是【反贼】\n击杀主公。';
-                else if(id==='spy')   msg = '你是【内奸】\n最后存活者胜。';
+                if(id==='lord')  msg = '主公\n找出忠臣，击败反贼&内奸。';
+                else if(id==='loyal') msg = '忠臣\n保护主公，击败反贼&内奸。';
+                else if(id==='rebel') msg = '反贼\n击杀主公。';
+                else if(id==='spy')   msg = '内奸\n最后存活者胜。';
             }
         }
     }catch(e){}
-    alert(msg);
+    const box = document.createElement('div');
+    box.id = 'roleHelpBox';
+    box.innerHTML = `<div style="padding:10px;font-size:13px;line-height:1.6;white-space:pre-wrap;color:#d4b86a">${msg}</div>
+        <button onclick="document.getElementById('roleHelpBox')?.remove()" style="position:absolute;top:2px;right:4px;background:0;border:0;color:#8b6914;font-size:16px;cursor:pointer">✕</button>`;
+    box.style.cssText = 'position:fixed;top:44px;left:8px;z-index:999;background:linear-gradient(180deg,#1a1410,#0d0a06);border:1px solid #8b6914;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.7);max-width:260px;';
+    document.body.appendChild(box);
+    // 点外面自动关
+    setTimeout(()=>{
+        document.addEventListener('click', function closeRole(e){
+            if(!box.contains(e.target)){ box.remove(); document.removeEventListener('click', closeRole); }
+        });
+    }, 50);
 }
 
 // ---- 导航函数（被HTML按钮调用） ----
@@ -4667,7 +4673,7 @@ function showBugReportModal() {
             </div>
             
             <div style="display:flex;gap:10px;justify-content:center;">
-                <button onclick="this.closest('div').parentElement.remove(); document.getElementById('cardSelOverlay').style.display='none';" style="padding:10px 16px;border:1px solid #444;border-radius:4px;background:#222;color:#f0f0f0;cursor:pointer;">取消</button>
+                <button onclick="document.getElementById('bugReportModal')?.remove()" style="padding:10px 16px;border:1px solid #444;border-radius:4px;background:#222;color:#f0f0f0;cursor:pointer;">取消</button>
                 <button id="submitBugBtn" style="padding:10px 16px;border:1px solid #c41e3a;border-radius:4px;background:rgba(196,30,58,0.2);color:#c41e3a;cursor:pointer;font-weight:bold;">📤 提交日志</button>
             </div>
         </div>

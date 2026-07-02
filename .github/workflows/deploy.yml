@@ -1,31 +1,36 @@
-name: Deploy to GitHub Pages
+name: Sync to gh-pages
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  deploy:
+  sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
-      - name: Debug repo info
+      - name: Sync working tree into gh-pages
         run: |
-          echo "=== Remote URLs ==="
-          git remote -v
-          echo "=== Branches ==="
-          git branch -a
-          echo "=== Current HEAD ==="
-          git log --oneline -1
-
-      - name: Deploy to gh-pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: .
-          publish_branch: gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin gh-pages
+          git checkout -B gh-pages origin/gh-pages
+          # 用 main 的工作区文件覆盖，但保留 gh-pages 特有的文件（如有）
+          git checkout main -- .
+          if [ -f .nojekyll ]; then :; fi
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to sync"
+          else
+            git commit -m "sync: update gh-pages from main"
+            git push origin gh-pages
+          fi

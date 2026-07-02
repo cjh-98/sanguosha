@@ -1207,7 +1207,7 @@ SGS.GameEngine = (function() {
                 }
             }
 
-            if (this.checkGameOver()) return;
+            if (this.checkGameOver()) { this.endGame(); return; }
             this.notifyState();
             this.nextTurn();
         }

@@ -2669,12 +2669,23 @@ SGS.GameEngine = (function() {
                             if (player.hp > 0) return;
                         }
                     }
-                    // 急救
+                    // 急救（人类与AI均可发动：将红色手牌当桃救濒死角色）
                     if (p.skills && p.skills.some(s => s.name === '急救')) {
-                        const redCard = p.handCards.find(c => c.suit === 'heart' || c.suit === 'diamond');
-                        if (redCard) {
-                            if (p.isAI && this.ai && this.ai.shouldSaveTeammate(p, player, this)) {
-                                this.discardCard(p, redCard);
+                        const redCards = p.handCards.filter(c => c.suit === 'heart' || c.suit === 'diamond');
+                        if (redCards.length > 0) {
+                            let useCard = null;
+                            if (p.isAI && this.ai) {
+                                if (this.ai.shouldSaveTeammate(p, player, this)) useCard = redCards[0];
+                            } else {
+                                const want = await this.askSkillConfirm(p, '急救',
+                                    `是否发动【急救】，将红色手牌当【桃】救${player.name}？`);
+                                if (want) {
+                                    const chosen = await this.chooseCard(p, redCards, '急救：选择当【桃】的红色牌');
+                                    if (chosen) useCard = chosen;
+                                }
+                            }
+                            if (useCard) {
+                                this.discardCard(p, useCard);
                                 this.heal(player, 1);
                                 this.log(`${p.name}发动急救救了${player.name}`, 'success');
                                 if (player.hp > 0) return;
@@ -3383,6 +3394,8 @@ SGS.GameEngine = (function() {
                                 this.log(`${player.name}发动火计，将红色牌当火攻使用`, 'highlight');
                                 const fakeHuogong = { ...card, name: '火攻(火计)', subtype: 'huogong', type: 'trick' };
                                 await this.resolveTrickCard(player, fakeHuogong, [target.id]);
+                                // 该"火攻"牌已使用，入弃牌堆（否则此牌凭空消失）
+                                this.discardPile.push(fakeHuogong);
                             }
                         }
                     }

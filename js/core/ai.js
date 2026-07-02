@@ -395,6 +395,21 @@ SGS.AI = (function() {
             return false;
         }
 
+        // ========== 主公技：是否替主公打出闪/无懈 ==========
+        shouldSaveLord(helper, lord, engine) {
+            if (!helper || !helper.isAlive || !lord || !lord.isAlive) return false;
+            // 忠心助手：在主公需要闪/无懈时替其打出（有对应牌即可替主公出）
+            return true;
+        }
+
+        // ========== 主动技能是否发动（AI决策） ==========
+        shouldUseSkill(player, skillName, engine) {
+            if (!player || !player.isAlive) return false;
+            // 大多数主动技能对AI有利，默认发动（除非游戏即将结束）
+            if (engine && engine.getAlivePlayers && engine.getAlivePlayers().length <= 1) return false;
+            return true;
+        }
+
         // ========== 选将决策 ==========
         chooseHero(availableHeroes, engine, playerIdx) {
             // AI优先选强力武将

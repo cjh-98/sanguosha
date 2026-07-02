@@ -302,9 +302,9 @@
         .players-arc-area {
             display: flex;
             justify-content: space-evenly;
-            align-items: flex-start;  /* 配合 JS margin-top：中间卡在顶、两边被推下来，形成弧形 */
-            gap: 0.6vw;
-            padding: 6px 1.2vw 4px;
+            align-items: flex-start;  /* 顶部对齐——所有武将牌 y=0 顶着屏幕最顶 */
+            gap: 0.4vw;
+            padding: 0 0.4vw 2px;     /* 关键：去掉原本 6px 的 top padding */
             flex-wrap: nowrap;  /* 不换行，保持一行排列 */
             z-index: 2;
             flex-shrink: 0;  /* 顶部对手区不被压缩 */
@@ -327,6 +327,12 @@
             transition:all 0.22s; flex-shrink:1; min-width:0;
             background:#2a2018;
             display:flex; flex-direction:column;
+        }
+        /* 两边武将牌变短（仿官方三国杀）：aspect-ratio 5/5 ≈ 1:1 正方形，
+           高度比中间武将（5/7 ≈ 1:1.4）矮，弧形靠"中间高两边矮"自然形成 */
+        .players-arc-area .hero-card:first-child,
+        .players-arc-area .hero-card:last-child {
+            aspect-ratio: 5 / 5;
         }
         .hero-card:hover { box-shadow:0 6px 22px rgba(230,200,77,0.25),0 4px 16px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(212,184,106,0.25), 0 0 0 1.5px rgba(230,200,77,0.3); }
         .hero-card:active { transform:scale(0.95); }
@@ -1268,10 +1274,10 @@ function showScreen(id){
     Logger.action('切换屏幕 → ' + id);
     if(id==='gameScreen'){
         enforceGameAspect();
-        // 手机上进入游戏时自动尝试全屏（在用户点击"进入游戏"的手势内，浏览器会放行）
+        // 手机上进入游戏时自动尝试全屏（必须在用户点击手势的同步调用栈内——不能 setTimeout，否则会断手势链）
         if(!(document.fullscreenElement||document.webkitFullscreenElement)){
             const isMob=/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            if(isMob) setTimeout(()=>toggleFullscreen(), 50);
+            if(isMob) toggleFullscreen();
         }
     }
 }
@@ -1960,15 +1966,8 @@ function _updateBoardImpl(state){
     if (arcArea) {
         // 计算弧形偏移：中间0，两边逐渐增加（使用margin-top）
         // 配合 align-items: flex-start，中间卡牌在顶，两边卡牌被推下来
-        const getArcOffset = (idx, total) => {
-            if (total <= 1) return 0;
-            const centerIdx = (total - 1) / 2;
-            const distanceFromCenter = Math.abs(idx - centerIdx);
-            const maxOffset = total <= 3 ? 25 : total <= 5 ? 30 : total <= 7 ? 35 : 40;
-            const normalizedDist = distanceFromCenter / centerIdx;
-            // 距离中心越远，偏移越大（推下来越多）
-            return Math.round(maxOffset * normalizedDist * normalizedDist);
-        };
+        // 弧形偏移：改为 0（弧形改用 CSS：边卡 aspect-ratio 5/5 变短，中间自然显得高）
+        const getArcOffset = (idx, total) => 0;
         // 移除缩放效果，保持卡牌大小一致
         const getArcScale = () => 1;
         let arcHtml = '';

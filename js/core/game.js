@@ -1169,6 +1169,18 @@ SGS.GameEngine = (function() {
                 this.log(`${player.name}发动【闭月】，摸了1张牌`, 'highlight');
             }
 
+            // 崩坏 (董卓) — 锁定技，回合结束若体力不是全场最少，失去1点体力
+            if (player.skills.some(s => s.name === '崩坏')) {
+                const minHp = Math.min(...this.getAlivePlayers().map(p => p.hp));
+                if (player.hp > minHp) {
+                    player.hp -= 1;
+                    this.log(`${player.name}崩坏：失去1点体力`, 'danger');
+                    if (player.hp <= 0) { await this.handleDying(player, player); }
+                } else {
+                    this.log(`${player.name}崩坏：体力已是最低，不触发`, 'normal');
+                }
+            }
+
             // 放权 (刘禅)：回合结束时弃一张牌，令一名角色进行一个额外回合
             if (player._fangquanPending && !this.gameOver && this.getAlivePlayers().length > 1) {
                 player._fangquanPending = false;
@@ -1698,22 +1710,7 @@ SGS.GameEngine = (function() {
                     }
                     break;
                 case 'shan':
-                    // 激将 (刘备 主公技): 需闪时请蜀势力角色打出闪
-                    if (player.isLord && player.skills.some(s => s.name === '激将') && player.faction === 'shu') {
-                        const shuHelpers = this.getAlivePlayers().filter(p => p.id !== player.id && p.faction === 'shu' && p.handCards.some(c => c.subtype === 'shan'));
-                        if (shuHelpers.length > 0) {
-                            for (const helper of shuHelpers) {
-                                const shan = helper.handCards.find(c => c.subtype === 'shan');
-                                if (shan) {
-                                    if (helper.isAI && this.ai && this.ai.shouldSaveLord(helper, player, this)) {
-                                        this.discardCard(helper, shan);
-                                        this.log(`${helper.name}激将：为${player.name}打出闪`, 'success');
-                                        return true;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    // 闪只能通过响应(requestResponse)打出；主公技(护驾/黄天)在 requestResponse 内处理
                     return false; // 闪只能响应打出
                     break;
                 case 'tao':
@@ -1832,52 +1829,6 @@ SGS.GameEngine = (function() {
                 } else {
                     this.log(`${source.name}没有基本牌，享乐使【杀】无效！`, 'danger');
                     return;
-                }
-                // 护驾 (曹操 主公技): 需闪时请魏势力角色打出闪
-                if (target.isLord && target.skills.some(s => s.name === '护驾') && target.faction === 'wei') {
-                    const weiHelpers = this.getAlivePlayers().filter(p => p.id !== target.id && p.faction === 'wei' && p.handCards.some(c => c.subtype === 'shan'));
-                    if (weiHelpers.length > 0) {
-                        let saved = false;
-                        for (const helper of weiHelpers) {
-                            const shan = helper.handCards.find(c => c.subtype === 'shan');
-                            if (shan) {
-                                if (helper.isAI && this.ai && this.ai.shouldSaveLord(helper, target, this)) {
-                                    this.discardCard(helper, shan);
-                                    this.log(`${helper.name}护驾：为${target.name}打出闪`, 'success');
-                                    saved = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if (!saved) {
-                            this.log(`${target.name}护驾：魏势力无人打出闪`, 'danger');
-                        }
-                    }
-                }
-                // 黄天 (张角 主公技): 需闪时令反贼角色打出闪
-                if (target.isLord && target.skills.some(s => s.name === '黄天') && target.faction === 'qun') {
-                    const rebelHelpers = this.getAlivePlayers().filter(p => p.id !== target.id && p.faction === 'rebel' && p.handCards.some(c => c.subtype === 'shan'));
-                    if (rebelHelpers.length > 0) {
-                        let saved = false;
-                        for (const helper of rebelHelpers) {
-                            const shan = helper.handCards.find(c => c.subtype === 'shan');
-                            if (shan) {
-                                if (helper.isAI && this.ai && this.ai.shouldSaveLord(helper, target, this)) {
-                                    this.discardCard(helper, shan);
-                                    this.log(`${helper.name}黄天：为${target.name}打出闪`, 'success');
-                                    saved = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if (!saved) {
-                            this.log(`${target.name}黄天：反贼无人打出闪`, 'danger');
-                        }
-                    }
-                }
-                // 制霸 (孙策 主公技): 吴势力角色可以对自己使用杀
-                if (target.isLord && target.skills.some(s => s.name === '制霸') && target.faction === 'wu' && source.faction === 'wu') {
-                    this.log(`${source.name}制霸：吴势力角色可以对${target.name}使用杀`, 'highlight');
                 }
             }
 
@@ -2386,6 +2337,21 @@ SGS.GameEngine = (function() {
             
             if (!player.isAlive) return null;
 
+            // 主公技：激将(蜀 需杀)/护驾(魏 需闪)/黄天(群 需闪) —— AI 同势力助手代主公打出
+            // 仅当主公自身没有对应的牌时才请助手代打（主公优先用自己的）
+            if (cardType === 'sha' && player.isLord && player.faction === 'shu' && player.skills.some(s => s.name === '激将') && !player.handCards.some(c => c.subtype === 'sha')) {
+                const c = this._provideLordCard(player, 'shu', 'sha');
+                if (c) return c;
+            }
+            if (cardType === 'shan' && player.isLord && player.faction === 'wei' && player.skills.some(s => s.name === '护驾') && !player.handCards.some(c => c.subtype === 'shan')) {
+                const c = this._provideLordCard(player, 'wei', 'shan');
+                if (c) return c;
+            }
+            if (cardType === 'shan' && player.isLord && player.faction === 'qun' && player.skills.some(s => s.name === '黄天') && !player.handCards.some(c => c.subtype === 'shan')) {
+                const c = this._provideLordCard(player, 'qun', 'shan');
+                if (c) return c;
+            }
+
             // 红颜 (小乔): 黑桃当红桃
             if (player.skills.some(s => s.name === '红颜')) {
                 // 在手牌检查时，黑桃视为红桃（简化：在canUseCard中处理）
@@ -2534,6 +2500,29 @@ SGS.GameEngine = (function() {
             }
 
             // 无闪/杀时，检查技能转化
+            return null;
+        }
+
+        // 主公技辅助：让同势力 AI 助手代主公打出一张【杀】或【闪】
+        // 返回该牌（由调用方负责入弃牌堆）；若无可用的 AI 助手则返回 null。
+        _provideLordCard(lord, faction, cardType) {
+            try {
+                const helpers = this.getAlivePlayers().filter(
+                    p => p.id !== lord.id && p.faction === faction && p.handCards.some(c => c.subtype === cardType)
+                );
+                for (const h of helpers) {
+                    if (h.isAI && this.ai && typeof this.ai.shouldSaveLord === 'function' && this.ai.shouldSaveLord(h, lord, this)) {
+                        const c = h.handCards.find(x => x.subtype === cardType);
+                        if (c) {
+                            const idx = h.handCards.indexOf(c);
+                            if (idx >= 0) h.handCards.splice(idx, 1);
+                            const label = faction === 'shu' ? '激将' : faction === 'wei' ? '护驾' : '黄天';
+                            this.log(`${h.name}${label}：为${lord.name}打出${cardType === 'sha' ? '杀' : '闪'}`, 'success');
+                            return c;
+                        }
+                    }
+                }
+            } catch (e) { console.error('_provideLordCard:', e); }
             return null;
         }
 
@@ -3516,6 +3505,7 @@ SGS.GameEngine = (function() {
                     }
                     break;
                 case '天义':
+                    if (player.skillStates && player.skillStates.tianyiUsed) return false;
                     if (params.targetId !== undefined) {
                         const target = this.players[params.targetId];
                         // 简化拼点
@@ -3531,10 +3521,13 @@ SGS.GameEngine = (function() {
                             }
                             this.discardCard(player, myCard);
                             this.discardCard(target, targetCard);
+                            player.skillStates = player.skillStates || {};
+                            player.skillStates.tianyiUsed = true;
                         }
                     }
                     break;
                 case '国色':
+                    if (player.skillStates && player.skillStates.guoseUsed) return false;
                     if (params.targetId !== undefined && params.card) {
                         const target = this.players[params.targetId];
                         const card = params.card;
@@ -3543,6 +3536,8 @@ SGS.GameEngine = (function() {
                             // 放置乐不思蜀
                             const lebu = { name: '乐不思蜀(国色)', subtype: 'lebusi' };
                             target.judgmentCards.push(lebu);
+                            player.skillStates = player.skillStates || {};
+                            player.skillStates.guoseUsed = true;
                             this.log(`${player.name}对${target.name}使用国色`, 'highlight');
                         }
                     }

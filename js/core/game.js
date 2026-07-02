@@ -1465,6 +1465,8 @@ SGS.GameEngine = (function() {
             let finalResult = this._guicaiFinalResult;
             const judgeCard = this._guicaiJudgeCard;
             const currentPlayer = this._guicaiPlayer; // 保存引用，因为后面会清理
+            // 先保留原判定牌引用（被替换的牌需入弃牌堆），清理后再读取就已为 null
+            const originalResult = this._guicaiOriginalResult;
 
             if (chosenCard) {
                 // 找到并移除选择的牌（从发动鬼才的玩家手中移除）
@@ -1484,8 +1486,8 @@ SGS.GameEngine = (function() {
             this._guicaiOriginalResult = null;
             this._guicaiFinalResult = null;
 
-            // 继续判定流程（传入player引用）
-            this._continueJudgeAfterSkill(judgeCard, finalResult, currentPlayer);
+            // 继续判定流程（传入player引用与被替换的原判定牌）
+            this._continueJudgeAfterSkill(judgeCard, finalResult, currentPlayer, originalResult);
         }
 
         // 人类玩家完成鬼道
@@ -1495,6 +1497,8 @@ SGS.GameEngine = (function() {
             let finalResult = this._guidaoFinalResult;
             const judgeCard = this._guidaoJudgeCard;
             const currentPlayer = this._guidaoPlayer; // 保存引用
+            // 先保留原判定牌引用（被替换的牌需入弃牌堆），清理后再读取就已为 null
+            const originalResult = this._guidaoOriginalResult;
 
             if (chosenCard && (chosenCard.suit === 'spade' || chosenCard.suit === 'club')) {
                 // 找到并移除选择的牌（从发动鬼道的玩家手中移除）
@@ -1514,20 +1518,19 @@ SGS.GameEngine = (function() {
             this._guidaoOriginalResult = null;
             this._guidaoFinalResult = null;
 
-            // 继续判定流程（传入player引用）
-            this._continueJudgeAfterSkill(judgeCard, finalResult, currentPlayer);
+            // 继续判定流程（传入player引用与被替换的原判定牌）
+            this._continueJudgeAfterSkill(judgeCard, finalResult, currentPlayer, originalResult);
         }
 
         // 继续判定流程（鬼才/鬼道之后）
-        async _continueJudgeAfterSkill(judgeCard, finalResult, currentPlayer) {
+        async _continueJudgeAfterSkill(judgeCard, finalResult, currentPlayer, originalResult) {
             const player = currentPlayer; // 使用传入的player引用
             if (!player) return;
 
-            // 将判定结果放入弃牌堆
+            // 将判定结果（被替换后的牌）放入弃牌堆
             this.discardPile.push(finalResult);
 
-            // 如果判定牌被替换（鬼才/鬼道），原始判定牌也要放入弃牌堆
-            const originalResult = this._guicaiOriginalResult || this._guidaoOriginalResult;
+            // 如果判定牌被替换（鬼才/鬼道），被替换掉的原判定牌也要放入弃牌堆，避免凭空消失
             if (originalResult && originalResult !== finalResult) {
                 this.discardPile.push(originalResult);
             }
@@ -2494,6 +2497,15 @@ SGS.GameEngine = (function() {
                     return redCard;
                 }
             }
+            // 龙胆：将【闪】当【杀】打出（应对南蛮入侵/决斗/借刀杀人等需出杀的场景）
+            if (cardType === 'sha' && player.skills.some(s => s.name === '龙胆')) {
+                const shan = player.handCards.find(c => c.subtype === 'shan');
+                if (shan) {
+                    this.discardCard(player, shan);
+                    this.log(`${player.name}发动龙胆，将闪当杀`, 'success');
+                    return shan;
+                }
+            }
             // 急救
             if (cardType === 'tao' && player.skills.some(s => s.name === '急救')) {
                 const redCard = player.handCards.find(c => c.suit === 'heart' || c.suit === 'diamond');
@@ -3386,7 +3398,8 @@ SGS.GameEngine = (function() {
                     }
                     break;
                 case '驱虎':
-                    // 荀彧：与目标拼点，赢则对其攻击范围内一名角色造成1点伤害
+                    // 荀彧：与目标拼点，赢则对其攻击范围内一名角色造成1点伤害（出牌阶段限一次）
+                    if (player.skillStates && player.skillStates.qutigerUsed) return false;
                     if (params.targetId !== undefined) {
                         const target = this.players[params.targetId];
                         if (player.handCards.length > 0 && target.handCards.length > 0) {
@@ -3394,18 +3407,18 @@ SGS.GameEngine = (function() {
                             const targetCard = target.handCards[Math.floor(Math.random() * target.handCards.length)];
                             this.log(`${player.name}驱虎：${myCard.number} vs ${targetCard.number}`, 'normal');
                             if (myCard.number > targetCard.number) {
-                                // 赢：对【自己】攻击范围内的一名角色造成1点伤害
+                                // 赢：对【对手】攻击范围内的一名角色造成1点伤害（而非荀彧本人的攻击范围）
                                 const targetsInRange = this.getAlivePlayers().filter(p => 
-                                    p.id !== player.id && this.getDistance(player, p) <= player.weaponRange
+                                    p.id !== player.id && this.getDistance(target, p) <= target.weaponRange
                                 );
                                 if (targetsInRange.length > 0) {
                                     const damaged = targetsInRange[0]; // 简化：选第一个
                                     await this.dealDamage(damaged, 1, { source: player });
-                                    this.log(`${target.name}拼点失败，${damaged.name}受到1点伤害`, 'danger');
+                                    this.log(`驱虎：拼点获胜，${damaged.name}受到1点伤害`, 'danger');
                                 } else {
-                                    // 无人在攻击范围内，打对手自己
+                                    // 对手攻击范围内无人，直接对对手造成伤害
                                     await this.dealDamage(target, 1, { source: player });
-                                    this.log(`${target.name}拼点失败，受到1点伤害`, 'danger');
+                                    this.log(`驱虎：拼点获胜，范围内无目标，${target.name}受到1点伤害`, 'danger');
                                 }
                             } else {
                                 await this.dealDamage(player, 1, { source: player });
@@ -3413,6 +3426,9 @@ SGS.GameEngine = (function() {
                             }
                             this.discardCard(player, myCard);
                             this.discardCard(target, targetCard);
+                            // 仅在实际发生拼点后标记本回合已用（出牌阶段限一次）
+                            player.skillStates = player.skillStates || {};
+                            player.skillStates.qutigerUsed = true;
                         }
                     }
                     break;

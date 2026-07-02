@@ -566,7 +566,7 @@ SGS.GameEngine = (function() {
 
         // 获取技能描述文本（从英雄定义中查找）
         getSkillDesc(heroId, skillName) {
-            const hero = SGS.HeroData.list.find(h => h.id === heroId);
+            const hero = SGS.HeroData.heroes.find(h => h.id === heroId);
             if (!hero) return '';
             const sk = (hero.skills || []).find(s => s.name === skillName);
             return sk ? sk.desc : '';
@@ -2167,12 +2167,16 @@ SGS.GameEngine = (function() {
                     }
                     return null;
                 }
-                // 人类玩家响应（由UI处理）
-                // 简化：如果是人类玩家的防守，自动打出
-                const hasCard = player.handCards.find(c => c.subtype === cardType);
-                if (hasCard && !player.isAI) {
-                    this.discardCard(player, hasCard);
-                    return hasCard;
+                // 人类玩家：若没有可发动的技能转化（倾国/龙胆/武圣/急救），则自动打出
+                // 否则交给下方的技能触发流程由玩家确认是否发动技能
+                const canSkillConvert =
+                    (cardType === 'shan' && player.skills.some(s => s.name === '倾国')) ||
+                    (cardType === 'shan' && player.skills.some(s => s.name === '龙胆')) ||
+                    (cardType === 'sha' && player.skills.some(s => s.name === '武圣')) ||
+                    (cardType === 'tao' && player.skills.some(s => s.name === '急救'));
+                if (!canSkillConvert) {
+                    this.discardCard(player, card);
+                    return card;
                 }
             }
 

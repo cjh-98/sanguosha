@@ -328,12 +328,6 @@
             background:#2a2018;
             display:flex; flex-direction:column;
         }
-        /* 两边武将牌变短（仿官方三国杀）：aspect-ratio 5/5 ≈ 1:1 正方形，
-           高度比中间武将（5/7 ≈ 1:1.4）矮，弧形靠"中间高两边矮"自然形成 */
-        .players-arc-area .hero-card:first-child,
-        .players-arc-area .hero-card:last-child {
-            aspect-ratio: 5 / 5;
-        }
         .hero-card:hover { box-shadow:0 6px 22px rgba(230,200,77,0.25),0 4px 16px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(212,184,106,0.25), 0 0 0 1.5px rgba(230,200,77,0.3); }
         .hero-card:active { transform:scale(0.95); }
         .hero-card.cur { box-shadow:0 0 24px rgba(230,180,60,0.85),0 0 0 3px #e6b43c,0 0 40px rgba(230,180,60,0.3); z-index:2; }
@@ -492,12 +486,14 @@
         .game-log-panel .log-highlight { color: #e6c84d; font-weight: bold; }
 
         .player-bottom { flex-shrink:0; width:100%; box-sizing:border-box; background:linear-gradient(180deg,rgba(0,0,0,0.7),rgba(0,0,0,0.5)); border-top:2px solid #8b6914; padding:5px 8px; }
-        .my-avatar { width:96px; height:128px; border-radius:6px; overflow:hidden; border:2px solid #8b6914; flex-shrink:0; box-shadow:0 2px 8px rgba(0,0,0,0.6),0 0 4px rgba(230,200,77,0.15); order:3; }
+        .my-avatar { width:96px; height:128px; border-radius:6px; overflow:hidden; border:2px solid #8b6914; flex-shrink:0; box-shadow:0 2px 8px rgba(0,0,0,0.6),0 0 4px rgba(230,200,77,0.15); }
         .my-avatar img { width:100%; height:100%; object-fit:cover; object-position:top center; }
-        .myinfo { display:flex; align-items:center; justify-content:space-between; padding:0 6px; gap:8px; }
-        .myinfo-left { display:flex; align-items:center; gap:9px; font-size:12px; white-space: nowrap; cursor:pointer; }
-        .mhn { color:#e6c84d; font-weight:bold; font-size:15px; text-shadow:0 1px 3px #000; }
-        .mhp { font-size:14px; letter-spacing:1.5px; }
+        .myinfo { display:flex; align-items:center; padding:0 6px; gap:8px; flex-shrink:0; }
+        /* 自己角色+血条：垂直堆叠在同一栏，宽度跟武将牌一致（血条在武将正下方） */
+        .myinfo-left { display:flex; flex-direction:column; align-items:stretch; gap:3px; font-size:12px; cursor:pointer; }
+        .my-name-hp { width:100%; text-align:center; }
+        .mhn { color:#e6c84d; font-weight:bold; font-size:13px; text-shadow:0 1px 3px #000; line-height:1.2; }
+        .mhp { font-size:13px; letter-spacing:1.5px; line-height:1.2; }
         .mhp .h-full { color:#e74c3c; text-shadow:0 0 4px rgba(231,76,60,0.6); }
         .mhp .h-empty { color:rgba(255,255,255,0.15); }
         .equip-zone { display:flex; gap:3px; flex-wrap:wrap; }
@@ -505,7 +501,7 @@
                border:1px solid #8b6914; color:#e6c84d; box-shadow:0 1px 2px rgba(0,0,0,0.3); }
 
         /* 技能按钮（古风/篆刻风格） */
-        .skill-bar { display:flex; gap:6px; padding:3px; overflow-x:auto; flex-shrink:0; order:1; }
+        .skill-bar { display:flex; gap:6px; padding:3px; overflow-x:auto; flex-shrink:0; }
         .skb { padding:4px 12px; font-size:12px; border:1px solid #8b6914; border-radius:14px;
                 background:linear-gradient(180deg,rgba(139,105,20,0.25),rgba(139,105,20,0.05));
                 color:#e6c84d; cursor:pointer; white-space:nowrap; flex-shrink:0;
@@ -533,14 +529,13 @@
         }
 
         /* 卡牌（正版三国杀卡牌风格 - 参考官方手牌设计） */
-        /* 所有手牌共用一个大边框 */
+        /* 所有手牌共用一个大边框——占满自己角色和技能栏之外的所有空间 */
         .hand-cards {
             display:flex; gap:2px; overflow-x:auto;
-            padding:2px 4px; min-height:108px; align-items:center;
+            padding:2px 4px; min-height:108px; align-items:center; justify-content:center;
             background:linear-gradient(180deg, rgba(0,0,0,0.6), rgba(20,15,10,0.7));
-            border-radius:6px; order:2;
+            border-radius:6px; flex:1; min-width:0;
             box-shadow:inset 0 0 8px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.4);
-            margin:0 auto; width:fit-content; max-width:100%;
         }
         
         /* 弹窗相关 */
@@ -943,19 +938,6 @@
 
 <!-- ===== 游戏桌面（横屏圆桌风格） ===== -->
 <div id="gameScreen" class="screen">
-    <!-- 四角浮按钮（仿官方三国杀移动版） -->
-    <button class="corner-help" onclick="showRoleHelp()" title="身份说明">?</button>
-    <div class="corner-top-right">
-        <span id="deckInfo"></span>
-        <div class="plus-wrap">
-            <button id="plusMenuBtn" onclick="togglePlusMenu(event)" title="菜单">+</button>
-            <div class="plus-menu" id="plusMenu">
-                <button class="plus-menu-item" onclick="toggleFullscreen();togglePlusMenu()">⛶&nbsp;全屏 / 退出全屏</button>
-                <button class="plus-menu-item" onclick="confirmQuit();togglePlusMenu()">退出当前对局</button>
-                <button class="plus-menu-item" onclick="if(confirm('确定返回主菜单？')){quitToMenu();togglePlusMenu()}">←&nbsp;返回主菜单</button>
-            </div>
-        </div>
-    </div>
     <div class="topbar">
         <div class="topbar-info">
             <button class="btn-sm" onclick="if(confirm('确定退出当前对局？'))quitToMenu()" style="margin-right:6px">←返回</button>
@@ -984,10 +966,6 @@
             </div>
             <div class="skill-bar" id="skillBar"></div>
             <div class="hand-cards" id="handCards"></div>
-            <div class="action-bar" id="actionBar">
-                <button class="log-toggle-btn" onclick="toggleGameLog()">📜 牌局记录</button>
-                <button class="btn-submit-log" onclick="submitBugLog()">🐛 提交Bug</button>
-            </div>
         </div>
     </div>
     <!-- 日志面板：fixed 浮在屏幕右下角手牌区上方（不占文档流） -->
@@ -1065,9 +1043,24 @@
     </div>
 </div>
 
-</div><!-- end app -->
+    <!-- 四角浮按钮（仿官方三国杀移动版）——放在 #app 内保证 position:fixed 真正脱离游戏区文档流 -->
+    <button class="corner-help" onclick="showRoleHelp()" title="身份说明">?</button>
+    <div class="corner-top-right">
+        <span id="deckInfo"></span>
+        <div class="plus-wrap">
+            <button id="plusMenuBtn" onclick="togglePlusMenu(event)" title="菜单">+</button>
+            <div class="plus-menu" id="plusMenu">
+                <button class="plus-menu-item" onclick="toggleGameLog();togglePlusMenu()">📜&nbsp;牌局记录</button>
+                <button class="plus-menu-item" onclick="submitBugLog();togglePlusMenu()">🐛&nbsp;提交Bug</button>
+                <button class="plus-menu-item" onclick="toggleFullscreen();togglePlusMenu()">⛶&nbsp;全屏 / 退出全屏</button>
+                <button class="plus-menu-item" onclick="confirmQuit();togglePlusMenu()">退出当前对局</button>
+                <button class="plus-menu-item" onclick="if(confirm('确定返回主菜单？')){quitToMenu();togglePlusMenu()}">←&nbsp;返回主菜单</button>
+            </div>
+        </div>
+    </div>
+    <button class="fab-fs" id="fabFullscreen" onclick="toggleFullscreen()" title="全屏">⛶</button>
 
-<button class="fab-fs" id="fabFullscreen" onclick="toggleFullscreen()" title="全屏">⛶</button>
+</div><!-- end app -->
 
 <!-- JS文件按顺序加载 -->
 <script src="js/data/cards.js?v=20260701"></script>
@@ -1966,8 +1959,16 @@ function _updateBoardImpl(state){
     if (arcArea) {
         // 计算弧形偏移：中间0，两边逐渐增加（使用margin-top）
         // 配合 align-items: flex-start，中间卡牌在顶，两边卡牌被推下来
-        // 弧形偏移：改为 0（弧形改用 CSS：边卡 aspect-ratio 5/5 变短，中间自然显得高）
-        const getArcOffset = (idx, total) => 0;
+        // 弧形偏移：中间 0，两边逐渐增加（用 margin-top）——配合 align-items: flex-start，
+        // 中间武将牌在屏幕最顶端，两边被推下来，自然留出左上/右上角给角按钮。
+        const getArcOffset = (idx, total) => {
+            if (total <= 1) return 0;
+            const centerIdx = (total - 1) / 2;
+            const distanceFromCenter = Math.abs(idx - centerIdx);
+            const maxOffset = total <= 3 ? 25 : total <= 5 ? 30 : total <= 7 ? 35 : 40;
+            const normalizedDist = distanceFromCenter / centerIdx;
+            return Math.round(maxOffset * normalizedDist * normalizedDist);
+        };
         // 移除缩放效果，保持卡牌大小一致
         const getArcScale = () => 1;
         let arcHtml = '';

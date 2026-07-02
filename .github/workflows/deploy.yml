@@ -1,4 +1,4 @@
-name: Sync to gh-pages
+name: Deploy to GitHub Pages
 
 on:
   push:
@@ -6,31 +6,32 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
-  sync:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout main
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
 
-      - name: Sync working tree into gh-pages
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin gh-pages
-          git checkout -B gh-pages origin/gh-pages
-          # 用 main 的工作区文件覆盖，但保留 gh-pages 特有的文件（如有）
-          git checkout main -- .
-          if [ -f .nojekyll ]; then :; fi
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No changes to sync"
-          else
-            git commit -m "sync: update gh-pages from main"
-            git push origin gh-pages
-          fi
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "."
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

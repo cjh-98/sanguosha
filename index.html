@@ -1183,20 +1183,19 @@ function enforceGameAspect(){
     const h = window.innerHeight;
     
     if (isMobile) {
-        // 手机上：旋转90度显示横屏游戏
-        // 画面尺寸：宽=h（屏幕高度变成宽度），高=w（屏幕宽度变成高度）
-        // 旋转90度后，画面会超出屏幕，需要调整位置
-        gs.style.width = h + 'px';
-        gs.style.height = w + 'px';
-        // 旋转90度，然后平移到正确位置
-        // 旋转后画面的左上角会移动到 (h, 0) 的位置
-        // 需要把它移回来让画面显示在屏幕内
-        gs.style.transform = `rotate(90deg) translate(${-w}px, 0)`;
+        // 手机端：不再做「旋转 90° 强制横屏」！
+        // 旧实现用 rotate(90deg) translate(-w,0) 把整块 #gameScreen 平移到了
+        // 视口左侧屏幕外（x<0），导致棋盘/武将牌/手牌全部不可见，
+        // 只剩 position:fixed 居中、不受旋转影响的出牌动画能看到（即用户说的「只能看到出牌动作」）。
+        // 现在直接让画面正常填满视口，配合下方 @media 竖屏响应式布局即可正常显示与操作。
+        gs.style.width = '100%';
+        gs.style.height = '100%';
+        gs.style.transform = 'none';
         gs.style.transformOrigin = 'top left';
-        gs.style.position = 'absolute';
+        gs.style.position = 'relative';
         gs.style.left = '0';
         gs.style.top = '0';
-        
+
     } else {
         // 桌面端：填满整个可用空间
         const app = document.getElementById('app');

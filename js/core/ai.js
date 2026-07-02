@@ -205,21 +205,18 @@ SGS.AI = (function() {
                     return c.type === 'equip' && player.equipment[c.slot];
                 });
                 if (uselessCards.length >= 2) {
-                    player.skillStates.zhihengUsed = true;
                     return { type: 'useSkill', skillName: '制衡', params: { cards: uselessCards } };
                 }
                 // 手牌多于体力时制衡
                 if (handCards.length > player.hp + 2) {
-                    player.skillStates.zhihengUsed = true;
                     const toDiscard = handCards.slice(0, handCards.length - player.hp);
                     return { type: 'useSkill', skillName: '制衡', params: { cards: toDiscard } };
                 }
             }
 
             // 苦肉：黄盖
-            if (player.skills.some(s => s.name === '苦肉') && player.hp >= 1 && 
+            if (player.skills.some(s => s.name === '苦肉') && player.hp >= 1 &&
                 !player.skillStates.kuruUsed && handCards.length < 3) {
-                player.skillStates.kuruUsed = true;
                 return { type: 'useSkill', skillName: '苦肉', params: {} };
             }
 
@@ -227,7 +224,6 @@ SGS.AI = (function() {
             if (player.skills.some(s => s.name === '反间') && !player.skillStates.fanjianUsed) {
                 const targets = engine.getAttackTargets(player);
                 if (targets.length > 0) {
-                    player.skillStates.fanjianUsed = true;
                     return { type: 'useSkill', skillName: '反间', params: { targetId: targets[0].id } };
                 }
             }
@@ -238,7 +234,6 @@ SGS.AI = (function() {
                 if (injured.length > 0 && handCards.length > 2) {
                     const target = injured.find(p => p.id === player.id) || injured[0];
                     if (target) {
-                        player.skillStates.qingnangUsed = true;
                         return { type: 'useSkill', skillName: '青囊', params: { targetId: target.id, card: handCards[0] } };
                     }
                 }
@@ -248,7 +243,6 @@ SGS.AI = (function() {
             if (player.skills.some(s => s.name === '仁德') && !player.skillStates.rendeUsed && handCards.length >= 3) {
                 const injuredAllies = this.findAllies(player, engine).filter(p => p.hp < p.maxHp);
                 if (injuredAllies.length > 0) {
-                    player.skillStates.rendeUsed = true;
                     const cards = handCards.slice(0, 2);
                     return { type: 'useSkill', skillName: '仁德', params: { targetId: injuredAllies[0].id, cards } };
                 }
@@ -259,7 +253,6 @@ SGS.AI = (function() {
                 player.gender === 'female' && handCards.length >= 3) {
                 const males = engine.getAlivePlayers().filter(p => p.gender === 'male' && p.hp < p.maxHp);
                 if (males.length > 0 && player.hp < player.maxHp) {
-                    player.skillStates.jieyinUsed = true;
                     return { type: 'useSkill', skillName: '结姻', params: { targetId: males[0].id, cards: [handCards[0], handCards[1]] } };
                 }
             }
@@ -269,7 +262,6 @@ SGS.AI = (function() {
                 player.gender === 'female' && handCards.length >= 2) {
                 const males = engine.getAlivePlayers().filter(p => p.gender === 'male' && p.id !== player.id);
                 if (males.length >= 2) {
-                    player.skillStates.lijianUsed = true;
                     return { type: 'useSkill', skillName: '离间', params: { targetId: males[0].id, targetId2: males[1].id, card: handCards[0] } };
                 }
             }
@@ -278,7 +270,6 @@ SGS.AI = (function() {
             if (player.skills.some(s => s.name === '强袭') && !player.skillStates.qiangxiUsed) {
                 const targets = engine.getAttackTargets(player);
                 if (targets.length > 0 && targets[0].hp <= 2) {
-                    player.skillStates.qiangxiUsed = true;
                     return { type: 'useSkill', skillName: '强袭', params: { targetId: targets[0].id } };
                 }
             }
@@ -286,7 +277,6 @@ SGS.AI = (function() {
             // 据守
             if (player.skills.some(s => s.name === '据守') && !player.skillStates.jushouUsed &&
                 player.hp > 2 && handCards.length < 3) {
-                player.skillStates.jushouUsed = true;
                 return { type: 'useSkill', skillName: '据守', params: {} };
             }
 
@@ -371,6 +361,16 @@ SGS.AI = (function() {
                 if (shaCount >= 2) return true;
                 // 如果是南蛮且血量健康
                 if (player.hp > 2) return true;
+                return false;
+            }
+
+            // 倾国（甄姬）：有黑色手牌则当作闪打出
+            if (cardType === 'qinged') {
+                const blackCards = player.handCards.filter(c => c.suit === 'spade' || c.suit === 'club');
+                if (blackCards.length > 0) {
+                    // 血少时更倾向保留黑色牌，但一般情况下都打出
+                    return player.hp > 1;
+                }
                 return false;
             }
             

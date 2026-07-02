@@ -321,7 +321,7 @@
         }
         /* 武将牌（正版风格）- 带立绘的卡片 */
         .hero-card {
-            width:clamp(72px, 8.5vw, 104px); aspect-ratio: 5 / 7; cursor:pointer;
+            width:clamp(90px, 10vw, 120px); aspect-ratio: 5 / 7; cursor:pointer;
             border-radius:6px; overflow:hidden;
             box-shadow:0 4px 16px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(212,184,106,0.25), 0 0 0 1.5px rgba(230,200,77,0.3);
             transition:all 0.22s; flex-shrink:1; min-width:0;
@@ -486,7 +486,7 @@
         .game-log-panel .log-highlight { color: #e6c84d; font-weight: bold; }
 
         .player-bottom { flex-shrink:0; width:100%; box-sizing:border-box; background:linear-gradient(180deg,rgba(0,0,0,0.7),rgba(0,0,0,0.5)); border-top:2px solid #8b6914; padding:5px 8px; }
-        .my-avatar { width:80px; height:108px; border-radius:6px; overflow:hidden; border:2px solid #8b6914; flex-shrink:0; box-shadow:0 2px 8px rgba(0,0,0,0.6),0 0 4px rgba(230,200,77,0.15); order:3; }
+        .my-avatar { width:96px; height:128px; border-radius:6px; overflow:hidden; border:2px solid #8b6914; flex-shrink:0; box-shadow:0 2px 8px rgba(0,0,0,0.6),0 0 4px rgba(230,200,77,0.15); order:3; }
         .my-avatar img { width:100%; height:100%; object-fit:cover; object-position:top center; }
         .myinfo { display:flex; align-items:center; justify-content:space-between; padding:0 6px; gap:8px; }
         .myinfo-left { display:flex; align-items:center; gap:9px; font-size:12px; white-space: nowrap; cursor:pointer; }
@@ -791,7 +791,7 @@
             /* 对手武将牌区：进一步缩小，保证一行放下所有对手 */
             .players-arc-area { gap: 0.4vw; padding: 4px 0.5vw 2px; }
             /* 武将牌走基类 flex:1 1 0 平均铺满，不再单独写 width */
-            .hero-card { max-width: 100px; }
+            .hero-card { max-width: 110px; }
             .hc-name { font-size: 10px; }
             .hc-hp-icon { font-size: 8px; }
             .hc-hand { font-size: 8px; }
@@ -1898,13 +1898,21 @@ function startPlayGame(){
             throw new Error(`玩家 ${missingHero.name} 没有武将！`);
         }
         
-        // 加超时监控：3秒后如果还在begin阶段说明卡住了
-        setTimeout(function(){
+        // 加超时监控：60秒后如果还在begin阶段说明卡住了
+        // 注意：AI的BEGIN阶段正常是瞬间完成，只有人类玩家等待观星等交互时才会停留
+        // 如果正在等待观星交互，不强制推进（由玩家自行操作）
+        const _beginGuard = function(){
             if(engine && engine.phase === SGS.Config.PHASE.BEGIN){
+                // 如果正在等待观星，重置定时器再等（不强制跳过玩家交互）
+                if(engine._waitingForGuanxing){
+                    setTimeout(_beginGuard, 30000);
+                    return;
+                }
                 Logger.warn('检测到回合卡在BEGIN阶段，强制推进');
                 try { engine.nextTurn(); } catch(e){ Logger.error('强制推进失败', e.stack); }
             }
-        }, 3000);
+        };
+        setTimeout(_beginGuard, 60000);
         
         engine.startGame();
         Logger.info('engine.startGame() 已返回');
@@ -2162,7 +2170,7 @@ function canUseCard(player,c){
 
 function renderSkills(human,state){
     const sb=document.getElementById('skillBar');
-    if(!human.hero||!human.hero.skills){sb.innerHTML='';return;}
+    if(!human.hero||!human.hero.skills){sb.innerHTML='';sb.style.display='none';return;}
     const isMyTurn=state.currentPlayerIdx===human.id;
     let skHtml='';
     for(const s of human.hero.skills){
@@ -2178,6 +2186,7 @@ function renderSkills(human,state){
         }
     }
     sb.innerHTML=skHtml;
+    sb.style.display=skHtml?'flex':'none';
 }
 function isSkillOk(player,skill,isTurn){
     // 被动技能不需要手动点击
@@ -2594,8 +2603,8 @@ function openGuanxing(){
     
     // 显示星牌供选择
     const cardsDiv=document.getElementById('guanxingCards');
-    // 打乱显示顺序（但记录原始顺序）
-    const displayOrder = [...Array(n).keys()].sort(() => Math.random() - 0.5);
+    // 按牌堆顺序显示（牌堆顶→牌堆底），玩家可以拖动调整顺序
+    const displayOrder = [...Array(n).keys()];
     window._guanxingDisplayOrder = displayOrder;
     window._guanxingCards = stars;
     window._guanxingOriginalOrder = [...Array(n).keys()];

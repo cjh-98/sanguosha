@@ -148,8 +148,8 @@
         /* 日志面板独立定位：用fixed浮在右下角手牌区上方，不占文档流 */
         #gameScreen > #logPanelWrap { position: fixed; right: 8px; bottom: 220px; z-index: 200; }
 
-        /* 顶部信息栏 */
-        .topbar { display:flex; width:100%; box-sizing:border-box; align-items:center; justify-content:space-between; padding:4px 10px;
+        /* 顶部信息栏 —— 仿官方三国杀移动版：顶栏整体隐藏，改用四角浮按钮 */
+        .topbar { display:none; width:100%; box-sizing:border-box; align-items:center; justify-content:space-between; padding:4px 10px;
             background:linear-gradient(180deg,#2a2218 0%,#1a1410 100%); border-bottom:2px solid #5c4a28;
             height:34px; flex-shrink:0; font-size:11px; white-space: nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.5); z-index: 100;
             position: relative; }
@@ -183,6 +183,39 @@
         }
         .plus-menu-item:last-child { border-bottom: 0; }
         .plus-menu-item:hover, .plus-menu-item:active { background: rgba(196,30,58,0.2); color: #e6c84d; }
+
+        /* ===== 四角浮按钮（仿官方三国杀移动版：顶栏去掉，按钮改放屏幕四角） ===== */
+        .corner-help {
+            position: fixed; top: 6px; left: 8px; z-index: 300;
+            width: 32px; height: 32px; border-radius: 50%;
+            background: linear-gradient(180deg, rgba(42,34,24,0.75), rgba(26,20,16,0.9));
+            border: 1.5px solid #5c4a28; color: #e6c84d;
+            font-size: 16px; font-weight: bold;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+            -webkit-tap-highlight-color: transparent;
+        }
+        .corner-help:active { transform: scale(0.92); }
+        .corner-top-right {
+            position: fixed; top: 6px; right: 8px; z-index: 300;
+            display: flex; align-items: center; gap: 6px;
+            background: linear-gradient(180deg, rgba(42,34,24,0.75), rgba(26,20,16,0.9));
+            border: 1.5px solid #5c4a28; border-radius: 18px;
+            padding: 2px 4px 2px 10px;
+        }
+        .corner-top-right #deckInfo {
+            color: #d4b86a; font-size: 11px; text-shadow: 0 1px 2px #000;
+            white-space: nowrap;
+        }
+        .corner-top-right .plus-wrap { position: relative; }
+        .corner-top-right #plusMenuBtn {
+            width: 26px; height: 26px; padding: 0; font-size: 16px; line-height: 1;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: linear-gradient(180deg,#3a3020,#251e12); color:#e6c84d;
+            border: 1px solid #5c4a28; border-radius: 50%;
+            cursor: pointer; -webkit-tap-highlight-color: transparent;
+        }
+        .corner-top-right #plusMenuBtn:active { transform: scale(0.92); }
 
 
         /* 日志面板包裹层 - 右下角悬浮，在用户UI上方 */
@@ -254,10 +287,10 @@
         /* 上方对手区域 - 弧形凸型布局（中间在顶，两边逐渐降低） */
         .players-arc-area {
             display: flex;
-            justify-content: space-between;  /* 均匀分布铺满整行 */
-            align-items: flex-end;  /* 底部对齐，两边武将牌更矮（仿官方三国杀） */
-            gap: 0.4vw;
-            padding: 4px 0.6vw;
+            justify-content: space-evenly;
+            align-items: flex-start;  /* 配合 JS margin-top：中间卡在顶、两边被推下来，形成弧形 */
+            gap: 0.6vw;
+            padding: 6px 1.2vw 4px;
             flex-wrap: nowrap;  /* 不换行，保持一行排列 */
             z-index: 2;
             flex-shrink: 0;  /* 顶部对手区不被压缩 */
@@ -269,26 +302,17 @@
             /* 弧形布局中的玩家卡片基础样式 */
             transform-origin: bottom center;
             transition: transform 0.3s ease;
-            flex-shrink: 0;
+            flex-shrink: 1;  /* 玩家多时允许压缩，避免整行溢出 */
             position: relative;
         }
         /* 武将牌（正版风格）- 带立绘的卡片 */
         .hero-card {
-            flex: 1 1 0;                /* 平均分满整行宽度，自适应玩家人数 */
-            min-width: 0;                /* 允许收缩到比内容更窄 */
-            max-width: 140px;            /* 不至于太宽 */
-            aspect-ratio: 5 / 7;         /* 竖版武将立绘 */
-            cursor: pointer; border-radius:6px; overflow:hidden;
+            width:clamp(72px, 8.5vw, 104px); aspect-ratio: 5 / 7; cursor:pointer;
+            border-radius:6px; overflow:hidden;
             box-shadow:0 4px 16px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(212,184,106,0.25), 0 0 0 1.5px rgba(230,200,77,0.3);
-            transition:all 0.22s;
+            transition:all 0.22s; flex-shrink:1; min-width:0;
             background:#2a2018;
             display:flex; flex-direction:column;
-        }
-        /* 两边武将牌变矮（仿官方三国杀），给顶部留出放按钮的空间 */
-        .players-arc-area .hero-card:first-child,
-        .players-arc-area .hero-card:last-child {
-            aspect-ratio: 5 / 5;        /* 接近正方形，明显比中间矮 */
-            max-height: 78%;
         }
         .hero-card:hover { box-shadow:0 6px 22px rgba(230,200,77,0.25),0 4px 16px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(212,184,106,0.25), 0 0 0 1.5px rgba(230,200,77,0.3); }
         .hero-card:active { transform:scale(0.95); }
@@ -899,23 +923,25 @@
 
 <!-- ===== 游戏桌面（横屏圆桌风格） ===== -->
 <div id="gameScreen" class="screen">
+    <!-- 四角浮按钮（仿官方三国杀移动版） -->
+    <button class="corner-help" onclick="showRoleHelp()" title="身份说明">?</button>
+    <div class="corner-top-right">
+        <span id="deckInfo"></span>
+        <div class="plus-wrap">
+            <button id="plusMenuBtn" onclick="togglePlusMenu(event)" title="菜单">+</button>
+            <div class="plus-menu" id="plusMenu">
+                <button class="plus-menu-item" onclick="toggleFullscreen();togglePlusMenu()">⛶&nbsp;全屏 / 退出全屏</button>
+                <button class="plus-menu-item" onclick="confirmQuit();togglePlusMenu()">退出当前对局</button>
+                <button class="plus-menu-item" onclick="if(confirm('确定返回主菜单？')){quitToMenu();togglePlusMenu()}">←&nbsp;返回主菜单</button>
+            </div>
+        </div>
+    </div>
     <div class="topbar">
         <div class="topbar-info">
             <button class="btn-sm" onclick="if(confirm('确定退出当前对局？'))quitToMenu()" style="margin-right:6px">←返回</button>
             <span id="turnInfo"></span>
             <span id="phaseInfo" class="topbar-phase"></span>
             <div class="phase-indicator" id="phaseIndicator"></div>
-        </div>
-        <div class="topbar-info">
-            <span id="deckInfo"></span>
-            <div class="plus-wrap">
-                <button id="plusMenuBtn" onclick="togglePlusMenu(event)" title="菜单">+</button>
-                <div class="plus-menu" id="plusMenu">
-                    <button class="plus-menu-item" onclick="toggleFullscreen();togglePlusMenu()">⛶&nbsp;全屏 / 退出全屏</button>
-                    <button class="plus-menu-item" onclick="confirmQuit();togglePlusMenu()">退出当前对局</button>
-                    <button class="plus-menu-item" onclick="if(confirm('确定返回主菜单？')){quitToMenu();togglePlusMenu()}">←&nbsp;返回主菜单</button>
-                </div>
-            </div>
         </div>
     </div>
     <!-- 弧形对手区域 - 渲染后由JS填充 -->
@@ -1336,6 +1362,24 @@ document.addEventListener('click', function(e){
     if(e.target && e.target.closest && e.target.closest('.plus-wrap')) return;
     m.classList.remove('open');
 });
+
+// 左上「?」按钮：弹出身份/阵营说明（仿官方三国杀移动版）
+function showRoleHelp(){
+    let msg = '主公 ×1　忠臣 ×2　反贼 ×4　内奸 ×1\n\n找出反贼队友，全力击败忠公。';
+    try{
+        if(typeof engine!=='undefined' && engine.getHumanPlayer){
+            const me = engine.getHumanPlayer();
+            if(me && me.identity){
+                const id = me.identity;
+                if(id==='lord')  msg = '你是【主公】\n找出忠臣，击败反贼和内奸。';
+                else if(id==='loyal') msg = '你是【忠臣】\n保护主公，击败反贼和内奸。';
+                else if(id==='rebel') msg = '你是【反贼】\n击杀主公。';
+                else if(id==='spy')   msg = '你是【内奸】\n最后存活者胜。';
+            }
+        }
+    }catch(e){}
+    alert(msg);
+}
 
 // ---- 导航函数（被HTML按钮调用） ----
 function goSetup(){ 

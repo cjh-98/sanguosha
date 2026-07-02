@@ -2196,8 +2196,8 @@ SGS.GameEngine = (function() {
 
                 case 'tiesuo': // 铁索连环
                     if (targets.length === 0) {
-                        // 重铸
-                        this.discardPile.push(card);
+                        // 重铸：铁索连环弃置后重摸一张。该牌统一由 resolveCard 在结算末尾入弃牌堆，
+                        // 此处若再入弃牌堆会导致同一张牌入两次（洗牌后出现重复牌），故不再重复处理。
                         this.drawCard(player, 1);
                         this.log(`${player.name}重铸了铁索连环`, 'normal');
                     } else {
@@ -2552,7 +2552,7 @@ SGS.GameEngine = (function() {
             }
             // 仁王盾：免疫黑杀
             if (player.equipment.armor && player.equipment.armor.subtype === 'renwang') {
-                if (card && card.subtype === 'sha' && (card.suit === 'spade' || card.suit === 'club') && element === 'normal') {
+                if (card && card.subtype === 'sha' && (card.suit === 'spade' || card.suit === 'club')) {
                     this.log(`${player.name}的仁王盾抵挡了黑色杀！`, 'success');
                     return;
                 }
@@ -2902,6 +2902,7 @@ SGS.GameEngine = (function() {
                         this.log(`${player.name}发动不屈！不屈牌：${card.name}(${card.number})`, 'highlight');
                         return;
                     } else {
+                        this.discardPile.push(card); // 不屈失败：揭示的牌不再作为不屈标记，应入弃牌堆，避免凭空消失
                         this.log(`${player.name}不屈失败（点数重复）`, 'danger');
                     }
                 }
@@ -2950,6 +2951,26 @@ SGS.GameEngine = (function() {
                             this.heal(player, extraHeal);
                             this.log(`${p.name}为${player.name}使用了桃`, 'success');
                             if (player.hp > 0) return;
+                        }
+                    }
+                    // 酒：濒死时可将【酒】当【桃】自救（仅限自身；契合卡面"濒死时使用回复1点体力"）
+                    const jiuSelf = (p.id === player.id) ? p.handCards.find(c => c.subtype === 'jiu') : null;
+                    if (jiuSelf) {
+                        if (p.isAI && this.ai) {
+                            if (this.ai.shouldSaveTeammate(p, player, this)) {
+                                this.discardCard(p, jiuSelf);
+                                this.heal(player, 1);
+                                this.log(`${p.name}在濒死时使用【酒】自救`, 'success');
+                                if (player.hp > 0) return;
+                            }
+                        } else if (p === this.getHumanPlayer()) {
+                            const wantJiu = await this.askSkillConfirm(p, '酒', '是否使用【酒】自救（恢复1点体力）？');
+                            if (wantJiu) {
+                                this.discardCard(p, jiuSelf);
+                                this.heal(player, 1);
+                                this.log(`${p.name}在濒死时使用【酒】自救`, 'success');
+                                if (player.hp > 0) return;
+                            }
                         }
                     }
                     // 急救（人类与AI均可发动：将红色手牌当桃救濒死角色）

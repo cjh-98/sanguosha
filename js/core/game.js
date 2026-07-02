@@ -97,6 +97,8 @@ SGS.GameEngine = (function() {
             this.includeMilitary = config.includeMilitary !== false;
             this.waitingForHuman = false;
             this._pendingCardChoice = null; // 卡牌选择Promise解析器
+            this._pendingExtraTurn = null;     // 放权：待插入的额外回合
+            this._resumeAfterExtraTurn = null; // 放权：额外回合结束后应回归的玩家id
             this.aiSpeed = 1; // AI速度倍率：0.5(慢) - 3(快)，默认1
             // 对局日志系统
             this.matchId = null;
@@ -636,6 +638,13 @@ SGS.GameEngine = (function() {
             player.alreadyDrew = false;
             // 重置技能状态
             player.skillStates = {};
+            // 天义(太史慈)出杀上限：每回合重置；放权(刘禅)待定标记每回合清理
+            player.shaLimitOverride = 0;
+            player._fangquanPending = false;
+            // 清除上回合可能遗留的_phase skip 标记（神速会在本回合 doBegin 中按需重新设置）
+            player._skipJudge = false;
+            player._skipDraw = false;
+            player._skipPlay = false;
 
             this.phase = SGS.Config.PHASE.BEGIN;
             this.log(`── ${player.name}(${player.hero.name})的回合 ──`, 'highlight');
@@ -693,8 +702,8 @@ SGS.GameEngine = (function() {
             }
         }
 
-        // === 各阶段实现（全部同步） ===
-        doBegin(player) {
+        // === 各阶段实现（全部同步，human 的技能确认走 await） ===
+        async doBegin(player) {
             // 回合开始技能
             try { this.emit('turnBegin', { player, engine: this }); } catch(e){}
             // 国战亮将
@@ -707,6 +716,33 @@ SGS.GameEngine = (function() {
             this.doBeginInstantSkills(player);
             // 觉醒技：定义 type 为 AWAKENING 且体力=1 时由引擎统一触发（魂姿/志继/若愚/凿险）
             this.doBeginAwakeningSkills(player);
+            // 神速 (夏侯渊)：跳过判定和摸牌阶段，视为使用一张【杀】
+            if (player.skills.some(s => s.name === '神速')) {
+                const want = player.isAI ? true
+                    : await this.askSkillConfirm(player, '神速', '是否发动【神速】跳过判定和摸牌阶段，视为使用一张【杀】？');
+                if (want) {
+                    player._skipJudge = true;
+                    player._skipDraw = true;
+                    const targets = this.getAttackTargets(player);
+                    if (targets.length > 0) {
+                        this.log(`${player.name}发动【神速】，视为使用一张杀`, 'highlight');
+                        await this.resolveSha(player, targets[0],
+                            { name:'杀(神速)', subtype:'sha', element:'normal', suit:'spade', number:0, instanceId:'sx_'+Date.now(), uid:'sx' }, 1);
+                    } else {
+                        this.log(`${player.name}发动神速，但没有攻击目标`, 'normal');
+                    }
+                }
+            }
+            // 放权 (刘禅)：跳过本回合出牌阶段，回合结束时令一名角色进行额外回合
+            if (player.skills.some(s => s.name === '放权')) {
+                const want = player.isAI ? true
+                    : await this.askSkillConfirm(player, '放权', '是否发动【放权】跳过本回合出牌阶段，回合结束时令一名角色进行额外回合？');
+                if (want) {
+                    player._skipPlay = true;
+                    player._fangquanPending = true;
+                    this.log(`${player.name}发动【放权】，将跳过出牌阶段`, 'highlight');
+                }
+            }
             // 观星 (诸葛亮) - 主动技，人类玩家需要UI交互
             if (player.skills.some(s => s.name === '观星')) {
                 if (player.isAI) {
@@ -840,6 +876,13 @@ SGS.GameEngine = (function() {
         }
 
         async doJudge(player) {
+            // 神速 (夏侯渊)：跳过判定阶段
+            if (player._skipJudge) {
+                player._skipJudge = false;
+                this.log(`${player.name}神速：跳过判定阶段`, 'normal');
+                this.advancePhase();
+                return;
+            }
             // 依次处理判定区
             try {
                 while (player.judgmentCards.length > 0) {
@@ -1004,7 +1047,7 @@ SGS.GameEngine = (function() {
             }
         }
 
-        doEnd(player) {
+        async doEnd(player) {
             try { this.emit('turnEnd', { player, engine: this }); } catch(e){}
 
             // 重置裸衣标记
@@ -1014,6 +1057,32 @@ SGS.GameEngine = (function() {
             if (player.skills.some(s => s.name === '闭月')) {
                 this.drawCard(player, 1);
                 this.log(`${player.name}发动【闭月】，摸了1张牌`, 'highlight');
+            }
+
+            // 放权 (刘禅)：回合结束时弃一张牌，令一名角色进行一个额外回合
+            if (player._fangquanPending && !this.gameOver && this.getAlivePlayers().length > 1) {
+                player._fangquanPending = false;
+                const candidates = this.getAlivePlayers().filter(p => p.id !== player.id);
+                let fqTarget = null;
+                if (player.isAI) {
+                    if (player.handCards.length > 0) {
+                        this.discardCard(player, player.handCards[0]);
+                        fqTarget = candidates[Math.floor(Math.random() * candidates.length)];
+                    }
+                } else if (player.handCards.length > 0) {
+                    const dc = await this.chooseCard(player, player.handCards, '放权：弃一张牌，令一名角色进行额外回合');
+                    if (dc) {
+                        this.discardCard(player, dc);
+                        fqTarget = await this.chooseTarget(player, candidates, '放权：选择进行额外回合的角色');
+                    }
+                }
+                if (fqTarget) {
+                    const alive = this.getAlivePlayers();
+                    const lcIdx = alive.findIndex(p => p.id === player.id);
+                    const normalNext = alive[(lcIdx + 1) % alive.length];
+                    this._pendingExtraTurn = { targetId: fqTarget.id, resumeAfterId: normalNext.id };
+                    this.log(`${player.name}发动放权，令${fqTarget.name}进行一个额外回合`, 'highlight');
+                }
             }
 
             if (this.checkGameOver()) return;
@@ -1142,6 +1211,38 @@ SGS.GameEngine = (function() {
         async nextTurn() {
             if (this._destroyed) return;
             if (this.gameOver) return;
+
+            // 放权 (刘禅) 额外回合衔接：
+            // 1) 上一回合设置了额外回合 → 让目标立即行动，并记下回归点
+            if (this._pendingExtraTurn) {
+                const pend = this._pendingExtraTurn;
+                this._pendingExtraTurn = null;
+                this._resumeAfterExtraTurn = pend.resumeAfterId;
+                const aliveP = this.getAlivePlayers();
+                const idx = aliveP.findIndex(p => p.id === pend.targetId);
+                if (idx >= 0) {
+                    this.currentPlayerIdx = this.players.indexOf(aliveP[idx]);
+                    this.turnCount++;
+                    await this.delay(500 / this.aiSpeed);
+                    this.startTurn();
+                    return;
+                }
+            }
+            // 2) 额外回合结束后 → 回归到原本该行动的下一位玩家
+            if (this._resumeAfterExtraTurn != null) {
+                const resumeId = this._resumeAfterExtraTurn;
+                this._resumeAfterExtraTurn = null;
+                const aliveR = this.getAlivePlayers();
+                const idx = aliveR.findIndex(p => p.id === resumeId);
+                if (idx >= 0) {
+                    this.currentPlayerIdx = this.players.indexOf(aliveR[idx]);
+                    this.turnCount++;
+                    await this.delay(500 / this.aiSpeed);
+                    this.startTurn();
+                    return;
+                }
+            }
+
             const alive = this.getAlivePlayers();
             if (alive.length <= 1) {
                 this.endGame();
@@ -1425,6 +1526,8 @@ SGS.GameEngine = (function() {
             // 武神技能：红桃手牌视为杀
             const hasWushen = player.skills.some(s => s.name === '武神');
             const isWushenSha = hasWushen && (card.suit === 'heart');
+            // 天义(太史慈)等技能可提高本回合出【杀】的上限
+            const shaLimit = player.shaLimitOverride || 1;
             
             // 检查阶段
             if (this.phase !== SGS.Config.PHASE.PLAY) {
@@ -1439,7 +1542,7 @@ SGS.GameEngine = (function() {
             // 武神：红桃牌视为杀
             if (isWushenSha) {
                 // 按杀来处理
-                if (player.shaUsedThisTurn >= 1) {
+                if (player.shaUsedThisTurn >= shaLimit) {
                     const hasZhuge = player.equipment.weapon && player.equipment.weapon.subtype === 'zhuge';
                     const hasPaoxiao = player.skills.some(s => s.name === '咆哮');
                     if (!hasZhuge && !hasPaoxiao) return false;
@@ -1459,8 +1562,8 @@ SGS.GameEngine = (function() {
             
             switch (card.subtype) {
                 case 'sha':
-                    // 检查出杀次数（诸葛连弩除外）
-                    if (player.shaUsedThisTurn >= 1) {
+                    // 检查出杀次数（诸葛连弩/咆哮/天义除外）
+                    if (player.shaUsedThisTurn >= shaLimit) {
                         const hasZhuge = player.equipment.weapon && player.equipment.weapon.subtype === 'zhuge';
                         const hasPaoxiao = player.skills.some(s => s.name === '咆哮');
                         if (!hasZhuge && !hasPaoxiao) return false;
@@ -3177,17 +3280,9 @@ SGS.GameEngine = (function() {
                     this.log(`${player.name}帷幕生效`, 'highlight');
                     break;
                 case '神速':
-                    // 夏侯渊: 跳过判定和摸牌阶段，视为使用了一张【杀】
-                    player._skipJudge = true;
-                    player._skipDraw = true;
-                    const shensuTargets = this.getAttackTargets(player);
-                    if (shensuTargets.length > 0) {
-                        const target = shensuTargets[0];
-                        this.log(`${player.name}发动神速`, 'highlight');
-                        await this.resolveSha(player, target, { name:'杀(神速)', subtype:'sha', element:'normal' }, 1);
-                    } else {
-                        this.log(`${player.name}发动神速，但没有攻击目标`, 'normal');
-                    }
+                    // 神速已在回合开始阶段(doBegin)统一触发；
+                    // 此处为 UI 兜底：回合开始技能不应在出牌阶段由 useSkill 发起，直接忽略
+                    this.log(`${player.name}的【神速】仅在回合开始时发动`, 'normal');
                     break;
                 case '断粮':
                     // 徐晃: 将黑色非装备牌当【兵粮寸断】使用，距离为2

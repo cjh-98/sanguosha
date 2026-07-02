@@ -1950,27 +1950,49 @@ function _updateBoardImpl(state){
     updatePrompt(hs, state);
 }
 
+// 手牌排序：相同类型（基本→锦囊/延时→装备）排在一起，同类再按花色(♠♥♣♦)、点数升序。
+// 仅用于「展示」，返回的 idx 是牌在 player.handCards 中的真实下标，供选择/点击时定位用。
+function sortedHandCards(player){
+    if(!player || !player.handCards || !player.handCards.length) return [];
+    const suitOrder  = { spade:0, heart:1, club:2, diamond:3 };
+    const typeRank   = { basic:0, trick:1, delay:1, equip:2 };
+    return player.handCards
+        .map((card, idx) => ({ card, idx }))
+        .sort((a, b) => {
+            const A=a.card, B=b.card;
+            const ta = typeRank[A.type]!=null ? typeRank[A.type] : 3;
+            const tb = typeRank[B.type]!=null ? typeRank[B.type] : 3;
+            if(ta!==tb) return ta-tb;
+            const sa = suitOrder[A.suit]!=null ? suitOrder[A.suit] : 9;
+            const sb = suitOrder[B.suit]!=null ? suitOrder[B.suit] : 9;
+            if(sa!==sb) return sa-sb;
+            return (A.number||0) - (B.number||0);
+        });
+}
+
 function renderHand(human, state){
     const isMyTurn=state.currentPlayerIdx===human.id && state.phase==='play';
     const hc=document.getElementById('handCards');
     let cardsHtml='';
-    for(let ci=0;ci<human.handCards.length;ci++){
-        const c=human.handCards[ci];
+    const _sorted=sortedHandCards(human);
+    for(let ci=0;ci<_sorted.length;ci++){
+        const c=_sorted[ci].card;
+        const realIdx=_sorted[ci].idx;
         const suitC=c.suit==='heart'||c.suit==='diamond'?'red':'blk';
         const suitChar={spade:'♠',heart:'♥',club:'♣',diamond:'♦'}[c.suit];
         const numStr={1:'A',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K'}[c.number];
         const nm=(c.element==='fire'?'火':c.element==='thunder'?'雷':'')+c.name;
         const tp=c.type==='basic'?'基本':c.type==='trick'?'锦囊':c.type==='delay'?'延时':'装备';
         const canUse=isMyTurn && canUseCard(human,c);
-        const isSelected=selectedCardIdx===ci;
+        const isSelected=selectedCardIdx===realIdx;
         const typeCls=c.type==='trick'?'trick':c.type==='delay'?'delay':c.type==='equip'?'equip':'';
         const elemCls=c.element==='fire'?'fire':c.element==='thunder'?'thunder':'';
         // 卡牌图片路径
         const cardImg=getCardImagePath(c);
         cardsHtml+=`<div class="card ${suitC} ${typeCls} ${elemCls}${isSelected?' sel':''}${canUse?' ok':''}"
-                         data-instance-id="${c.instanceId}" data-i="${ci}"
+                         data-instance-id="${c.instanceId}" data-i="${realIdx}"
                          ondragstart="return false" onmousedown="startHandDrag(event)"
-                         onclick="clickCard(${ci})">
+                         onclick="clickCard(${realIdx})">
             <span class="cs ${suitC}">${suitChar}</span>
             <span class="cn">${numStr}</span>
             ${cardImg?`<img class="card-img" src="${cardImg}" onerror="this.style.display='none'" alt="${nm}">`:''}
@@ -2406,7 +2428,7 @@ function openZhiheng(){
     ov.innerHTML=`<div class="modal" style="max-height:75vh;overflow-y:auto">
         <h4>制衡：选择要弃的牌</h4>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px" id="zhCards">
-            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
+            ${sortedHandCards(human).map(({card:c, idx:i})=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
                 data-i="${i}" onclick="this.classList.toggle('sel')">
                 <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
                 <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
@@ -2626,7 +2648,7 @@ function openGuicai(){
     
     // 显示手牌供选择
     const handDiv=document.getElementById('guicaiHand');
-    handDiv.innerHTML = human.handCards.map((c,i)=>`
+    handDiv.innerHTML = sortedHandCards(human).map(({card:c, idx:i})=>`
         <div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}" 
             data-i="${i}" 
             onclick="selectGuicaiCard(this)">
@@ -2752,7 +2774,7 @@ function selectQngTarget(el){
     ov2.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
         <h4>青囊：选择要弃置的牌</h4>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px" id="qngCards">
-            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
+            ${sortedHandCards(human).map(({card:c, idx:i})=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
                 data-i="${i}" onclick="selectQngCard(this)">
                 <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
                 <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
@@ -2833,7 +2855,7 @@ function openRendeCardPicker(){
     ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
         <h4>仁德：选择要给的牌（至少2张）</h4>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px" id="rdCards">
-            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_rdSelectedCards.includes(i)?'sel':''}"
+            ${sortedHandCards(human).map(({card:c, idx:i})=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_rdSelectedCards.includes(i)?'sel':''}"
                 data-i="${i}" onclick="toggleRdCard(this)">
                 <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
                 <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
@@ -2859,7 +2881,7 @@ function toggleRdCard(el){
 function updateRdCardDisplay(){
     const container = document.getElementById('rdCards');
     if(!container) return;
-    container.innerHTML = engine.getHumanPlayer().handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_rdSelectedCards.includes(i)?'sel':''}"
+    container.innerHTML = sortedHandCards(engine.getHumanPlayer()).map(({card:c, idx:i})=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_rdSelectedCards.includes(i)?'sel':''}"
         data-i="${i}" onclick="toggleRdCard(this)">
         <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
         <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('');
@@ -2929,7 +2951,7 @@ function selectJyTarget(el){
     ov2.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
         <h4>结姻：选择要弃置的2张牌</h4>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px" id="jyCards">
-            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_jySelectedCards.includes(i)?'sel':''}"
+            ${sortedHandCards(human).map(({card:c, idx:i})=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_jySelectedCards.includes(i)?'sel':''}"
                 data-i="${i}" onclick="toggleJyCard(this)">
                 <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
                 <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
@@ -2957,7 +2979,7 @@ function updateJyCardDisplay(){
     const container = document.getElementById('jyCards');
     const btn = document.getElementById('jyConfirmBtn');
     if(!container) return;
-    container.innerHTML = engine.getHumanPlayer().handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_jySelectedCards.includes(i)?'sel':''}"
+    container.innerHTML = sortedHandCards(engine.getHumanPlayer()).map(({card:c, idx:i})=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_jySelectedCards.includes(i)?'sel':''}"
         data-i="${i}" onclick="toggleJyCard(this)">
         <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
         <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('');
@@ -3052,7 +3074,7 @@ function selectLjTarget2(el){
     ov3.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
         <h4>离间：选择要弃置的牌</h4>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px" id="ljCards">
-            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
+            ${sortedHandCards(human).map(({card:c, idx:i})=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
                 data-i="${i}" onclick="selectLjCard(this)">
                 <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
                 <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
@@ -3156,7 +3178,7 @@ function selectTyTarget(el){
     ov2.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
         <h4>天义：选择要弃置的2张牌</h4>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px" id="tyCards">
-            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_tySelectedCards.includes(i)?'sel':''}"
+            ${sortedHandCards(human).map(({card:c, idx:i})=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_tySelectedCards.includes(i)?'sel':''}"
                 data-i="${i}" onclick="toggleTyCard(this)">
                 <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
                 <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
@@ -3184,7 +3206,7 @@ function updateTyCardDisplay(){
     const container = document.getElementById('tyCards');
     const btn = document.getElementById('tyConfirmBtn');
     if(!container) return;
-    container.innerHTML = engine.getHumanPlayer().handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_tySelectedCards.includes(i)?'sel':''}"
+    container.innerHTML = sortedHandCards(engine.getHumanPlayer()).map(({card:c, idx:i})=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_tySelectedCards.includes(i)?'sel':''}"
         data-i="${i}" onclick="toggleTyCard(this)">
         <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
         <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('');
@@ -3214,7 +3236,7 @@ function openLuanji(){
         <h4>乱击：选择2张同花色的牌</h4>
         <p style="color:#a0a0b0;font-size:12px;margin-bottom:10px;">选择2张相同花色的牌，对目标造成等同于牌数的伤害</p>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px" id="ljSelectCards">
-            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_ljSelectedCards.includes(i)?'sel':''}"
+            ${sortedHandCards(human).map(({card:c, idx:i})=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_ljSelectedCards.includes(i)?'sel':''}"
                 data-i="${i}" onclick="toggleLjCard(this)">
                 <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
                 <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
@@ -3242,7 +3264,7 @@ function updateLjCardDisplay(){
     const container = document.getElementById('ljSelectCards');
     const btn = document.getElementById('ljConfirmBtn');
     if(!container) return;
-    container.innerHTML = engine.getHumanPlayer().handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_ljSelectedCards.includes(i)?'sel':''}"
+    container.innerHTML = sortedHandCards(engine.getHumanPlayer()).map(({card:c, idx:i})=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'} ${_ljSelectedCards.includes(i)?'sel':''}"
         data-i="${i}" onclick="toggleLjCard(this)">
         <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
         <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('');
@@ -3371,7 +3393,7 @@ function openXukun(){
         <h4>虚鲲：选择要展示的牌</h4>
         <p style="color:#a0a0b0;font-size:12px;margin-bottom:10px;">选择一张牌展示给所有玩家看</p>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px">
-            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
+            ${sortedHandCards(human).map(({card:c, idx:i})=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
                 data-i="${i}" onclick="selectXkCard(this)">
                 <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
                 <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
@@ -3434,7 +3456,7 @@ function selectHlTarget(el){
     ov2.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
         <h4>挥泪：选择要弃置的牌</h4>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px" id="hlCards">
-            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
+            ${sortedHandCards(human).map(({card:c, idx:i})=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
                 data-i="${i}" onclick="selectHlCard(this)">
                 <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
                 <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
@@ -3563,7 +3585,7 @@ function selectDlTarget(el){
     ov2.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
         <h4>断粮：选择要弃置的牌</h4>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px">
-            ${human.handCards.map((c,i)=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
+            ${sortedHandCards(human).map(({card:c, idx:i})=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
                 data-i="${i}" onclick="selectDlCard(this)">
                 <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
                 <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}

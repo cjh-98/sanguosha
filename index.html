@@ -1183,18 +1183,30 @@ function enforceGameAspect(){
     const h = window.innerHeight;
     
     if (isMobile) {
-        // 手机端：不再做「旋转 90° 强制横屏」！
-        // 旧实现用 rotate(90deg) translate(-w,0) 把整块 #gameScreen 平移到了
-        // 视口左侧屏幕外（x<0），导致棋盘/武将牌/手牌全部不可见，
-        // 只剩 position:fixed 居中、不受旋转影响的出牌动画能看到（即用户说的「只能看到出牌动作」）。
-        // 现在直接让画面正常填满视口，配合下方 @media 竖屏响应式布局即可正常显示与操作。
-        gs.style.width = '100%';
-        gs.style.height = '100%';
-        gs.style.transform = 'none';
-        gs.style.transformOrigin = 'top left';
-        gs.style.position = 'relative';
-        gs.style.left = '0';
-        gs.style.top = '0';
+        // 手机端：把整块游戏桌面当作一个固定比例的「舞台」，整体等比缩放铺满视口。
+        // 这样无论横屏还是竖屏，内容都不会被裁切（只在四周留少量黑边），
+        // 比把横版棋盘强行塞进窄/短视口更可靠——这是 H5 游戏在手机上最稳的适配方式。
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const landscape = vw >= vh;
+        // 横屏用宽屏舞台、竖屏用偏竖的舞台，让两种朝向都能较充分地利用屏幕空间。
+        const BASE_W = landscape ? 960 : 540;
+        const BASE_H = landscape ? 540 : 960;
+        const scale = Math.min(vw / BASE_W, vh / BASE_H);
+
+        // 让舞台居中、等比缩放；黑边用与棋盘一致的深色，避免突兀。
+        // 注意：CSS 里 #gameScreen 有 height:100dvh !important，
+        // 故这里必须用 setProperty(...,'important') 才能覆盖它。
+        const app = document.getElementById('app');
+        if (app) app.style.background = '#0d0a06';
+        gs.style.setProperty('width', BASE_W + 'px', 'important');
+        gs.style.setProperty('height', BASE_H + 'px', 'important');
+        gs.style.position = 'absolute';
+        gs.style.left = '50%';
+        gs.style.top = '50%';
+        gs.style.margin = '0';
+        gs.style.transformOrigin = 'center center';
+        gs.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
 
     } else {
         // 桌面端：填满整个可用空间
@@ -1219,6 +1231,10 @@ window.addEventListener('resize', function(){
     if(document.getElementById('gameScreen').classList.contains('active')){
         enforceGameAspect();
     }
+});
+window.addEventListener('orientationchange', function(){
+    // 旋转后延迟一帧，等浏览器完成布局再重算缩放比例
+    setTimeout(function(){ if(document.getElementById('gameScreen').classList.contains('active')){ enforceGameAspect(); } }, 250);
 });
 
 // ---- 导航函数（被HTML按钮调用） ----

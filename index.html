@@ -151,9 +151,38 @@
         /* 顶部信息栏 */
         .topbar { display:flex; width:100%; box-sizing:border-box; align-items:center; justify-content:space-between; padding:4px 10px;
             background:linear-gradient(180deg,#2a2218 0%,#1a1410 100%); border-bottom:2px solid #5c4a28;
-            height:34px; flex-shrink:0; font-size:11px; white-space: nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.5); z-index: 100; }
+            height:34px; flex-shrink:0; font-size:11px; white-space: nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.5); z-index: 100;
+            position: relative; }
         .topbar span { color:#d4b86a; text-shadow:0 1px 2px rgba(0,0,0,0.9); }
         .topbar .btn-sm { background:linear-gradient(180deg,#3a3020,#251e12); color:#d4b86a; border-color:#5c4a28; font-size:11px; }
+
+        /* 顶部「+」菜单：把所有次要按钮收进一个下拉 */
+        .plus-wrap { position: relative; display: inline-flex; align-items: center; }
+        #plusMenuBtn {
+            width: 28px; height: 28px; padding: 0; font-size: 18px; line-height: 1;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: linear-gradient(180deg,#3a3020,#251e12); color:#e6c84d;
+            border:1px solid #5c4a28; border-radius: 50%;
+            cursor: pointer; -webkit-tap-highlight-color: transparent;
+        }
+        #plusMenuBtn:active { transform: scale(0.92); }
+        .plus-menu {
+            display: none; position: absolute; top: calc(100% + 6px); right: 0;
+            min-width: 130px; padding: 4px 0;
+            background: linear-gradient(180deg,#1a1410,#0d0a06);
+            border: 1px solid #8b6914; border-radius: 6px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.7);
+            z-index: 300; flex-direction: column;
+        }
+        .plus-menu.open { display: flex; }
+        .plus-menu-item {
+            padding: 8px 14px; background: transparent; border: 0;
+            color: #d4b86a; text-align: left; cursor: pointer;
+            font-size: 13px; white-space: nowrap;
+            border-bottom: 1px solid rgba(139,105,20,0.25);
+        }
+        .plus-menu-item:last-child { border-bottom: 0; }
+        .plus-menu-item:hover, .plus-menu-item:active { background: rgba(196,30,58,0.2); color: #e6c84d; }
 
 
         /* 日志面板包裹层 - 右下角悬浮，在用户UI上方 */
@@ -225,10 +254,10 @@
         /* 上方对手区域 - 弧形凸型布局（中间在顶，两边逐渐降低） */
         .players-arc-area {
             display: flex;
-            justify-content: space-evenly;  /* 均匀分布铺满整行，两边不留大空白 */
-            align-items: flex-start;  /* 顶部对齐，中间卡牌保持在最上 */
-            gap: 0.6vw;
-            padding: 6px 1.2vw 4px;
+            justify-content: space-between;  /* 均匀分布铺满整行 */
+            align-items: flex-end;  /* 底部对齐，两边武将牌更矮（仿官方三国杀） */
+            gap: 0.4vw;
+            padding: 4px 0.6vw;
             flex-wrap: nowrap;  /* 不换行，保持一行排列 */
             z-index: 2;
             flex-shrink: 0;  /* 顶部对手区不被压缩 */
@@ -245,12 +274,21 @@
         }
         /* 武将牌（正版风格）- 带立绘的卡片 */
         .hero-card {
-            width:clamp(72px, 8.5vw, 104px); aspect-ratio: 5 / 7; cursor:pointer;
-            border-radius:6px; overflow:hidden;
+            flex: 1 1 0;                /* 平均分满整行宽度，自适应玩家人数 */
+            min-width: 0;                /* 允许收缩到比内容更窄 */
+            max-width: 140px;            /* 不至于太宽 */
+            aspect-ratio: 5 / 7;         /* 竖版武将立绘 */
+            cursor: pointer; border-radius:6px; overflow:hidden;
             box-shadow:0 4px 16px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(212,184,106,0.25), 0 0 0 1.5px rgba(230,200,77,0.3);
-            transition:all 0.22s; flex-shrink:1; min-width:0;
+            transition:all 0.22s;
             background:#2a2018;
             display:flex; flex-direction:column;
+        }
+        /* 两边武将牌变矮（仿官方三国杀），给顶部留出放按钮的空间 */
+        .players-arc-area .hero-card:first-child,
+        .players-arc-area .hero-card:last-child {
+            aspect-ratio: 5 / 5;        /* 接近正方形，明显比中间矮 */
+            max-height: 78%;
         }
         .hero-card:hover { box-shadow:0 6px 22px rgba(230,200,77,0.25),0 4px 16px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(212,184,106,0.25), 0 0 0 1.5px rgba(230,200,77,0.3); }
         .hero-card:active { transform:scale(0.95); }
@@ -410,7 +448,7 @@
         .game-log-panel .log-highlight { color: #e6c84d; font-weight: bold; }
 
         .player-bottom { flex-shrink:0; width:100%; box-sizing:border-box; background:linear-gradient(180deg,rgba(0,0,0,0.7),rgba(0,0,0,0.5)); border-top:2px solid #8b6914; padding:5px 8px; }
-        .my-avatar { width:72px; height:98px; border-radius:6px; overflow:hidden; border:2px solid #8b6914; flex-shrink:0; box-shadow:0 2px 8px rgba(0,0,0,0.6),0 0 4px rgba(230,200,77,0.15); }
+        .my-avatar { width:80px; height:108px; border-radius:6px; overflow:hidden; border:2px solid #8b6914; flex-shrink:0; box-shadow:0 2px 8px rgba(0,0,0,0.6),0 0 4px rgba(230,200,77,0.15); order:3; }
         .my-avatar img { width:100%; height:100%; object-fit:cover; object-position:top center; }
         .myinfo { display:flex; align-items:center; justify-content:space-between; padding:0 6px; gap:8px; }
         .myinfo-left { display:flex; align-items:center; gap:9px; font-size:12px; white-space: nowrap; cursor:pointer; }
@@ -423,7 +461,7 @@
                border:1px solid #8b6914; color:#e6c84d; box-shadow:0 1px 2px rgba(0,0,0,0.3); }
 
         /* 技能按钮（古风/篆刻风格） */
-        .skill-bar { display:flex; gap:6px; padding:3px; overflow-x:auto; flex-shrink:0; }
+        .skill-bar { display:flex; gap:6px; padding:3px; overflow-x:auto; flex-shrink:0; order:1; }
         .skb { padding:4px 12px; font-size:12px; border:1px solid #8b6914; border-radius:14px;
                 background:linear-gradient(180deg,rgba(139,105,20,0.25),rgba(139,105,20,0.05));
                 color:#e6c84d; cursor:pointer; white-space:nowrap; flex-shrink:0;
@@ -456,7 +494,7 @@
             display:flex; gap:2px; overflow-x:auto;
             padding:2px 4px; min-height:108px; align-items:center;
             background:linear-gradient(180deg, rgba(0,0,0,0.6), rgba(20,15,10,0.7));
-            border-radius:6px;
+            border-radius:6px; order:2;
             box-shadow:inset 0 0 8px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.4);
             margin:0 auto; width:fit-content; max-width:100%;
         }
@@ -714,7 +752,8 @@
 
             /* 对手武将牌区：进一步缩小，保证一行放下所有对手 */
             .players-arc-area { gap: 0.4vw; padding: 4px 0.5vw 2px; }
-            .hero-card { width: clamp(48px, 12vw, 84px); }
+            /* 武将牌走基类 flex:1 1 0 平均铺满，不再单独写 width */
+            .hero-card { max-width: 100px; }
             .hc-name { font-size: 10px; }
             .hc-hp-icon { font-size: 8px; }
             .hc-hand { font-size: 8px; }
@@ -726,21 +765,21 @@
 
             /* 底部手牌区：固定不被压缩，始终可见可操作 */
             .hand-area { padding: 4px 4px; gap: 4px; }
-            .my-avatar { width: 52px; height: 72px; }
+            .my-avatar { width: 62px; height: 86px; }
             .mhn { font-size: 12px; }
             .mhp { font-size: 11px; }
-            .card { width: 60px; height: 84px; }
-            .hand-cards { min-height: 88px; gap: 1px; padding: 2px; }
+            .card { width: 68px; height: 96px; }
+            .hand-cards { min-height: 100px; gap: 2px; padding: 2px; }
             .skb { padding: 3px 8px; font-size: 10px; }
         }
 
         /* 竖屏专项：横屏圆桌游戏在竖屏下极窄，需要极致压缩 */
         @media (orientation: portrait) and (max-width: 640px) {
-            .hero-card { width: clamp(40px, 13vw, 66px); }
+            /* 武将牌走基类的 flex:1 1 0 平均铺满整行，不再单独写 width 干扰 */
             .hc-faction { width: 13px; height: 13px; font-size: 7px; }
-            .my-avatar { width: 44px; height: 62px; }
-            .card { width: 52px; height: 74px; }
-            .hand-cards { min-height: 78px; }
+            .my-avatar { width: 54px; height: 76px; }
+            .card { width: 58px; height: 82px; }
+            .hand-cards { min-height: 86px; }
             .action-bar .log-toggle-btn, .action-bar .btn-submit-log { font-size: 10px; padding: 3px 6px; }
         }
     </style>
@@ -869,8 +908,14 @@
         </div>
         <div class="topbar-info">
             <span id="deckInfo"></span>
-            <button class="topbar-btn" id="fullscreenBtn" onclick="toggleFullscreen()" title="全屏游戏（隐藏浏览器顶部地址栏/底部导航栏）">⛶</button>
-            <button class="topbar-btn" onclick="confirmQuit()">退出</button>
+            <div class="plus-wrap">
+                <button id="plusMenuBtn" onclick="togglePlusMenu(event)" title="菜单">+</button>
+                <div class="plus-menu" id="plusMenu">
+                    <button class="plus-menu-item" onclick="toggleFullscreen();togglePlusMenu()">⛶&nbsp;全屏 / 退出全屏</button>
+                    <button class="plus-menu-item" onclick="confirmQuit();togglePlusMenu()">退出当前对局</button>
+                    <button class="plus-menu-item" onclick="if(confirm('确定返回主菜单？')){quitToMenu();togglePlusMenu()}">←&nbsp;返回主菜单</button>
+                </div>
+            </div>
         </div>
     </div>
     <!-- 弧形对手区域 - 渲染后由JS填充 -->
@@ -1195,30 +1240,21 @@ function enforceGameAspect(){
     const h = window.innerHeight;
     
     if (isMobile) {
-        // 手机端：把整块游戏桌面当作一个固定比例的「舞台」，整体等比缩放铺满视口。
-        // 这样无论横屏还是竖屏，内容都不会被裁切（只在四周留少量黑边），
-        // 比把横版棋盘强行塞进窄/短视口更可靠——这是 H5 游戏在手机上最稳的适配方式。
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-        const landscape = vw >= vh;
-        // 横屏用宽屏舞台、竖屏用偏竖的舞台，让两种朝向都能较充分地利用屏幕空间。
-        const BASE_W = landscape ? 960 : 540;
-        const BASE_H = landscape ? 540 : 960;
-        const scale = Math.min(vw / BASE_W, vh / BASE_H);
-
-        // 让舞台居中、等比缩放；黑边用与棋盘一致的深色，避免突兀。
-        // 注意：CSS 里 #gameScreen 有 height:100dvh !important，
-        // 故这里必须用 setProperty(...,'important') 才能覆盖它。
+        // 手机端：让 #gameScreen 直接铺满视口（不再做 scale-to-fit），
+        // 这样画面会真正占满整个屏幕——横屏左右、竖屏上下都不会再留黑边。
+        // 配合下方 CSS 的 flex 布局 + 100dvh + 100% 宽度，布局会自适应铺满。
+        // 这是官方三国杀移动版的做法。
         const app = document.getElementById('app');
         if (app) app.style.background = '#0d0a06';
-        gs.style.setProperty('width', BASE_W + 'px', 'important');
-        gs.style.setProperty('height', BASE_H + 'px', 'important');
-        gs.style.position = 'absolute';
-        gs.style.left = '50%';
-        gs.style.top = '50%';
+        // 清掉之前 scale-to-fit 留下的 inline 尺寸/变换，让 CSS 的 100%/100dvh 接管
+        gs.style.removeProperty('width');
+        gs.style.removeProperty('height');
+        gs.style.transform = 'none';
+        gs.style.transformOrigin = 'top left';
+        gs.style.position = 'relative';
+        gs.style.left = '0';
+        gs.style.top = '0';
         gs.style.margin = '0';
-        gs.style.transformOrigin = 'center center';
-        gs.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
 
     } else {
         // 桌面端：填满整个可用空间
@@ -1285,6 +1321,21 @@ function updateFullscreenBtn(){
 }
 document.addEventListener('fullscreenchange', updateFullscreenBtn);
 document.addEventListener('webkitfullscreenchange', updateFullscreenBtn);
+
+// ===== 顶栏「+」下拉菜单 =====
+function togglePlusMenu(e){
+    if(e) e.stopPropagation();
+    const m = document.getElementById('plusMenu');
+    if(!m) return;
+    m.classList.toggle('open');
+}
+// 点击菜单外区域自动收起
+document.addEventListener('click', function(e){
+    const m = document.getElementById('plusMenu');
+    if(!m || !m.classList.contains('open')) return;
+    if(e.target && e.target.closest && e.target.closest('.plus-wrap')) return;
+    m.classList.remove('open');
+});
 
 // ---- 导航函数（被HTML按钮调用） ----
 function goSetup(){ 

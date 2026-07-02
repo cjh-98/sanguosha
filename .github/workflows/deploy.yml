@@ -11,6 +11,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Debug repo info
+        run: |
+          echo "=== Remote URLs ==="
+          git remote -v
+          echo "=== Branches ==="
+          git branch -a
+          echo "=== Current HEAD ==="
+          git log --oneline -1
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v3

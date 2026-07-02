@@ -701,6 +701,8 @@ SGS.GameEngine = (function() {
                     try { this.ai.maybeRevealNational(player, this); } catch(e){}
                 }
             }
+            // 回合开始：无UI交互类技能（英魂/再起）对所有玩家均触发，置于观星/洛神之前
+            this.doBeginInstantSkills(player);
             // 观星 (诸葛亮) - 主动技，人类玩家需要UI交互
             if (player.skills.some(s => s.name === '观星')) {
                 if (player.isAI) {
@@ -778,12 +780,37 @@ SGS.GameEngine = (function() {
                     return;
                 }
             }
-            // AI回合开始技能（观星等）
-            if (player.isAI && this.ai) {
-                try { this.ai.handleBeginPhase(player, this); } catch(e){ console.error('AI beginPhase:', e); }
-            }
             this.notifyState();
             this.advancePhase();
+        }
+
+        // 回合开始阶段：无UI交互类技能（英魂/再起），对所有玩家均触发
+        doBeginInstantSkills(player) {
+            // 英魂 (孙坚)：受伤时摸 X 弃 X-1（X = 已损失体力）
+            if (player.skills.some(s => s.name === '英魂') && player.hp < player.maxHp) {
+                const x = player.maxHp - player.hp;
+                if (x >= 1) {
+                    this.drawCard(player, x);
+                    const discardCount = x - 1;
+                    for (let i = 0; i < discardCount && player.handCards.length > 0; i++) {
+                        const card = this.ai ? this.ai.chooseDiscard(player, this)
+                                             : player.handCards[player.handCards.length - 1];
+                        if (card) this.discardCard(player, card);
+                    }
+                    this.log(`${player.name}发动【英魂】`, 'highlight');
+                }
+            }
+            // 再起：翻牌堆顶，若为红色则回1体力
+            if (player.skills.some(s => s.name === '再起') && player.hp < player.maxHp) {
+                const card = this.revealTopCard();
+                if (card) {
+                    if (card.suit === 'heart' || card.suit === 'diamond') {
+                        this.heal(player, 1);
+                        this.log(`${player.name}【再起】回1体力`, 'success');
+                    }
+                    player.handCards.push(card);
+                }
+            }
         }
 
         async doJudge(player) {

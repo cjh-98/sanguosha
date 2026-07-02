@@ -12,97 +12,9 @@ SGS.AI = (function() {
         }
 
         // ========== 回合开始阶段处理 ==========
-        async handleBeginPhase(player, engine) {
-            const skills = player.skills;
-            // 观星
-            if (skills.some(s => s.name === '观星') || skills.some(s => s.name === '志继')) {
-                this.doGuanxing(player, engine);
-            }
-            // 洛神
-            if (skills.some(s => s.name === '洛神')) {
-                this.doLuoshen(player, engine);
-            }
-            // 英魂
-            if (skills.some(s => s.name === '英魂') && player.hp < player.maxHp) {
-                this.doYinghun(player, engine);
-            }
-            // 再起
-            if (skills.some(s => s.name === '再起') && player.hp < player.maxHp) {
-                this.doZaiqi(player, engine);
-            }
-        }
-
-        doGuanxing(player, engine) {
-            // 简化观星：将好牌放牌堆顶
-            const aliveCount = Math.min(engine.getAlivePlayers().length, 5);
-            const cards = [];
-            for (let i = 0; i < aliveCount; i++) {
-                const c = engine.revealTopCard();
-                if (c) cards.push(c);
-            }
-            // 将杀、闪、桃放上面，其他放下面
-            cards.sort((a, b) => {
-                const score = (c) => {
-                    if (c.subtype === 'tao') return 5;
-                    if (c.subtype === 'shan') return 4;
-                    if (c.subtype === 'sha') return 3;
-                    if (c.type === 'trick') return 2;
-                    return 1;
-                };
-                return score(b) - score(a);
-            });
-            // 前两张放回牌堆顶
-            for (let i = 0; i < 2 && cards.length > 0; i++) {
-                engine.deck.push(cards.shift());
-            }
-            // 其余放牌堆底
-            for (const c of cards) {
-                engine.deck.unshift(c);
-            }
-            engine.log(`${player.name}发动了观星`, 'normal');
-        }
-
-        doLuoshen(player, engine) {
-            let count = 0;
-            while (true) {
-                const card = engine.revealTopCard();
-                if (!card) break;
-                if (card.suit === 'spade' || card.suit === 'club') {
-                    player.handCards.push(card);
-                    count++;
-                } else {
-                    engine.deck.push(card);
-                    break;
-                }
-            }
-            if (count > 0) {
-                engine.log(`${player.name}洛神获得${count}张牌`, 'highlight');
-            }
-        }
-
-        doYinghun(player, engine) {
-            const x = player.maxHp - player.hp;
-            if (x < 1) return;
-            // 令一名角色摸X弃X-1，优先自己
-            const target = player; // 简化：自己
-            engine.drawCard(target, x);
-            const discardCount = x - 1;
-            for (let i = 0; i < discardCount && target.handCards.length > 0; i++) {
-                const card = this.chooseDiscard(target, engine);
-                if (card) engine.discardCard(target, card);
-            }
-            engine.log(`${player.name}发动英魂`, 'highlight');
-        }
-
-        doZaiqi(player, engine) {
-            const card = engine.revealTopCard();
-            if (!card) return;
-            if (card.suit === 'heart' || card.suit === 'diamond') {
-                engine.heal(player, 1);
-                engine.log(`${player.name}再起回1体力`, 'success');
-            }
-            player.handCards.push(card);
-        }
+        // 观星/洛神/英魂/再起 现已统一由引擎 doBegin + doBeginInstantSkills 处理：
+        // 观星、洛神 由引擎负责（人类走UI、AI走内联），英魂、再起 由 doBeginInstantSkills
+        // 对所有玩家触发。此处不再重复处理，避免重复结算或人类玩家漏触发。
 
         // ========== 出牌阶段 ==========
         async handlePlayPhase(player, engine) {
@@ -411,8 +323,8 @@ SGS.AI = (function() {
             } catch(e) {
                 console.error('executeAction内部错误:', e);
             }
-            // 等待让UI更新
-            await new Promise(r => setTimeout(r, 50));  // 从100降到50
+            // 等待让UI更新（使用引擎统一定时器，便于销毁时清理，并尊重AI速度）
+            await engine.delay(50);
         }
 
         // ========== 弃牌选择 ==========

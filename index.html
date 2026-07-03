@@ -2254,20 +2254,16 @@ function isSkillOk(player,skill,isTurn){
 function renderActions(human,state){
     const ab=document.getElementById('actionBar');
     const isMy=state.currentPlayerIdx===human.id;
-    // 日志按钮始终显示
-    let logBtn='<button class="log-toggle-btn" onclick="toggleGameLog()">📜 牌局记录</button>';
-    let bugBtn='<button class="btn-submit-log" onclick="submitBugLog()">🐛</button>';
     if(isMy && state.phase==='play'){
-        ab.innerHTML=logBtn+bugBtn+'<button class="btn-sm end-turn" onclick="endTurn()">结束出牌</button>';
+        ab.innerHTML='<button class="btn-sm end-turn" onclick="endTurn()">结束出牌</button>';
     }else if(isMy && state.phase==='discard'){
         const need=human.handCards.length-human.hp;
-        ab.innerHTML=logBtn+bugBtn+`<button class="btn-sm danger" id="discardBtn" disabled onclick="doDiscard()">弃牌(${need})</button>`;
+        ab.innerHTML=`<button class="btn-sm danger" id="discardBtn" disabled onclick="doDiscard()">弃牌(${need})</button>`;
         window._discarding=true; window._discSel=[]; selectedCardIdx=-1;
     }else if(!isMy){
-        // 非自己的回合：显示等待提示 + 日志按钮
         const cp=engine.players[state.currentPlayerIdx];
-        ab.innerHTML=`<span style="color:var(--text-secondary);font-size:11px;flex:1">⏳ 等待 ${cp?cp.hero.name:''} 出牌...</span>`+logBtn+bugBtn;
-    }else{ab.innerHTML=logBtn+bugBtn;}
+        ab.innerHTML=`<span style="color:var(--text-secondary);font-size:11px">⏳ 等待 ${cp?cp.hero.name:''} 出牌...</span>`;
+    }else{ab.innerHTML='';}
 }
 window._discarding=false;
 window._discSel=[];

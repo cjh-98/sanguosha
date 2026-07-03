@@ -1622,6 +1622,7 @@ SGS.GameEngine = (function() {
             // 从手牌移除
             const idx = player.handCards.indexOf(card);
             player.handCards.splice(idx, 1);
+            if (global.__SGS_TRACE__) console.error('[TRACE] useCard splice', player.name, 'card=', card.instanceId, 'actualCard===card?', actualCard === card, 'actualCard.id=', actualCard.instanceId);
 
             this.log(`${player.name}使用了${actualCard.name}`, 'highlight');
 
@@ -1755,6 +1756,7 @@ SGS.GameEngine = (function() {
         }
 
         async resolveCard(player, card, targetIds = []) {
+            if (global.__SGS_TRACE__) console.error('[TRACE] resolveCard ENTER', card.instanceId, 'type=', card.type, 'subtype=', card.subtype);
             // 记录对局事件
             this.addMatchEvent('use_card', {
                 player: player.name,
@@ -1787,8 +1789,21 @@ SGS.GameEngine = (function() {
             }
 
             // 弃入弃牌堆（装备和延时锦囊例外）
+            if (global.__SGS_TRACE__) console.error('[TRACE] resolveCard after-switch', card.instanceId);
             if (card.type !== 'equip' && card.type !== 'delay') {
-                this.discardPile.push(card);
+                // 若该牌已被某技能（如奸雄）收入某角色的手牌/装备/判定区，
+                // 则不再入弃牌堆，否则同一对象会同时存在于手牌与弃牌堆，
+                // 造成卡牌重复、洗牌后出现重复牌（破坏卡牌守恒）。
+                let alreadyHeld = false;
+                for (const p of this.players) {
+                    if (p.handCards.indexOf(card) >= 0 || p.judgmentCards.indexOf(card) >= 0 ||
+                        p.equipment.weapon === card || p.equipment.armor === card ||
+                        p.equipment.horsePlus === card || p.equipment.horseMinus === card) {
+                        alreadyHeld = true; break;
+                    }
+                }
+                if (!alreadyHeld) { this.discardPile.push(card); if (global.__SGS_TRACE__) console.error('[TRACE] resolveCard push discard', card.instanceId); }
+                else { if (global.__SGS_TRACE__) console.error('[TRACE] resolveCard alreadyHeld, NOT pushed', card.instanceId); }
             }
 
             this.notifyState();
@@ -1858,6 +1873,14 @@ SGS.GameEngine = (function() {
                 }
             }
 
+            // 朱雀羽扇：普通杀当作火杀
+            let element = card.element;
+            if (card.subtype === 'sha' && source.equipment.weapon && source.equipment.weapon.subtype === 'zhuque' && element === 'normal') {
+                element = 'fire';
+            }
+            // 青釭剑：使用杀时无视目标防具
+            const ignoreArmor = !!(source.equipment.weapon && source.equipment.weapon.subtype === 'qinggang');
+
             // 检查是否可被闪避
             let unavoidable = false;
             if (source.skills.some(s => s.name === '铁骑')) {
@@ -1880,18 +1903,18 @@ SGS.GameEngine = (function() {
             }
 
             if (!unavoidable) {
-                // 请求闪
-                const shan = await this.requestResponse(target, 'shan', source);
+                // 请求闪（青釭剑：无视目标防具）
+                const shan = await this.requestResponse(target, 'shan', source, { ignoreArmor });
                 if (shan) {
                     this.log(`${target.name}打出了闪`, 'success');
                     // 无双 (吕布)：需要打出两张闪（requestResponse 已负责入弃牌堆）
                     if (source.skills.some(s => s.name === '无双')) {
-                        const shan2 = await this.requestResponse(target, 'shan', source);
+                        const shan2 = await this.requestResponse(target, 'shan', source, { ignoreArmor });
                         if (shan2) {
                             this.log(`${target.name}无双：打出了第二张闪`, 'success');
                         } else {
                             this.log(`${target.name}无双：未能打出第二张闪，杀命中！`, 'danger');
-                            await this.dealDamage(target, baseDamage, { source, element: card.element, card });
+                            await this._resolveShaHit(source, target, card, baseDamage, element, ignoreArmor);
                             return;
                         }
                     }
@@ -1928,10 +1951,32 @@ SGS.GameEngine = (function() {
                             }
                         }
                     }
-                    // 青龙偃月刀
-                    if (source.equipment.weapon && source.equipment.weapon.subtype === 'qinglong') {
-                        this.log(`${source.name}可使用青龙偃月刀追杀`, 'normal');
-                        // 简化：如果还有杀就继续
+                    // 贯石斧：杀被闪抵消时，可弃两张牌强制命中
+                    if (source.equipment.weapon && source.equipment.weapon.subtype === 'guanshi' && source.isAlive && target.isAlive && source.handCards.length >= 2) {
+                        let useGuanshi = source.isAI ? true : await this.askSkillConfirm(source, '贯石斧', `是否发动【贯石斧】弃两张牌，强制命中${target.name}？`);
+                        if (useGuanshi) {
+                            const g1 = source.handCards[0];
+                            const g2 = source.handCards.find(c => c !== g1) || source.handCards[1];
+                            this.discardCard(source, g1);
+                            this.discardCard(source, g2);
+                            this.log(`${source.name}发动贯石斧，强制命中${target.name}`, 'highlight');
+                            await this.dealDamage(target, baseDamage, { source, element, card, ignoreArmor });
+                            return;
+                        }
+                    }
+                    // 青龙偃月刀：杀被闪抵消时，可再出一张杀
+                    if (source.equipment.weapon && source.equipment.weapon.subtype === 'qinglong' && source.isAlive && target.isAlive) {
+                        const ns = source.handCards.find(c => c.subtype === 'sha' && c.instanceId !== card.instanceId);
+                        if (ns) {
+                            let useQinglong = source.isAI ? true : await this.askSkillConfirm(source, '青龙偃月刀', `是否发动【青龙偃月刀】再对${target.name}出一张杀？`);
+                            if (useQinglong) {
+                                source.handCards.splice(source.handCards.indexOf(ns), 1);
+                                this.log(`${source.name}发动青龙偃月刀，再出一张杀`, 'highlight');
+                                await this.resolveSha(source, target, ns, baseDamage, depth + 1);
+                                this.discardPile.push(ns);
+                                return;
+                            }
+                        }
                     }
                     // 庞德猛进
                     if (source.skills.some(s => s.name === '猛进') && target.handCards.length > 0) {
@@ -1944,8 +1989,64 @@ SGS.GameEngine = (function() {
                 this.log(`${target.name}没有闪，受到伤害！`, 'danger');
             }
 
+            // 古锭刀/寒冰剑/雌雄双股剑/麒麟弓 等命中后效果统一在此处理
+            await this._resolveShaHit(source, target, card, baseDamage, element, ignoreArmor);
+        }
+
+        // 杀命中后的武器特效结算（古锭刀/寒冰剑/雌雄双股剑/麒麟弓）
+        async _resolveShaHit(source, target, card, baseDamage, element, ignoreArmor) {
+            // 古锭刀：使用杀造成伤害时，若目标无手牌，伤害+1
+            let dmg = baseDamage;
+            if (source.equipment.weapon && source.equipment.weapon.subtype === 'guding' && target.handCards.length === 0) {
+                dmg += 1;
+                this.log(`${source.name}古锭刀：目标无手牌，伤害+1`, 'highlight');
+            }
+
+            // 寒冰剑：可改为弃置目标两张牌（代替伤害）
+            if (source.equipment.weapon && source.equipment.weapon.subtype === 'hanbing' && target.isAlive && target.handCards.length >= 2) {
+                let useHanbing = source.isAI ? true : await this.askSkillConfirm(source, '寒冰剑', `是否发动【寒冰剑】弃置${target.name}两张手牌代替伤害？`);
+                if (useHanbing) {
+                    const h1 = target.handCards[0];
+                    const h2 = target.handCards.find(c => c !== h1) || target.handCards[1];
+                    this.discardCard(target, h1);
+                    this.discardCard(target, h2);
+                    this.log(`${source.name}发动寒冰剑，弃置了${target.name}的两张牌`, 'highlight');
+                    return;
+                }
+            }
+
             // 造成伤害
-            await this.dealDamage(target, baseDamage, { source, element: card.element, card });
+            await this.dealDamage(target, dmg, { source, element, card, ignoreArmor });
+
+            // 雌雄双股剑：命中异性后，令其弃一张手牌或自己摸一张
+            if (source.equipment.weapon && source.equipment.weapon.subtype === 'cixiong' && target.isAlive && target.gender !== source.gender) {
+                let useCixiong = source.isAI ? true : await this.askSkillConfirm(source, '雌雄双股剑', `是否发动【雌雄双股剑】令${target.name}弃一张手牌或你摸一张牌？`);
+                if (useCixiong) {
+                    if (target.handCards.length > 0) {
+                        const dc = target.handCards[Math.floor(Math.random() * target.handCards.length)];
+                        this.discardCard(target, dc);
+                        this.log(`${target.name}雌雄双股剑：弃置了${dc.name}`, 'normal');
+                    } else {
+                        this.drawCard(source, 1);
+                        this.log(`${source.name}雌雄双股剑：摸了一张牌`, 'normal');
+                    }
+                }
+            }
+
+            // 麒麟弓：造成伤害后，可弃置目标一匹坐骑
+            if (source.equipment.weapon && source.equipment.weapon.subtype === 'qilin' && target.isAlive && (target.equipment.horseMinus || target.equipment.horsePlus)) {
+                let useQilin = source.isAI ? true : await this.askSkillConfirm(source, '麒麟弓', `是否发动【麒麟弓】弃置${target.name}一匹坐骑？`);
+                if (useQilin) {
+                    const slot = target.equipment.horseMinus ? 'horseMinus' : 'horsePlus';
+                    const h = target.equipment[slot];
+                    if (h) {
+                        target.equipment[slot] = null;
+                        this.discardPile.push(h);
+                        this.emit('onLoseEquip', { player: target, card: h, engine: this });
+                        this.log(`${source.name}发动麒麟弓，弃置了${target.name}的${h.name}`, 'highlight');
+                    }
+                }
+            }
         }
 
         // ========== 锦囊牌 ==========
@@ -1976,7 +2077,8 @@ SGS.GameEngine = (function() {
             const canWuxie = await this.checkWuxie(player, card, target);
             if (canWuxie) {
                 this.log(`${player.name}的${card.name}被无懈可击抵消！`, 'normal');
-                this.discardPile.push(card);
+                // 该锦囊牌由调用方 resolveCard 统一入弃牌堆（火计路径则由 useSkill 自行入堆），
+                // 此处若再 push 会导致同一对象在弃牌堆出现两次，洗牌后牌堆出现重复牌（破坏卡牌守恒）。
                 return;
             }
             
@@ -2310,7 +2412,8 @@ SGS.GameEngine = (function() {
         }
 
         // ========== 响应请求（请求打出闪/杀等）==========
-        async requestResponse(player, cardType, source) {
+        async requestResponse(player, cardType, source, opts = {}) {
+            const ignoreArmor = !!opts.ignoreArmor;
             // 无懈可击响应
             if (cardType === 'wuxie') {
                 const wuxieCard = player.handCards.find(c => c.subtype === 'wuxie');
@@ -2325,11 +2428,16 @@ SGS.GameEngine = (function() {
                     }
                     return null;
                 }
-                // 人类玩家：自动打出无懈（后续可以添加UI确认）
-                this.log(`${player.name}有无懈可击，是否打出？(自动打出)`, 'normal');
-                this.discardCard(player, wuxieCard);
-                this.log(`${player.name}打出了无懈可击`, 'highlight');
-                return wuxieCard;
+                // 人类玩家：弹出确认，由玩家决定是否发动无懈可击。
+                // 改为确认而非自动打出：此前会自动抵消一切锦囊（含桃园结义/五谷丰登等己方有益锦囊），属逻辑错误。
+                const use = await this.askSkillConfirm(player, '无懈可击',
+                    `是否使用【无懈可击】抵消${source ? source.name : '一名角色'}的【${card.name}】？`);
+                if (use) {
+                    this.discardCard(player, wuxieCard);
+                    this.log(`${player.name}打出了无懈可击`, 'highlight');
+                    return wuxieCard;
+                }
+                return null;
             }
             
             if (!player.isAlive) return null;
@@ -2355,7 +2463,7 @@ SGS.GameEngine = (function() {
             }
 
             // 八阵 (卧龙): 锁定技，无防具时视为装备八卦阵
-            if (cardType === 'shan' && player.skills.some(s => s.name === '八阵') && !player.equipment.armor) {
+            if (!ignoreArmor && cardType === 'shan' && player.skills.some(s => s.name === '八阵') && !player.equipment.armor) {
                 const judge = this.revealTopCard();
                 if (!judge) {
                     this.log(`${player.name}八阵：牌堆已空，无法判定`, 'normal');
@@ -2371,8 +2479,8 @@ SGS.GameEngine = (function() {
                 }
             }
 
-            // 检查防具
-            if (player.equipment.armor) {
+            // 检查防具（青釭剑：无视防具）
+            if (player.equipment.armor && !ignoreArmor) {
                 switch (player.equipment.armor.subtype) {
                     case 'bagua':
                         if (cardType === 'shan') {
@@ -2527,11 +2635,11 @@ SGS.GameEngine = (function() {
         // ========== 伤害系统 ==========
         async dealDamage(player, damage, opts = {}) {
             if (!player.isAlive) return;
-            const { source = null, element = 'normal', card = null, chainProcessed = null } = opts;
+            const { source = null, element = 'normal', card = null, chainProcessed = null, ignoreArmor = false } = opts;
             if (chainProcessed) chainProcessed.add(player.id);
 
             // 藤甲：免疫普通杀
-            if (player.equipment.armor && player.equipment.armor.subtype === 'tengjia') {
+            if (!ignoreArmor && player.equipment.armor && player.equipment.armor.subtype === 'tengjia') {
                 if (element === 'normal') {
                     this.log(`${player.name}的藤甲抵挡了普通伤害！`, 'success');
                     return;
@@ -2542,14 +2650,14 @@ SGS.GameEngine = (function() {
                 }
             }
             // 白银狮子：每回合最多1点
-            if (player.equipment.armor && player.equipment.armor.subtype === 'baiyin') {
+            if (!ignoreArmor && player.equipment.armor && player.equipment.armor.subtype === 'baiyin') {
                 if (damage > 1) {
                     damage = 1;
                     this.log(`白银狮子减少伤害至1！`, 'success');
                 }
             }
             // 仁王盾：免疫黑杀
-            if (player.equipment.armor && player.equipment.armor.subtype === 'renwang') {
+            if (!ignoreArmor && player.equipment.armor && player.equipment.armor.subtype === 'renwang') {
                 if (card && card.subtype === 'sha' && (card.suit === 'spade' || card.suit === 'club')) {
                     this.log(`${player.name}的仁王盾抵挡了黑色杀！`, 'success');
                     return;

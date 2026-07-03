@@ -175,11 +175,11 @@ SGS.AI = (function() {
                 }
             }
 
-            // 火攻
+            // 火攻（要求目标有手牌且自身能付出弃牌，否则 useCard 会因 canUseCard 失败而空耗整回合）
             const huogong = handCards.find(c => c.subtype === 'huogong');
             if (huogong) {
                 const target = this.chooseBestTarget(player, engine, targets);
-                if (target) {
+                if (target && target.handCards.length > 0 && player.handCards.length >= 2) {
                     return { type: 'useCard', card: huogong, targetIds: [target.id] };
                 }
             }
@@ -296,6 +296,16 @@ SGS.AI = (function() {
             return []; // 内奸没有队友
         }
 
+        // 判断两名角色是否为同一阵营（用于无懈可击等决策）
+        areTeammates(a, b, engine) {
+            if (!a || !b) return false;
+            if (engine.gameMode === 'national') return a.faction === b.faction;
+            const allySide = (id) => id === 'lord' || id === 'loyal';
+            if (allySide(a.identity) && allySide(b.identity)) return true;
+            if (a.identity === 'rebel' && b.identity === 'rebel') return true;
+            return false; // 内奸无队友
+        }
+
         async executeAction(player, engine, action) {
             try {
                 switch (action.type) {
@@ -373,7 +383,13 @@ SGS.AI = (function() {
                 }
                 return false;
             }
-            
+
+            if (cardType === 'wuxie') {
+                // 无懈可击：不抵消队友的锦囊（队友的锦囊通常对己方有利），只抵消敌方锦囊
+                if (source && this.areTeammates(player, source, engine)) return false;
+                return true;
+            }
+
             return true;
         }
 

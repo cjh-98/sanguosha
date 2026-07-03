@@ -3417,7 +3417,9 @@ SGS.GameEngine = (function() {
                             this.log(`反间牌为${SGS.CardData.suitName[c.suit]}${c.name}`, 'normal');
                             target.handCards.splice(target.handCards.indexOf(c), 1);
                             if (c.suit !== declaredSuit) {
-                                await this.dealDamage(target, 1, { source: player, card: c });
+                                // 注意：反间会把展示牌 c 交给周瑜；此处故意不把 c 作为伤害来源牌传入，
+                                // 否则若目标持有【奸雄】，奸雄会把 c 也收入目标手牌，导致同一张牌同时出现在周瑜与目标手中。
+                                await this.dealDamage(target, 1, { source: player, card: null });
                                 this.log(`${target.name}猜错花色，受到1点伤害`, 'danger');
                             }
                             player.handCards.push(c);
@@ -3502,7 +3504,9 @@ SGS.GameEngine = (function() {
                                 if (!p.isAlive) continue;
                                 const shan = await this.requestResponse(p, 'shan', player);
                             if (!shan) {
-                                await this.dealDamage(p, 1, { source: player, card: { subtype: 'sha' } });
+                                // 乱击=万箭齐发式的范围伤害，非实体【杀】，不传入 card；
+                                // 否则若该目标持有【奸雄】，会把一个无 instanceId 的畸形牌对象塞入手牌。
+                                await this.dealDamage(p, 1, { source: player, card: null });
                             }
                             }
                             this.log(`${player.name}发动乱击(万箭齐发)`, 'highlight');
@@ -3825,7 +3829,12 @@ SGS.GameEngine = (function() {
                                 this.log(`${player.name}发动火计，将红色牌当火攻使用`, 'highlight');
                                 const fakeHuogong = { ...card, name: '火攻(火计)', subtype: 'huogong', type: 'trick' };
                                 await this.resolveTrickCard(player, fakeHuogong, [target.id]);
-                                // 该"火攻"牌已使用，入弃牌堆（否则此牌凭空消失）
+                                // 该"火攻"合成牌可能已被奸雄等技能收入某角色手牌，
+                                // 统一回收后入弃牌堆，避免同一张牌对象同时存在于手牌与弃牌堆（卡牌重复/洗牌后重复牌）
+                                for (const p of this.players) {
+                                    const hIdx = p.handCards.indexOf(fakeHuogong);
+                                    if (hIdx >= 0) p.handCards.splice(hIdx, 1);
+                                }
                                 this.discardPile.push(fakeHuogong);
                             }
                         }

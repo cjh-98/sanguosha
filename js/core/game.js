@@ -549,6 +549,13 @@ SGS.GameEngine = (function() {
             return this.deck.pop();
         }
 
+        // 动画桥接：将引擎事件转发给 UI 层播放动画
+        _showAnim(type, data) {
+            if (typeof window !== 'undefined' && window._onGameAnim) {
+                window._onGameAnim(type, data);
+            }
+        }
+
         // ========== 弃牌 ==========
         discardCard(player, card) {
             const idx = player.handCards.indexOf(card);
@@ -1227,7 +1234,8 @@ SGS.GameEngine = (function() {
         async resolveJudgment(player, judgeCard) {
             const judgeResult = this.revealTopCard();
             if (!judgeResult) return;
-
+            // 动画：判定抽牌
+            this._showAnim('judgeDraw', { player, card: judgeResult });
             let finalResult = judgeResult;
             this.log(`${player.name}判定${judgeCard.name}：${SGS.CardData.suitName[judgeResult.suit]}${SGS.CardData.numberName[judgeResult.number]}`, 'normal');
             try { this.emit('onJudge', { player, judgeCard, judgeResult, engine: this, setResult: (c) => { finalResult = c; } }); } catch(e){}
@@ -2809,6 +2817,7 @@ SGS.GameEngine = (function() {
             // 刚烈 (夏侯惇) — 被动技，强制判定，人类选择弃置的牌
             if (player.skills.some(s => s.name === '刚烈') && source && source.isAlive) {
                 const judge = this.revealTopCard();
+                this._showAnim('judgeDraw', { player, card: judge });
                 if (!judge) {
                     this.log(`${player.name}刚烈：牌堆已空，无法判定`, 'normal');
                 } else {

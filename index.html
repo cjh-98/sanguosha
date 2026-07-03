@@ -130,14 +130,17 @@
             background-size: cover; background-position: center; background-repeat: no-repeat;
             position: relative;
             width: 100%;
-            height: 100vh;
+            height: 100%;
+            height: 100dvh;
             flex-shrink: 0;
             /* 纵向布局：topbar + arc-area + players-area */
             display: flex;
             flex-direction: column;
             align-items: stretch;
-            justify-content: flex-start;  /* 改为 flex-start 让子元素按顺序排列 */
+            justify-content: flex-start;
             gap: 0;
+            margin: 0;
+            padding-bottom: 0;
         }
         #gameScreen::before {
             content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
@@ -490,12 +493,12 @@
         .skill-bar { display:flex; flex-direction:column; gap:3px; padding:0; overflow-y:auto;
             flex-shrink:0; width:auto; min-width:44px;
             align-items:flex-end; }
-        .skb { padding:3px 6px; font-size:11px; border:1px solid #8b6914; border-radius:8px;
-                background:linear-gradient(180deg,rgba(139,105,20,0.25),rgba(139,105,20,0.05));
+        .skb { padding:5px 10px; font-size:12px; border:1.5px solid #8b6914; border-radius:8px;
+                background:linear-gradient(180deg,rgba(139,105,20,0.3),rgba(92,74,40,0.15));
                 color:#e6c84d; cursor:pointer; white-space:nowrap; flex-shrink:0;
                 text-shadow:0 1px 1px #000; transition:all 0.2s; font-weight:bold;
                 box-shadow:inset 0 1px 0 rgba(230,200,77,0.2), 0 1px 3px rgba(0,0,0,0.3);
-                text-overflow:ellipsis; overflow:hidden; text-align:center; }
+                text-overflow:ellipsis; overflow:hidden; text-align:center; min-height:28px; min-width:44px; }
         .skb.on { background:linear-gradient(180deg,rgba(230,200,77,0.35),rgba(230,200,77,0.15)); box-shadow:0 0 8px rgba(230,200,77,0.4), inset 0 1px 0 rgba(230,200,77,0.4); }
         .skb.on:active { transform:scale(0.95); }
         .skb:disabled { opacity:0.3; }
@@ -2340,31 +2343,43 @@ function clickP(pid){
     const imgPath=heroId?`assets/images/heroes/${heroId}.jpg`:'';
     let skillHtml='';
     if(p.hero&&p.hero.skills){
-        skillHtml=p.hero.skills.map(s=>`<div style="background:rgba(0,0,0,0.3);border-left:3px solid #e6c84d;padding:6px 10px;margin:5px 0;border-radius:4px">
-            <b style="color:#e6c84d;font-size:13px">${s.name}</b>
-            <p style="font-size:11px;color:#c0c0d0;margin-top:3px;line-height:1.5">${s.desc}</p></div>`).join('');
+        skillHtml=p.hero.skills.map(s=>`<div style="background:rgba(0,0,0,0.3);border-left:3px solid #e6c84d;padding:5px 8px;margin:3px 0;border-radius:4px">
+            <b style="color:#e6c84d;font-size:12px">${s.name}</b>
+            <p style="font-size:10px;color:#c0c0d0;margin-top:2px;line-height:1.4">${s.desc}</p></div>`).join('');
     }
-    const eqList=Object.values(p.equipment).filter(e=>e).map(e=>`<span class="eqi">${e.name}</span>`).join('')||'<span style="color:#666;font-size:11px">无</span>';
+    const eqList=Object.values(p.equipment).filter(e=>e).map(e=>`<span class="eqi">${e.name}</span>`).join('')||'<span style="color:#666;font-size:10px">无</span>';
+    // 判定区
+    const judgeList=(p.judgmentCards&&p.judgmentCards.length)?p.judgmentCards.map(c=>`<span class="eqi" style="border-color:#c9a227">⚡${c.name}</span>`).join(''):'<span style="color:#666;font-size:10px">无</span>';
+    // 状态标记
+    let statusList=[];
+    if(p.isChained) statusList.push('🔗 连环');
+    if(p.isFlipped) statusList.push('↩ 翻面');
+    if(p.tokens&&p.tokens['梦魇']) statusList.push(`💀 梦魇×${p.tokens['梦魇']}`);
+    const statusHtml=statusList.length?statusList.map(s=>`<span style="color:#e74c3c;font-size:10px;margin-right:6px">${s}</span>`).join(''):'<span style="color:#666;font-size:10px">无异常</span>';
     const portraitHtml=imgPath
-        ?`<img src="${imgPath}" onerror="this.style.display='none'" style="width:100%;border-radius:4px;border:1px solid #5c4a28" alt="${p.hero.name}">`
+        ?`<img src="${imgPath}" onerror="this.style.display='none'" style="width:120px;max-width:35%;border-radius:4px;border:1px solid #5c4a28;float:right;margin-left:10px;margin-bottom:6px" alt="${p.hero.name}">`
         :'';
     const overlay=document.createElement('div');
     overlay.className='overlay';
     overlay.onclick=function(){this.remove();};
-    overlay.innerHTML=`<div class="modal" onclick="event.stopPropagation()">
+    overlay.innerHTML=`<div class="modal" onclick="event.stopPropagation()" style="max-width:92vw;max-height:85vh;overflow-y:auto;padding:12px;font-size:12px">
         ${portraitHtml}
-        <h4 style="display:flex;align-items:center;gap:8px;margin-top:8px">
-            <span style="display:inline-block;width:22px;height:22px;border-radius:50%;background:${facC};border:1px solid rgba(255,255,255,0.3);text-align:center;line-height:22px;font-size:11px">${facN}</span>
+        <h4 style="display:flex;align-items:center;gap:8px;margin-top:0;font-size:15px">
+            <span style="display:inline-block;width:20px;height:20px;border-radius:50%;background:${facC};border:1px solid rgba(255,255,255,0.3);text-align:center;line-height:20px;font-size:10px">${facN}</span>
             ${p.hero.name}
         </h4>
-        <p style="font-size:12px;color:#a0a0b0;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:8px">
+        <p style="font-size:11px;color:#a0a0b0;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:6px">
             体力 ${p.hp}/${p.maxHp} · 手牌 ${p.handCards.length} · ${p.isAlive?'存活':'阵亡'}
         </p>
-        <div style="font-size:12px;color:#e6c84d;margin:8px 0 4px">装备</div>
-        <div style="margin-bottom:8px">${eqList}</div>
-        <div style="font-size:12px;color:#e6c84d;margin:8px 0 4px">技能</div>
-        ${skillHtml||'<span style="color:#666;font-size:11px">无技能</span>'}
-        <button class="btn-sm" style="display:block;margin:12px auto 0" onclick="this.closest('.overlay').remove()">关闭</button></div>`;
+        <div style="font-size:11px;color:#e6c84d;margin:6px 0 3px">装备</div>
+        <div style="margin-bottom:6px">${eqList}</div>
+        <div style="font-size:11px;color:#e6c84d;margin:6px 0 3px">判定区</div>
+        <div style="margin-bottom:6px">${judgeList}</div>
+        <div style="font-size:11px;color:#e6c84d;margin:6px 0 3px">状态</div>
+        <div style="margin-bottom:6px">${statusHtml}</div>
+        <div style="font-size:11px;color:#e6c84d;margin:6px 0 3px">技能</div>
+        ${skillHtml||'<span style="color:#666;font-size:10px">无技能</span>'}
+        <button class="btn-sm" style="display:block;margin:10px auto 0" onclick="this.closest('.overlay').remove()">关闭</button></div>`;
     document.body.appendChild(overlay);
 }
 // 点击自己头像查看技能
@@ -4115,6 +4130,35 @@ function showGameOver(result){
 }
 
 // ---- 引擎适配器桥接 ----
+// 引擎动画桥接：从 game.js 接收动画事件
+window._onGameAnim = function(type, data) {
+    try {
+        if (type === 'judgeDraw' && data.player) {
+            const el = getPlayerElement(data.player.id);
+            if (el) {
+                const rect = el.getBoundingClientRect();
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+                showCardFlash(data.card, cx, cy, getCardImagePath(data.card));
+                // 延迟显示判定结果
+                setTimeout(() => {
+                    const suitChar = {spade:'♠',heart:'♥',club:'♣',diamond:'♦'}[data.card.suit]||'?';
+                    const suitColor = data.card.suit==='heart'||data.card.suit==='diamond'?'#e74c3c':'#111';
+                    const el2 = getPlayerElement(data.player.id);
+                    if (!el2) return;
+                    const rect2 = el2.getBoundingClientRect();
+                    const flash = document.createElement('div');
+                    flash.style.cssText = `position:fixed;left:${rect2.left+rect2.width/2}px;top:${rect2.top-30}px;transform:translate(-50%,0);font-size:22px;font-weight:bold;color:${suitColor};z-index:310;pointer-events:none;text-shadow:0 0 8px rgba(255,255,255,0.6);transition:all 0.5s;opacity:1;`;
+                    flash.textContent = suitChar + (data.card.number||'');
+                    document.body.appendChild(flash);
+                    setTimeout(() => { flash.style.opacity='0'; flash.style.transform='translate(-50%,-20px)'; }, 800);
+                    setTimeout(() => { if(flash.parentNode) flash.remove(); }, 1300);
+                }, 400);
+            }
+        }
+    } catch(e) { /* ignore */ }
+};
+
 class BridgeAdapter{
     constructor(){this.mode='local';}
     async sendAction(a){try{return engine.processAction(a);}catch(e){console.error('action err:',e);}}
@@ -4309,16 +4353,16 @@ function showCardFlash(card, x, y, cardImg){
         document.body.appendChild(flash);
 
         requestAnimationFrame(() => {
-            flash.style.transition = 'all 0.3s ease-out';
+            flash.style.transition = 'all 0.4s ease-out';
             flash.style.transform = 'translate(-50%,-50%) scale(1)';
             flash.style.opacity = '1';
         });
         setTimeout(() => {
-            flash.style.transition = 'all 0.2s';
-            flash.style.transform = 'translate(-50%,-50%) scale(1.3)';
+            flash.style.transition = 'all 0.5s';
+            flash.style.transform = 'translate(-50%,-50%) scale(1.2)';
             flash.style.opacity = '0';
-        }, 300);
-        setTimeout(() => { if(flash.parentNode) flash.remove(); }, 500);
+        }, 600);
+        setTimeout(() => { if(flash.parentNode) flash.remove(); }, 1100);
     } catch(e) { /* 忽略 */ }
 }
 

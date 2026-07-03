@@ -295,8 +295,10 @@ SGS.CardData = (function() {
             if (bannedSubtypes.length > 0) {
                 cards = cards.filter(c => !bannedSubtypes.includes(c.subtype));
             }
-            // 赋予唯一ID
-            return cards.map((c, i) => ({ ...c, uid: 'c' + i, instanceId: null }));
+            // 赋予唯一ID：instanceId 必须与 uid 一致且唯一
+            // （引擎在多处依赖 instanceId 做卡牌定位：handCards.find、装备/判定匹配、过牌过滤等；
+            //  若 instanceId 为 null，所有卡牌的 instanceId 都互相等价，会导致定位错乱/装备被误清等 bug）
+            return cards.map((c, i) => ({ ...c, uid: 'c' + i, instanceId: 'c' + i }));
         }
     };
 })();

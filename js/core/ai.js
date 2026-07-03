@@ -214,8 +214,8 @@ SGS.AI = (function() {
                 }
             }
 
-            // 苦肉：黄盖
-            if (player.skills.some(s => s.name === '苦肉') && player.hp >= 1 &&
+            // 苦肉：黄盖（代价为失去1点体力，hp=1时使用会致死，故要求hp>=2）
+            if (player.skills.some(s => s.name === '苦肉') && player.hp >= 2 &&
                 !player.skillStates.kuruUsed && handCards.length < 3) {
                 return { type: 'useSkill', skillName: '苦肉', params: {} };
             }

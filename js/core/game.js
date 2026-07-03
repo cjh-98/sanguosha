@@ -2057,6 +2057,10 @@ SGS.GameEngine = (function() {
                             }
                         }
                     }
+                    // 未被任何角色选走的牌必须入弃牌堆，否则凭空消失（洗牌后牌堆会缺牌/重复）
+                    for (const c of wuguCards) {
+                        this.discardPile.push(c);
+                    }
                     break;
 
                 case 'guohe': // 过河拆桥
@@ -3830,6 +3834,11 @@ SGS.GameEngine = (function() {
                 gameOver: this.gameOver,
                 winner: this.winner,
                 logs: this.logs.slice(-20),
+                // 添加等待状态，供UI判断是否需要阻止强制推进
+                _waitingForGuanxing: this._waitingForGuanxing,
+                _waitingForLuoshen: this._waitingForLuoshen,
+                _waitingForGuicai: this._waitingForGuicai,
+                _waitingForGuidao: this._waitingForGuidao,
             };
         }
 

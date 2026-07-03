@@ -2295,6 +2295,9 @@ function clickCard(idx){
     if(!engine || !engine.getHumanPlayer) return;
     const human=engine.getHumanPlayer(); if(!human){Logger.warn('clickCard失败: 无人类玩家');return;}
     const st=engine.getState();
+    
+    // 如果正在等待观星，不响应卡牌点击（防止误触发）
+    if(engine._waitingForGuanxing){ return; }
 
     // 弃牌模式
     if(st.phase==='discard' && st.currentPlayerIdx===human.id){

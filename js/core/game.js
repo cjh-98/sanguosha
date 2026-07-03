@@ -2597,7 +2597,10 @@ SGS.GameEngine = (function() {
                 // 红颜 (小乔): 黑桃牌视为红桃，可用于天香
                 const hasHongyan = player.skills.some(s => s.name === '红颜');
                 const heartCards = player.handCards.filter(c => c.suit === 'heart' || (hasHongyan && c.suit === 'spade'));
-                const otherTargets = this.getAlivePlayers().filter(p => p.id !== player.id);
+                // 天香转移链：记录已参与本次转移链的角色，避免两个天香角色互相转移造成无限循环
+                const tianxiangChain = opts.tianxiangChain || new Set();
+                tianxiangChain.add(player.id);
+                const otherTargets = this.getAlivePlayers().filter(p => p.id !== player.id && !tianxiangChain.has(p.id));
                 if (heartCards.length > 0 && otherTargets.length > 0) {
                     const wantTianxiang = await this.askSkillConfirm(player, '天香',
                         '受到伤害，是否发动【天香】弃置一张红桃牌，将伤害转移给另一名角色并令其摸一张牌？');
@@ -2613,7 +2616,7 @@ SGS.GameEngine = (function() {
                                 : await this.chooseTarget(player, otherTargets, '天香：选择伤害转移的目标');
                             if (target) {
                                 this.log(`${player.name}发动天香，将伤害转移给${target.name}`, 'highlight');
-                                await this.dealDamage(target, damage, { source: player, element, card, chainProcessed: opts.chainProcessed || null });
+                                await this.dealDamage(target, damage, { source: player, element, card, chainProcessed: opts.chainProcessed || null, tianxiangChain });
                                 this.drawCard(target, 1);
                                 return;
                             }
@@ -3377,6 +3380,9 @@ SGS.GameEngine = (function() {
                         if (c1 >= 0 && c2 >= 0 && params.cards[0].suit === params.cards[1].suit) {
                             player.handCards.splice(Math.max(c1, c2), 1);
                             player.handCards.splice(Math.min(c1, c2), 1);
+                            // 两张同花色牌已从手牌移除，须入弃牌堆，否则会凭空从对局消失（同类于铁索重铸/五谷泄漏）
+                            this.discardPile.push(params.cards[0]);
+                            this.discardPile.push(params.cards[1]);
                             const others = this.getAlivePlayers().filter(p => p.id !== player.id);
                             for (const p of others) {
                                 if (!p.isAlive) continue;

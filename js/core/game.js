@@ -473,6 +473,8 @@ SGS.GameEngine = (function() {
             }
             player.hp = player.maxHp;
             player.faction = hero.faction;
+            // 统一用武将名作显示名（人机测试方便，联机时再覆盖人类玩家名）
+            player.name = hero.name;
 
             // 触发游戏开始技能
             this.emit('gameStart', { player });
@@ -2746,14 +2748,15 @@ SGS.GameEngine = (function() {
             // 遗计 (郭嘉) — 被动技(可)，人类弹窗询问是否发动
             if (player.skills.some(s => s.name === '遗计')) {
                 const wantYiji = await this.askSkillConfirm(player, '遗计',
-                    '受到伤害，是否发动【遗计】摸2张牌并交给其他角色？');
+                    '受到伤害，是否发动【遗计】摸2张牌并交给任意角色（含自己）？');
                 if (wantYiji) {
                     for (let i = 0; i < damage; i++) {
                         this.drawCard(player, 2);
                         this.log(`${player.name}发动遗计，摸了2张牌`, 'highlight');
                         const y = Math.max(0, player.hp);
                         if (y > 0 && player.handCards.length > 0) {
-                            const aliveOthers = this.getAlivePlayers().filter(p => p.id !== player.id);
+                            // 遗计：任意角色（含自己）都可成为目标
+                            const aliveOthers = this.getAlivePlayers();
                             const giveCount = Math.min(y, player.handCards.length);
                             for (let j = 0; j < giveCount; j++) {
                                 if (aliveOthers.length === 0 || player.handCards.length === 0) break;

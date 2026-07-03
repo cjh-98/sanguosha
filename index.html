@@ -4474,8 +4474,8 @@ function boot(){
                 const factionC = {wei:'#5b8def',shu:'#e8503a',wu:'#3ab06a',qun:'#c9a227'}[t.faction] || '#aaa';
                 const roleC = {lord:'#e6c84d',rebel:'#e8503a',loyal:'#5b8def',spy:'#9b59b6'}[t.role] || '#aaa';
                 return `<div class="target-sel-item" onclick="window.doSelectTarget('${t.id}')" style="cursor:pointer;border:2px solid ${factionC};border-radius:8px;padding:8px 12px;margin:6px;background:rgba(0,0,0,0.3);text-align:center;min-width:90px;">
-                    <div style="color:#fff;font-weight:bold;font-size:14px;">${t.name}</div>
-                    <div style="color:${roleC};font-size:11px;margin-top:2px;">${t.hero ? t.hero.name : ''}</div>
+                    <div style="color:#fff;font-weight:bold;font-size:14px;">${t.hero ? t.hero.name : t.name}</div>
+                    <div style="color:${roleC};font-size:11px;margin-top:2px;">${t.identity || ''}</div>
                     <div style="color:${factionC};font-size:11px;">${t.hp}/${t.maxHp}血</div>
                 </div>`;
             }).join('');

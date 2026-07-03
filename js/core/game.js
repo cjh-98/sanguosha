@@ -1884,12 +1884,10 @@ SGS.GameEngine = (function() {
                 const shan = await this.requestResponse(target, 'shan', source);
                 if (shan) {
                     this.log(`${target.name}打出了闪`, 'success');
-                    this.discardPile.push(shan);
-                    // 无双 (吕布)：需要打出两张闪
+                    // 无双 (吕布)：需要打出两张闪（requestResponse 已负责入弃牌堆）
                     if (source.skills.some(s => s.name === '无双')) {
                         const shan2 = await this.requestResponse(target, 'shan', source);
                         if (shan2) {
-                            this.discardPile.push(shan2);
                             this.log(`${target.name}无双：打出了第二张闪`, 'success');
                         } else {
                             this.log(`${target.name}无双：未能打出第二张闪，杀命中！`, 'danger');
@@ -2005,8 +2003,6 @@ SGS.GameEngine = (function() {
                         if (!sha) {
                             this.log(`${p.name}受到1点伤害`, 'danger');
                             await this.dealDamage(p, 1, { source: src, card });
-                        } else {
-                            this.discardPile.push(sha);
                         }
                     }
                     break;
@@ -2019,8 +2015,6 @@ SGS.GameEngine = (function() {
                         const shan = await this.requestResponse(p, 'shan', player);
                         if (!shan) {
                             await this.dealDamage(p, 1, { source: player, card });
-                        } else {
-                            this.discardPile.push(shan);
                         }
                     }
                     break;
@@ -2221,8 +2215,7 @@ SGS.GameEngine = (function() {
                         if (attackTargets.length > 0) {
                             const sha = await this.requestResponse(t4, 'sha', player);
                             if (sha) {
-                                this.discardPile.push(sha);
-                                // 正确：t4选择攻击范围内的一名角色出杀
+                                // 正确：t4选择攻击范围内的一名角色出杀（requestResponse 已负责入弃牌堆）
                                 let targetForT4 = attackTargets[0];
                                 if (t4.isAI && this.ai) {
                                     // AI选择最优目标
@@ -2272,8 +2265,7 @@ SGS.GameEngine = (function() {
                     await this.dealDamage(current, 1, { source: other, card });
                     break;
                 }
-                this.discardPile.push(sha);
-                // 无双：需再出一张【杀】
+                // 无双：需再出一张【杀】（requestResponse 已负责入弃牌堆）
                 if (wushuang) {
                     const sha2 = await this.requestResponse(current, 'sha', other);
                     if (!sha2) {
@@ -2281,7 +2273,6 @@ SGS.GameEngine = (function() {
                         await this.dealDamage(current, 1, { source: other, card });
                         break;
                     }
-                    this.discardPile.push(sha2);
                 }
                 [current, other] = [other, current];
             }
@@ -2524,6 +2515,7 @@ SGS.GameEngine = (function() {
                             if (idx >= 0) h.handCards.splice(idx, 1);
                             const label = faction === 'shu' ? '激将' : faction === 'wei' ? '护驾' : '黄天';
                             this.log(`${h.name}${label}：为${lord.name}打出${cardType === 'sha' ? '杀' : '闪'}`, 'success');
+                            this.discardPile.push(c);
                             return c;
                         }
                     }
@@ -2950,17 +2942,24 @@ SGS.GameEngine = (function() {
                                 this.log(`${p.name}为${player.name}使用了桃`, 'success');
                                 if (player.hp > 0) return;
                             }
-                        } else if (p.id === player.id || p === this.getHumanPlayer()) {
-                            this.discardCard(p, tao);
-                            let extraHeal = 1;
-                            // 救援 (孙权 主公技): 吴势力角色濒死用桃额外回复1点
-                            if (player.faction === 'wu' && this.getAlivePlayers().some(l => l.skills.some(s => s.name === '救援'))) {
-                                extraHeal += 1;
-                                this.log(`救援：${player.name}额外回复1点体力`, 'success');
+                        } else if (!p.isAI) {
+                            // 人类玩家：弹窗询问是否使用桃（自救或救他人皆可）
+                            const askMsg = (p.id === player.id)
+                                ? '你已濒死！是否使用【桃】自救？'
+                                : `是否使用【桃】救濒死的${player.name}？`;
+                            const wantTao = await this.askSkillConfirm(p, '桃', askMsg);
+                            if (wantTao) {
+                                this.discardCard(p, tao);
+                                let extraHeal = 1;
+                                // 救援 (孙权 主公技): 吴势力角色濒死用桃额外回复1点
+                                if (player.faction === 'wu' && this.getAlivePlayers().some(l => l.skills.some(s => s.name === '救援'))) {
+                                    extraHeal += 1;
+                                    this.log(`救援：${player.name}额外回复1点体力`, 'success');
+                                }
+                                this.heal(player, extraHeal);
+                                this.log(`${p.name}为${player.name}使用了桃`, 'success');
+                                if (player.hp > 0) return;
                             }
-                            this.heal(player, extraHeal);
-                            this.log(`${p.name}为${player.name}使用了桃`, 'success');
-                            if (player.hp > 0) return;
                         }
                     }
                     // 酒：濒死时可将【酒】当【桃】自救（仅限自身；契合卡面"濒死时使用回复1点体力"）
@@ -3116,8 +3115,12 @@ SGS.GameEngine = (function() {
                 this.drawCard(killer, 3);
                 this.log(`${killer.name}击杀反贼，摸3张牌`, 'highlight');
             }
-            // 主公杀忠臣弃所有牌
+            // 主公杀忠臣弃所有牌（手牌+装备均入弃牌堆，避免凭空消失）
             if (player.identity === 'loyal' && killer.identity === 'lord') {
+                for (const c of killer.handCards) this.discardPile.push(c);
+                for (const slot of ['weapon', 'armor', 'horsePlus', 'horseMinus']) {
+                    if (killer.equipment[slot]) this.discardPile.push(killer.equipment[slot]);
+                }
                 killer.handCards = [];
                 killer.equipment = { weapon: null, armor: null, horsePlus: null, horseMinus: null };
                 this.log(`主公杀忠臣，弃所有牌！`, 'danger');
@@ -3126,8 +3129,12 @@ SGS.GameEngine = (function() {
 
         handleNationalDeath(player, killer) {
             if (!killer || !player.heroRevealed) return;
-            // 同势力杀同势力：弃所有牌
+            // 同势力杀同势力：弃所有牌（手牌+装备均入弃牌堆，避免凭空消失）
             if (killer.faction === player.faction) {
+                for (const c of killer.handCards) this.discardPile.push(c);
+                for (const slot of ['weapon', 'armor', 'horsePlus', 'horseMinus']) {
+                    if (killer.equipment[slot]) this.discardPile.push(killer.equipment[slot]);
+                }
                 killer.handCards = [];
                 killer.equipment = { weapon: null, armor: null, horsePlus: null, horseMinus: null };
                 this.log(`${killer.name}杀了同势力，弃所有牌！`, 'danger');
@@ -3357,7 +3364,6 @@ SGS.GameEngine = (function() {
                         const target = this.players[params.targetId];
                         const sha = await this.requestResponse(target, 'sha', player);
                         if (sha) {
-                            this.discardPile.push(sha);
                             await this.resolveSha(target, player, sha, 1);
                         } else if (target.handCards.length > 0) {
                             const c = target.handCards[Math.floor(Math.random() * target.handCards.length)];
@@ -3387,11 +3393,9 @@ SGS.GameEngine = (function() {
                             for (const p of others) {
                                 if (!p.isAlive) continue;
                                 const shan = await this.requestResponse(p, 'shan', player);
-                                if (!shan) {
-                                    await this.dealDamage(p, 1, { source: player, card: { subtype: 'sha' } });
-                                } else {
-                                    this.discardPile.push(shan);
-                                }
+                            if (!shan) {
+                                await this.dealDamage(p, 1, { source: player, card: { subtype: 'sha' } });
+                            }
                             }
                             this.log(`${player.name}发动乱击(万箭齐发)`, 'highlight');
                         }

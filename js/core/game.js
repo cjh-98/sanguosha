@@ -1655,14 +1655,16 @@ SGS.GameEngine = (function() {
 
             // 武神技能：红桃手牌视为杀
             const hasWushen = player.skills.some(s => s.name === '武神');
+            const wushenConvert = hasWushen && card.suit === 'heart';
             let actualCard = card;
-            if (hasWushen && card.suit === 'heart') {
-                // 创建临时卡牌对象（红桃牌当杀用）
+            if (wushenConvert) {
+                // 仅用于“能否使用 / UI 显示”的临时克隆，绝不会进入任何牌区，
+                // 因此不会引入新牌对象、也不会产生重复 instanceId（见下方真正结算路径）。
                 actualCard = { ...card, subtype: 'sha', name: '杀（武神）' };
-                this.log(`${player.name}发动【武神】，将红桃牌当【杀】使用`, 'highlight');
             }
 
-            // 检查是否能使用
+            // 检查是否能使用（注意：此处尚未改动原牌，canUseCard 失败时能够安全提前返回，
+            // 不会把红桃手牌永久误改成杀）
             if (!this.canUseCard(player, actualCard, targetIds)) {
                 return false;
             }
@@ -1682,8 +1684,29 @@ SGS.GameEngine = (function() {
                 });
             } catch(e) { /* 忽略 */ }
 
+            // 武神真正结算路径：复用原牌对象（不克隆新对象，保持 170 张守恒），
+            // 仅临时改 subtype/type 为【杀】用于本次结算，结算结束后再还原真实身份。
+            // 这样入弃牌堆/被洗回的始终是同一张真实牌，也不会产生重复 instanceId。
+            let wushenRestore = null;
+            if (wushenConvert) {
+                wushenRestore = { subtype: card.subtype, name: card.name, type: card.type };
+                card.subtype = 'sha';
+                card.name = '杀（武神）';
+                card.type = 'basic';
+                actualCard = card;
+            }
+
             // 处理卡牌效果
-            await this.resolveCard(player, actualCard, targetIds);
+            try {
+                await this.resolveCard(player, actualCard, targetIds);
+            } finally {
+                // 武神临时改动的属性在结算结束后必须还原，确保此牌入弃牌堆/被洗回后仍是其真实身份。
+                if (wushenRestore) {
+                    card.subtype = wushenRestore.subtype;
+                    card.name = wushenRestore.name;
+                    card.type = wushenRestore.type;
+                }
+            }
 
             // 集智 (黄月英)：使用非基本牌后摸1张
             if (player.skills.some(s => s.name === '集智') && card &&
@@ -1821,19 +1844,25 @@ SGS.GameEngine = (function() {
                 this.emit('onUseTrick', { player, card, engine: this });
             }
 
-            switch (card.type) {
-                case 'basic':
-                    await this.resolveBasicCard(player, card, targetIds);
-                    break;
-                case 'trick':
-                    await this.resolveTrickCard(player, card, targetIds);
-                    break;
-                case 'delay':
-                    await this.resolveDelayCard(player, card, targetIds);
-                    break;
-                case 'equip':
-                    this.resolveEquipCard(player, card);
-                    break;
+            try {
+                switch (card.type) {
+                    case 'basic':
+                        await this.resolveBasicCard(player, card, targetIds);
+                        break;
+                    case 'trick':
+                        await this.resolveTrickCard(player, card, targetIds);
+                        break;
+                    case 'delay':
+                        await this.resolveDelayCard(player, card, targetIds);
+                        break;
+                    case 'equip':
+                        this.resolveEquipCard(player, card);
+                        break;
+                }
+            } catch (err) {
+                // 结算过程异常兜底：确保本张已出手的牌最终进入弃牌堆（或已被某技能合法转移），
+                // 不会被"移出队列却未入弃牌堆"而凭空消失，破坏卡牌守恒。
+                this.log(`结算【${card.name}】异常，已强制回收此牌`, 'danger');
             }
 
             // 弃入弃牌堆（装备和延时锦囊例外）
@@ -1865,13 +1894,20 @@ SGS.GameEngine = (function() {
         // ========== 基本牌 ==========
         async resolveBasicCard(player, card, targetIds) {
             switch (card.subtype) {
-                case 'sha':
+                case 'sha': {
                     player.shaUsedThisTurn++;
                     const damage = player.drunk ? 2 : 1;
                     player.drunk = false;
                     const target = this.players[targetIds[0]];
+                    // 防御：目标无效或已阵亡（如指定目标在本回合行动间隙/技能链中死亡）时，
+                    // 直接作废并弃置此杀，避免后续结算读取 target.name 抛错导致整张牌凭空丢失。
+                    if (!target || !target.isAlive) {
+                        this.log(`${player.name}使用【杀】失败：目标无效或已阵亡，此杀作废`, 'danger');
+                        break;
+                    }
                     await this.resolveSha(player, target, card, damage);
                     break;
+                }
                 case 'tao':
                     this.heal(player, 1);
                     this.log(`${player.name}回复1点体力`, 'success');

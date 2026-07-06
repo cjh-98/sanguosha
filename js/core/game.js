@@ -566,11 +566,39 @@ SGS.GameEngine = (function() {
             if (idx >= 0) {
                 player.handCards.splice(idx, 1);
             }
+            // 若该牌当前装备在身上（如刚烈令伤害来源弃置装备牌），须同步清空装备槽并触发失装备事件，
+            // 否则该牌会同时存在于装备区与弃牌堆（破坏卡牌守恒）。
+            for (const slot of ['weapon', 'armor', 'horsePlus', 'horseMinus']) {
+                if (player.equipment[slot] && player.equipment[slot].instanceId === card.instanceId) {
+                    player.equipment[slot] = null;
+                    this.emit('onLoseEquip', { player, card, engine: this });
+                    break;
+                }
+            }
             this.discardPile.push(card);
             // 连营 (陆逊)：弃牌后如无手牌则摸1张
             if (player.skills.some(s => s.name === '连营') && player.handCards.length === 0 && player.isAlive) {
                 this.drawCard(player, 1);
                 this.log(`${player.name}发动【连营】，摸了1张牌`, 'highlight');
+            }
+        }
+
+        // 清除虚拟（非实体）牌：神速等技能产生的合成 uid 牌并非真实卡牌，
+        // 若被奸雄等技能卷入手牌/弃牌堆会污染牌堆（破坏卡牌守恒），结算后须彻底移除。
+        _removePhantomCard(card) {
+            if (!card) return;
+            const di = this.discardPile.indexOf(card);
+            if (di >= 0) this.discardPile.splice(di, 1);
+            for (const p of this.players) {
+                const hi = p.handCards.indexOf(card);
+                if (hi >= 0) p.handCards.splice(hi, 1);
+                for (const slot of ['weapon', 'armor', 'horsePlus', 'horseMinus']) {
+                    if (p.equipment[slot] === card) p.equipment[slot] = null;
+                }
+                const ji = p.judgmentCards.indexOf(card);
+                if (ji >= 0) p.judgmentCards.splice(ji, 1);
+                const bi = (p.buquCards || []).indexOf(card);
+                if (bi >= 0) p.buquCards.splice(bi, 1);
             }
         }
 
@@ -842,8 +870,11 @@ SGS.GameEngine = (function() {
                     const targets = this.getAttackTargets(player);
                     if (targets.length > 0) {
                         this.log(`${player.name}发动【神速】，视为使用一张杀`, 'highlight');
-                        await this.resolveSha(player, targets[0],
-                            { name:'杀(神速)', subtype:'sha', element:'normal', suit:'spade', number:0, instanceId:'sx_'+Date.now(), uid:'sx' }, 1);
+                        const fakeSha = { name:'杀(神速)', subtype:'sha', element:'normal', suit:'spade', number:0, instanceId:'sx_'+Date.now(), uid:'sx' };
+                        await this.resolveSha(player, targets[0], fakeSha, 1);
+                        // 神速的虚拟【杀】并非实体牌：结算后从所有可能残留的牌区清除，
+                        // 否则其合成 uid('sx') 会污染牌堆/手牌（破坏卡牌守恒，重洗后会变出幻影牌）。
+                        this._removePhantomCard(fakeSha);
                     } else {
                         this.log(`${player.name}发动神速，但没有攻击目标`, 'normal');
                     }
@@ -2416,6 +2447,13 @@ SGS.GameEngine = (function() {
         // ========== 装备牌 ==========
         resolveEquipCard(player, card) {
             const slot = card.slot;
+            // 防御：若该牌已经在本装备区对应槽位，无需重复装备，
+            // 否则会把它当作“旧装备”再次推入弃牌堆，造成同一张牌同时存在于装备区与弃牌堆（破坏卡牌守恒）。
+            if (player.equipment[slot] === card) return;
+            // 防御：若该牌仍在手牌中（例如某些技能直接将其装备而未走 useCard 出牌→弃手牌流程），
+            // 先将其从手牌移除，避免同一张牌同时出现在手牌与装备区。
+            const hi = player.handCards.indexOf(card);
+            if (hi >= 0) player.handCards.splice(hi, 1);
             // 弃掉旧装备
             if (player.equipment[slot]) {
                 this.discardPile.push(player.equipment[slot]);
@@ -2796,6 +2834,11 @@ SGS.GameEngine = (function() {
             // 技能触发：受到伤害后
             // 奸雄 (曹操) — LOCKED，自动发动
             if (player.skills.some(s => s.name === '奸雄') && card && source) {
+                // 若该牌此前已入弃牌堆（如 requestResponse 在打出时、或技能弃置代价时已入堆），
+                // 先将其从弃牌堆移除再入手，避免同一张卡牌同时存在于弃牌堆与手牌（破坏卡牌守恒）。
+                // 例：借刀杀人/挑衅/乱武 把对方打出的【杀】交给奸雄；离间/火计/乱击 走 null 不会触发本分支。
+                const di = this.discardPile.indexOf(card);
+                if (di >= 0) this.discardPile.splice(di, 1);
                 player.handCards.push(card);
                 this.log(`${player.name}发动奸雄，获得了${card.name}`, 'highlight');
                 try { this.adapter && this.adapter.notifyEvent({ type: 'skill', skillName: '奸雄', playerId: player.id }); } catch(e){}
@@ -3414,15 +3457,47 @@ SGS.GameEngine = (function() {
                     if (params.targetId !== undefined) {
                         const target = this.players[params.targetId];
                         const blackCard = params.card;
-                        const idx = player.handCards.indexOf(blackCard);
-                        if (idx >= 0 && (blackCard.suit === 'spade' || blackCard.suit === 'club')) {
+                        const idx = blackCard ? player.handCards.indexOf(blackCard) : -1;
+                        // 将黑色手牌当【过河拆桥】使用：仅当所交牌确为手中黑色牌时才发动
+                        if (blackCard && idx >= 0 && (blackCard.suit === 'spade' || blackCard.suit === 'club')) {
                             player.handCards.splice(idx, 1);
                             this.discardPile.push(blackCard);
-                            // 过河拆桥效果
-                            if (target.handCards.length > 0) {
-                                const c = target.handCards[Math.floor(Math.random() * target.handCards.length)];
-                                this.discardCard(target, c);
-                                this.log(`${player.name}奇袭拆了${target.name}的${c.name}`, 'highlight');
+                            // 谦逊(陆逊)：不能被过河拆桥选中
+                            if (target.skills.some(s => s.name === '谦逊')) {
+                                this.log(`${target.name}谦逊：不能被奇袭(过河拆桥)选中`, 'normal');
+                            } else if (target.skills.some(s => s.name === '帷幕') && (blackCard.suit === 'spade' || blackCard.suit === 'club')) {
+                                this.log(`${target.name}帷幕：不能被黑色锦囊选中`, 'normal');
+                            } else {
+                                // 收集目标所有可弃置的牌（手牌+装备+判定区），由使用者选择拆哪一张
+                                const allCards = [...target.handCards];
+                                for (const slot of ['weapon', 'armor', 'horsePlus', 'horseMinus']) {
+                                    if (target.equipment[slot]) allCards.push(target.equipment[slot]);
+                                }
+                                for (const jc of target.judgmentCards) allCards.push(jc);
+                                if (allCards.length > 0) {
+                                    const chosen = await this.chooseCard(player, allCards, `奇袭：拆掉${target.name}的一张牌`);
+                                    if (chosen) {
+                                        const hIdx = target.handCards.indexOf(chosen);
+                                        if (hIdx >= 0) {
+                                            target.handCards.splice(hIdx, 1);
+                                        } else {
+                                            const jIdx = target.judgmentCards.indexOf(chosen);
+                                            if (jIdx >= 0) {
+                                                target.judgmentCards.splice(jIdx, 1);
+                                            } else {
+                                                for (const slot of ['weapon', 'armor', 'horsePlus', 'horseMinus']) {
+                                                    if (target.equipment[slot] && target.equipment[slot].instanceId === chosen.instanceId) {
+                                                        target.equipment[slot] = null;
+                                                        this.emit('onLoseEquip', { player: target, card: chosen, engine: this });
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        this.discardPile.push(chosen);
+                                        this.log(`${player.name}奇袭拆了${target.name}的${chosen.name}`, 'highlight');
+                                    }
+                                }
                             }
                         }
                     }
@@ -3487,7 +3562,9 @@ SGS.GameEngine = (function() {
                             this.log(`${player.name}离间${t1.name}和${t2.name}决斗`, 'highlight');
                             player.skillStates = player.skillStates || {};
                             player.skillStates.lijianUsed = true;
-                            await this.resolveDuel(t1, t2, card);
+                            // 离间是技能而非实体牌：不把貂蝉的黑色代价牌当“决斗牌”传入，
+                            // 否则决斗失败方若持有【奸雄】会错误获得貂蝉已弃置的代价牌。
+                            await this.resolveDuel(t1, t2, null);
                         }
                     }
                     break;

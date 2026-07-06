@@ -1368,7 +1368,9 @@ SGS.GameEngine = (function() {
                     }
                     return;
             }
-            this.discardPile.push(judgeCard);
+            // 合成延时牌（国色/断粮）无 instanceId，系由本体牌转化的标记，结算后直接消失，
+            // 不入弃牌堆，否则洗牌重入后成为幻影牌污染牌堆。
+            if (judgeCard.instanceId) this.discardPile.push(judgeCard);
         }
 
         getNextPlayer(fromPlayer) {
@@ -1626,8 +1628,9 @@ SGS.GameEngine = (function() {
                     break;
             }
 
-            // 非闪电的判定牌（乐不思蜀/兵粮寸断）经鬼才/鬼道结算后需置入弃牌堆
-            if (judgeCard.subtype !== 'shandian') {
+            // 非闪电的判定牌（乐不思蜀/兵粮寸断）经鬼才/鬼道结算后需置入弃牌堆；
+            // 合成延时牌（国色/断粮）无 instanceId，系由本体牌转化的标记，不入弃牌堆，避免幻影牌污染
+            if (judgeCard.subtype !== 'shandian' && judgeCard.instanceId) {
                 this.discardPile.push(judgeCard);
             }
 
@@ -2029,7 +2032,10 @@ SGS.GameEngine = (function() {
                                     } else {
                                         this.log(`雷击判定：${SGS.CardData.suitName[judge.suit]}${SGS.CardData.numberName[judge.number]}`, 'normal');
                                         if (judge.suit === 'spade') {
-                                            await this.dealDamage(chosen, 2, { source: target, element: 'thunder', card: shan });
+                                            // 雷击属技能伤害（张角靠"打出闪"触发），并非由某张牌造成伤害，
+                                            // 故不把"闪"作为造成损害的牌传入 —— 否则若 chosen 持有【奸雄】，
+                                            // 会把八卦阵/八阵产出的"合成闪"（无 instanceId）收进手牌污染牌堆。
+                                            await this.dealDamage(chosen, 2, { source: target, element: 'thunder', card: null });
                                             this.log(`${target.name}雷击成功，${chosen.name}受到2点雷伤害！`, 'danger');
                                         } else {
                                             this.log(`雷击失败，判定不是♠`, 'normal');
@@ -3258,8 +3264,9 @@ SGS.GameEngine = (function() {
                 killer: killer?.name
             });
 
-            // 收集死者所有牌
-            const deadCards = [...player.handCards, ...player.judgmentCards];
+            // 收集死者所有牌；仅收集有 instanceId 的真牌，
+            // 丢弃判定区中因 国色/断粮 产生的无 instanceId 合成延时牌（不可入局）
+            const deadCards = [...player.handCards, ...player.judgmentCards].filter(c => c && c.instanceId);
             for (const slot of ['weapon', 'armor', 'horsePlus', 'horseMinus']) {
                 if (player.equipment[slot]) deadCards.push(player.equipment[slot]);
             }

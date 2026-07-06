@@ -980,6 +980,9 @@ SGS.GameEngine = (function() {
                 // 神威（神吕布）：觉醒条件为"狂暴"标记达到6
                 if (skill.name === '神威') {
                     canTrigger = (player.tokens['狂暴'] || 0) >= 6;
+                } else if (skill.name === '志继') {
+                    // 志继觉醒条件为"手牌为0"（与武将描述一致），而非默认的血量=1
+                    canTrigger = (player.handCards.length === 0);
                 }
                 if (canTrigger) {
                     try {
@@ -3926,15 +3929,16 @@ SGS.GameEngine = (function() {
                             if (idx >= 0) {
                                 player.handCards.splice(idx, 1);
                                 this.log(`${player.name}发动火计，将红色牌当火攻使用`, 'highlight');
-                                const fakeHuogong = { ...card, name: '火攻(火计)', subtype: 'huogong', type: 'trick' };
-                                await this.resolveTrickCard(player, fakeHuogong, [target.id]);
-                                // 该"火攻"合成牌可能已被奸雄等技能收入某角色手牌，
-                                // 统一回收后入弃牌堆，避免同一张牌对象同时存在于手牌与弃牌堆（卡牌重复/洗牌后重复牌）
-                                for (const p of this.players) {
-                                    const hIdx = p.handCards.indexOf(fakeHuogong);
-                                    if (hIdx >= 0) p.handCards.splice(hIdx, 1);
-                                }
-                                this.discardPile.push(fakeHuogong);
+                const fakeHuogong = { ...card, name: '火攻(火计)', subtype: 'huogong', type: 'trick' };
+                await this.resolveTrickCard(player, fakeHuogong, [target.id]);
+                // 火计消耗的是原红色手牌 card（已在上面一步从手牌移除），必须入弃牌堆，
+                // 否则该实体牌会凭空从对局消失（洗牌后牌堆缺牌，破坏卡牌守恒）。
+                // 合成牌 fakeHuogong 非实体牌：若被奸雄等技能收入手牌，先回收，但不计入牌堆。
+                for (const p of this.players) {
+                    const hIdx = p.handCards.indexOf(fakeHuogong);
+                    if (hIdx >= 0) p.handCards.splice(hIdx, 1);
+                }
+                this.discardPile.push(card);
                             }
                         }
                     }
@@ -3960,8 +3964,8 @@ SGS.GameEngine = (function() {
                     }
                     break;
                 case '志继':
-                    // 姜维觉醒技：体力=1时减1点体力上限，获得"观星"
-                    if (player.hp === 1 && !player.skills.some(s => s.name === '志继觉醒')) {
+                    // 姜维觉醒技：手牌为0时减1点体力上限，获得"观星"（与武将描述一致）
+                    if (player.handCards.length === 0 && !player.skills.some(s => s.name === '志继觉醒')) {
                         player.skills.push({ name: '志继觉醒', type: 'locked', desc: '觉醒技，体力=1时获得"观星"' });
                         player.skills.push({ name: '观星', type: 'active', trigger: 'turnBegin', desc: '回合开始时观看牌堆顶的牌并调整顺序' });
                         player.maxHp -= 1;

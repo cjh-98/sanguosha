@@ -3963,7 +3963,7 @@ function startLuoshen(){
     const ov=document.createElement('div');
     ov.id='luoshenOverlay';
     ov.className='overlay';
-    ov.onclick=function(e){if(e.target===this)this.remove();};
+    ov.onclick=function(e){if(e.target===this)cancelLuoshen();};
     ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
         <h4>洛神判定</h4>
         <div id="luoshenResult"></div>

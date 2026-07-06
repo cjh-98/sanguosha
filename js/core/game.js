@@ -18,7 +18,11 @@ SGS.GameEngine = (function() {
     function shuffleId(arr) {
         const copy = [...arr];
         shuffle(copy);
-        return copy.map((c, i) => ({ ...c, instanceId: 'card_' + i + '_' + Date.now() }));
+        // 保留每张牌既有的 instanceId（由 createDeck 赋值为 'c'+i，全局唯一且稳定）。
+        // 切勿在此重新生成 instanceId：否则每次洗牌（牌堆耗尽时把弃牌堆洗回牌堆）都会改变
+        // 卡牌身份，导致依赖 instanceId 的定位（handCards.find、装备/判定匹配、过牌/顺手选择等）
+        // 在洗牌后失效，破坏卡牌守恒判定与玩家选择。
+        return copy;
     }
 
     // ========== 玩家类 ==========
@@ -1293,14 +1297,14 @@ SGS.GameEngine = (function() {
                 }
             }
 
-            this.discardPile.push(finalResult);
-            if (finalResult !== judgeResult) { this.discardPile.push(judgeResult); }
-
-            // 天妒 (郭嘉)：获得判定牌
+            // 天妒 (郭嘉)：获得判定牌——优先入其手牌，不再入弃牌堆，避免同一张牌同时存在于手牌与弃牌堆（卡牌守恒）
             if (player.skills.some(s => s.name === '天妒')) {
                 player.handCards.push(finalResult);
                 this.log(`${player.name}发动天妒，获得了判定牌${finalResult.name}`, 'highlight');
+            } else {
+                this.discardPile.push(finalResult);
             }
+            if (finalResult !== judgeResult) { this.discardPile.push(judgeResult); }
 
             switch (judgeCard.subtype) {
                 case 'lebusi':
@@ -1549,8 +1553,10 @@ SGS.GameEngine = (function() {
             const player = currentPlayer; // 使用传入的player引用
             if (!player) return;
 
-            // 将判定结果（被替换后的牌）放入弃牌堆
-            this.discardPile.push(finalResult);
+            // 将判定结果（被替换后的牌）放入弃牌堆；若被天妒拿入手牌则跳过（由末尾天妒分支处理，避免卡牌重复/守恒破坏）
+            if (!(player.skills.some(s => s.name === '天妒'))) {
+                this.discardPile.push(finalResult);
+            }
 
             // 如果判定牌被替换（鬼才/鬼道），被替换掉的原判定牌也要放入弃牌堆，避免凭空消失
             if (originalResult && originalResult !== finalResult) {
@@ -1800,18 +1806,23 @@ SGS.GameEngine = (function() {
             if (global.__SGS_TRACE__) console.error('[TRACE] resolveCard after-switch', card.instanceId);
             if (card.type !== 'equip' && card.type !== 'delay') {
                 // 若该牌已被某技能（如奸雄）收入某角色的手牌/装备/判定区，
-                // 则不再入弃牌堆，否则同一对象会同时存在于手牌与弃牌堆，
+                // 或已被移入弃牌堆/牌堆（例如奸雄将牌放入手牌后，该角色在结算过程中阵亡，
+                // 死亡处理将其手牌弃入弃牌堆），则不再入弃牌堆，否则同一对象会被重复入堆，
                 // 造成卡牌重复、洗牌后出现重复牌（破坏卡牌守恒）。
-                let alreadyHeld = false;
-                for (const p of this.players) {
-                    if (p.handCards.indexOf(card) >= 0 || p.judgmentCards.indexOf(card) >= 0 ||
-                        p.equipment.weapon === card || p.equipment.armor === card ||
-                        p.equipment.horsePlus === card || p.equipment.horseMinus === card) {
-                        alreadyHeld = true; break;
+                let alreadyAccounted = false;
+                if (this.discardPile.indexOf(card) >= 0 || this.deck.indexOf(card) >= 0) {
+                    alreadyAccounted = true;
+                } else {
+                    for (const p of this.players) {
+                        if (p.handCards.indexOf(card) >= 0 || p.judgmentCards.indexOf(card) >= 0 ||
+                            p.equipment.weapon === card || p.equipment.armor === card ||
+                            p.equipment.horsePlus === card || p.equipment.horseMinus === card) {
+                            alreadyAccounted = true; break;
+                        }
                     }
                 }
-                if (!alreadyHeld) { this.discardPile.push(card); if (global.__SGS_TRACE__) console.error('[TRACE] resolveCard push discard', card.instanceId); }
-                else { if (global.__SGS_TRACE__) console.error('[TRACE] resolveCard alreadyHeld, NOT pushed', card.instanceId); }
+                if (!alreadyAccounted) { this.discardPile.push(card); if (global.__SGS_TRACE__) console.error('[TRACE] resolveCard push discard', card.instanceId); }
+                else { if (global.__SGS_TRACE__) console.error('[TRACE] resolveCard alreadyAccounted, NOT pushed', card.instanceId); }
             }
 
             this.notifyState();
@@ -2438,8 +2449,10 @@ SGS.GameEngine = (function() {
                 }
                 // 人类玩家：弹出确认，由玩家决定是否发动无懈可击。
                 // 改为确认而非自动打出：此前会自动抵消一切锦囊（含桃园结义/五谷丰登等己方有益锦囊），属逻辑错误。
+                // 注意：requestResponse 的签名仅有 (player, cardType, source, opts)，没有 card 形参，
+                // 故此处只能引用 source.name，不能引用 card.name（否则 ReferenceError 崩溃）。
                 const use = await this.askSkillConfirm(player, '无懈可击',
-                    `是否使用【无懈可击】抵消${source ? source.name : '一名角色'}的【${card.name}】？`);
+                    `是否使用【无懈可击】抵消${source ? source.name : '一名角色'}使用的锦囊？`);
                 if (use) {
                     this.discardCard(player, wuxieCard);
                     this.log(`${player.name}打出了无懈可击`, 'highlight');

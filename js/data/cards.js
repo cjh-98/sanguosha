@@ -10,7 +10,10 @@ SGS.CardData = (function() {
     // 卡牌类型
     const TYPE = { BASIC: 'basic', TRICK: 'trick', DELAY: 'delay', EQUIP: 'equip' };
     // 装备栏位
-    const SLOT = { WEAPON: 'weapon', ARMOR: 'armor', HORSE_PLUS: 'horse_plus', HORSE_MINUS: 'horse_minus' };
+    // 注意：slot 值必须与 engine 中 player.equipment 的键名一致（camelCase），
+    // 否则坐骑会被存入 equipment.horse_plus（错误键）而非 equipment.horsePlus，
+    // 导致：1) 距离加成永久失效；2) 角色阵亡时该坐骑漏收、卡牌凭空消失（破坏卡牌守恒）。
+    const SLOT = { WEAPON: 'weapon', ARMOR: 'armor', HORSE_PLUS: 'horsePlus', HORSE_MINUS: 'horseMinus' };
 
     // 卡牌定义模板
     function card(name, suit, number, type, subtype, opts = {}) {

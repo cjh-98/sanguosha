@@ -310,7 +310,7 @@
         }
         /* 武将牌（正版风格）- 带立绘的卡片 */
         .hero-card {
-            width:clamp(90px, 10vw, 120px); aspect-ratio: 5 / 7; cursor:pointer;
+            width:clamp(100px, 11vw, 140px); aspect-ratio: 5 / 7; cursor:pointer;
             border-radius:6px; overflow:hidden;
             box-shadow:0 4px 16px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(212,184,106,0.25), 0 0 0 1.5px rgba(230,200,77,0.3);
             transition:all 0.22s; flex-shrink:1; min-width:0;
@@ -516,7 +516,7 @@
         .hand-area {
             flex-shrink:0; width:100%; box-sizing:border-box; position:relative;
             background:linear-gradient(180deg, rgba(0,0,0,0.7), rgba(0,0,0,0.5));
-            border-top:2px solid #8b6914; padding:5px 8px;
+            padding:5px 8px;
             display:flex; align-items:center; gap:6px;
             margin-bottom: 0;
             padding-bottom: calc(5px + env(safe-area-inset-bottom, 0px));
@@ -2295,7 +2295,8 @@ function updatePrompt(human,state){
 
 // ---- 交互事件 ----
 function clickCard(idx){
-    if(!engine || !engine.getHumanPlayer) return;
+    if(!engine) return;
+    if(!engine.getHumanPlayer) return;
     const human=engine.getHumanPlayer(); if(!human){Logger.warn('clickCard失败: 无人类玩家');return;}
     const st=engine.getState();
     

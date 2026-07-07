@@ -4104,9 +4104,19 @@ function showGameOver(result){
     document.getElementById('goTitle').textContent=win?'胜利！':'失败...';
     document.getElementById('goTitle').className='go-title '+(win?'go-win':'go-lose');
 
-    const wn=Cfg.mode==='national'?
-        (result.winner&&result.winner.length===1&&result.winner[0].startsWith?'野心家获胜':result.winner?(SGS.HeroData.factionName[result.winner[0]]||'')+'势力获胜':''):
-        result.winner?(SGS.Config.identityName[result.winner[0]]||result.winner[0])+'方获胜':'';
+    let wn='';
+    if(result.winner&&result.winner.length){
+        if(Cfg.mode==='national'){
+            // winner 为玩家 id 列表（野心家为单元素）。取出获胜阵营造显示名（此前误用 winner[0].startsWith 直接作为布尔，
+            // 且用 player id 当 faction 下标，导致国战胜利文案恒为空的"势力获胜"）。
+            const winPlayers=(result.players||[]).filter(p=>result.winner.includes(p.id));
+            const fac=[...new Set(winPlayers.map(p=>p.faction).filter(Boolean))];
+            const facName=fac.length===1?(SGS.HeroData.factionName[fac[0]]||fac[0]):'';
+            wn=facName?(facName+'势力获胜'):'势力获胜';
+        }else{
+            wn=(SGS.Config.identityName[result.winner[0]]||result.winner[0])+'方获胜';
+        }
+    }
     document.getElementById('goInfo').innerHTML=wn+'<br><br>'+(win?'恭喜你取得了胜利！':'再接再厉！');
     
     // 添加查看日志按钮

@@ -734,8 +734,11 @@ SGS.GameEngine = (function() {
             let dist = Math.abs(fromIdx - toIdx);
             dist = Math.min(dist, n - dist);
 
-            // 装备修正
-            dist += to.distanceMod; // 目标的+1马增加距离
+            // 装备修正（距离非对称，规则修正）：
+            //   目标的 +1马(horsePlus) 使他人到其的距离 +1；目标的 -1马(horseMinus) 仅影响"目标自己到他人的距离"，
+            //   不应对"他人到目标"的距离产生 -1 的额外修正（此前 to.distanceMod 错误地包含了 -1马，导致目标有-1马时攻击方被多减 1）。
+            //   攻击方自己的 +1马 不改变"自己到他人"的距离（仅影响"他人到自己"），故不在此处理。
+            if (to.equipment.horsePlus) dist += 1;   // 目标的+1马：他人到目标距离+1
             if (from.equipment.horseMinus) dist -= 1; // 自己的-1马减少距离
             // 马术 (马超)：攻击距离-1
             if (from.skills.some(s => s.name === '马术')) dist -= 1;
@@ -3426,7 +3429,17 @@ SGS.GameEngine = (function() {
             
             // 判断人类玩家胜负
             const humanPlayer = this.players.find(p => !p.isAI);
-            const isWin = humanPlayer && this.winner && this.winner.includes(humanPlayer.id);
+            let isWin = false;
+            if (humanPlayer && this.winner) {
+                if (this.gameMode === 'national') {
+                    // 国战：winner 为玩家 id 列表；亮明势力后也可用势力判定（与 UI showGameOver 一致）
+                    isWin = this.winner.includes(humanPlayer.id) ||
+                            (humanPlayer.heroRevealed && this.winner.includes(humanPlayer.faction));
+                } else {
+                    // 身份局：winner 存放的是身份字符串（'lord'/'rebel'/'spy'/'loyal'），须按人类身份判定
+                    isWin = this.winner.includes(humanPlayer.identity);
+                }
+            }
             const result = isWin ? 'win' : 'lose';
             
             // 停止实时日志上传

@@ -374,17 +374,7 @@ SGS.AI = (function() {
                 return false;
             }
 
-            // 倾国（甄姬）：有黑色手牌则当作闪打出
-            if (cardType === 'qinged') {
-                const blackCards = player.handCards.filter(c => c.suit === 'spade' || c.suit === 'club');
-                if (blackCards.length > 0) {
-                    // 血少时更倾向保留黑色牌，但一般情况下都打出
-                    return player.hp > 1;
-                }
-                return false;
-            }
-
-            if (cardType === 'wuxie') {
+        if (cardType === 'wuxie') {
                 // 无懈可击：不抵消队友的锦囊（队友的锦囊通常对己方有利），只抵消敌方锦囊
                 if (source && this.areTeammates(player, source, engine)) return false;
                 return true;

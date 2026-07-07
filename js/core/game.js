@@ -4103,7 +4103,10 @@ SGS.GameEngine = (function() {
                     maxHp: p.maxHp,
                     handCount: p.handCards.length,
                     equipment: p.equipment,
-                    judgmentCards: p.judgmentCards.map(c => c.name),
+                    // 序列化为 {subtype, name} 对象（而非裸字符串），
+                    // 否则 _updateBoardImpl 中读取 c.subtype 以渲染 乐/兵/闪 标记时会全部得到 undefined，
+                    // 导致对手判定区徽标错误显示为 '?'。
+                    judgmentCards: p.judgmentCards.map(c => ({ subtype: c.subtype, name: c.name })),
                     identity: p.identity,
                     isAlive: p.isAlive,
                     isAI: p.isAI,

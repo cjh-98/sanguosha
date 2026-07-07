@@ -1678,7 +1678,6 @@ SGS.GameEngine = (function() {
             // 从手牌移除
             const idx = player.handCards.indexOf(card);
             player.handCards.splice(idx, 1);
-            if (global.__SGS_TRACE__) console.error('[TRACE] useCard splice', player.name, 'card=', card.instanceId, 'actualCard===card?', actualCard === card, 'actualCard.id=', actualCard.instanceId);
 
             this.log(`${player.name}使用了${actualCard.name}`, 'highlight');
 
@@ -1833,7 +1832,6 @@ SGS.GameEngine = (function() {
         }
 
         async resolveCard(player, card, targetIds = []) {
-            if (global.__SGS_TRACE__) console.error('[TRACE] resolveCard ENTER', card.instanceId, 'type=', card.type, 'subtype=', card.subtype);
             // 记录对局事件
             this.addMatchEvent('use_card', {
                 player: player.name,
@@ -1872,7 +1870,6 @@ SGS.GameEngine = (function() {
             }
 
             // 弃入弃牌堆（装备和延时锦囊例外）
-            if (global.__SGS_TRACE__) console.error('[TRACE] resolveCard after-switch', card.instanceId);
             if (card.type !== 'equip' && card.type !== 'delay') {
                 // 若该牌已被某技能（如奸雄）收入某角色的手牌/装备/判定区，
                 // 或已被移入弃牌堆/牌堆（例如奸雄将牌放入手牌后，该角色在结算过程中阵亡，
@@ -1890,8 +1887,7 @@ SGS.GameEngine = (function() {
                         }
                     }
                 }
-                if (!alreadyAccounted) { this.discardPile.push(card); if (global.__SGS_TRACE__) console.error('[TRACE] resolveCard push discard', card.instanceId); }
-                else { if (global.__SGS_TRACE__) console.error('[TRACE] resolveCard alreadyAccounted, NOT pushed', card.instanceId); }
+                if (!alreadyAccounted) { this.discardPile.push(card); }
             }
 
             this.notifyState();

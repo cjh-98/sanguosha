@@ -2047,7 +2047,7 @@ function _updateBoardImpl(state){
                 <div class="hc-faction ${fctCls}">${fn}</div>
                 ${p.judgmentCards && p.judgmentCards.length ? `<div class="hc-judge-badges">${p.judgmentCards.map(c=>{
                     const cls=c.subtype==='lebusi'?'lebu':c.subtype==='bingliang'?'bing':c.subtype==='shandian'?'shandian':'';
-                    const txt=c.subtype==='lebusi'?'乐':c.subtype==='bingliang'?'兵':c.subtype==='shandian'?'闪':'?';
+                    const txt=c.subtype==='lebusi'?'乐':c.subtype==='bingliang'?'兵':c.subtype==='shandian'?'电':'?';
                     return `<span class="hc-judge-badge ${cls}">${txt}</span>`;
                 }).join('')}</div>` : ''}
                 ${portraitHtml}${portraitPlaceholder}
@@ -2307,9 +2307,12 @@ function clickCard(idx){
     if(st.phase==='discard' && st.currentPlayerIdx===human.id){
         const di=window._discSel.indexOf(idx);
         if(di>=0){window._discSel.splice(di,1);}else{window._discSel.push(idx);}
-        document.querySelectorAll('#handCards .card').forEach((el,i)=>{
-            el.classList.toggle('sel',window._discSel.includes(i));
-        });
+            // 注意：_discSel 中存放的是【真实手牌下标(realIdx)】，而 .card 元素是按排序后的
+            // 展示顺序渲染的，二者通常不一致（排序后 DOM 位置 i 对应的真实下标是 dataset.i）。
+            // 因此必须用 el.dataset.i（真实下标）与 _discSel 比对，否则点选高亮会落到错误的卡牌上。
+            document.querySelectorAll('#handCards .card').forEach((el)=>{
+                el.classList.toggle('sel',window._discSel.includes(parseInt(el.dataset.i, 10)));
+            });
         const need=human.handCards.length-human.hp;
         const db=document.getElementById('discardBtn');
         if(db){db.disabled=window._discSel.length!==need;db.textContent=`弃牌(${window._discSel.length}/${need})`;}

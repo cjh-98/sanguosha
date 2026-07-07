@@ -949,7 +949,6 @@ SGS.GameEngine = (function() {
                         }
                     }
                     this.notifyState();
-                    this.advancePhase();
                 } else {
                     // 人类玩家：检查是否已经在等待状态
                     if (this._waitingForLuoshen) {

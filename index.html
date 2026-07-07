@@ -2765,6 +2765,12 @@ function onGuanxingDragEnd(e){
 function skipGuanxing(){
     const ov=document.getElementById('guanxingOverlay');
     if(ov)ov.remove();
+    // 观星观看到的牌已暂从牌堆顶移出（openGuanxing 中 splice），跳过时须放回牌堆顶，
+    // 否则这些牌会凭空消失，破坏卡牌守恒（confirmGuanxing 已正确还原，skip 路径需对齐）。
+    const cards = window._guanxingCards || [];
+    if(cards.length && engine && engine.deck){
+        engine.deck = [...engine.deck, ...cards];
+    }
     engine.log('你跳过了【观星】', 'normal');
     finishGuanxing(false);
 }

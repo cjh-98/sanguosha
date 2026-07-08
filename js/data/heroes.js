@@ -278,8 +278,8 @@ SGS.HeroData = (function() {
         ], { pack:'mountain' }),
 
         hero('dengai', '邓艾', FACTION.WEI, 4, [
-            { name:'屯田', type:SKILL_TYPE.PASSIVE, trigger:'onLoseCard', desc:'当你于回合外失去牌时，进行一次判定，若非红桃，将判定牌作为"田"标记', pack:'mountain' },
-            { name:'凿险', type:SKILL_TYPE.AWAKENING, trigger:'any', desc:'觉醒技，当你的"田"达到3个时，减1点体力上限，获得"急袭"', pack:'mountain' },
+            { name:'屯田', type:SKILL_TYPE.LOCKED, trigger:'turnBegin', desc:'（由【凿险】觉醒后生效）回合开始时，你摸一张牌', pack:'mountain' },
+            { name:'凿险', type:SKILL_TYPE.AWAKENING, trigger:'turnBegin', desc:'觉醒技，当你体力为1时，减1点体力上限，获得"屯田"（回合开始时摸一张牌）', pack:'mountain' },
         ], { pack:'mountain' }),
 
         hero('zhanghe', '张郃', FACTION.WEI, 4, [

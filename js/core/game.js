@@ -3749,7 +3749,7 @@ SGS.GameEngine = (function() {
                             const d = this.getDistance(p, q);
                             if (d < minDist) { minDist = d; nearest = q; }
                         }
-                        const sha = await this.requestResponse(p, 'sha', player);
+                        const sha = await this.requestResponse(p, 'sha', nearest);
                         if (!sha) {
                             await this.dealDamage(p, 1, { source: player });
                             this.log(`${p.name}乱武未能出杀，失去1点体力`, 'danger');

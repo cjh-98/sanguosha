@@ -28,7 +28,7 @@ SGS.CardData = (function() {
         };
     }
 
-    // ===== 标准版卡牌 (108张) =====
+    // ===== 标准版卡牌 (118张) =====
     const standardCards = [
         // === 杀 (30张) ===
         card('杀', SUIT.SPADE, 7, TYPE.BASIC, 'sha'),

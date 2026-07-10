@@ -3558,6 +3558,7 @@ function openYinghun(){
 function selectYhTarget(el){
     const human=engine.getHumanPlayer(); if(!human)return;
     const targetId = parseInt(el.dataset.id);
+    _yhTargetId = targetId;
     const ov=document.getElementById('yhOverlay');
     if(ov)ov.remove();
     // 打开牌选择
@@ -3592,10 +3593,13 @@ function selectYhCard(el){
     const ov=document.getElementById('yhCardOverlay');
     if(ov)ov.remove();
     // 需要找到原始牌索引
+    if(_yhTargetId === null){return;}
     const originalIdx = human.handCards.indexOf(card);
     engine.useSkill(human, '英魂', { targetId: _yhTargetId, card: human.handCards[originalIdx] });
     updateBoard(engine.getState());
 }
+
+let _yhTargetId = null;
 
 // ---- 虚鲲弹窗（左慈）----
 function openXukun(){
@@ -3724,6 +3728,7 @@ function openQixi(){
 function selectQxTarget(el){
     const human=engine.getHumanPlayer(); if(!human)return;
     const targetId = parseInt(el.dataset.id);
+    _qxTargetId = targetId;
     const ov=document.getElementById('qxOverlay');
     if(ov)ov.remove();
     // 选择黑色牌
@@ -3791,6 +3796,7 @@ function openDuanliang(){
 function selectDlTarget(el){
     const human=engine.getHumanPlayer(); if(!human)return;
     const targetId = parseInt(el.dataset.id);
+    _dlTargetId = targetId;
     const ov=document.getElementById('dlOverlay');
     if(ov)ov.remove();
     if(human.handCards.length === 0){
@@ -3890,6 +3896,7 @@ function openGuose(){
 function selectGsTarget(el){
     const human=engine.getHumanPlayer(); if(!human)return;
     const targetId = parseInt(el.dataset.id);
+    _gsTargetId = targetId;
     const ov=document.getElementById('gsOverlay');
     if(ov)ov.remove();
     const redCards = human.handCards.filter(c => c.suit === 'heart' || c.suit === 'diamond');

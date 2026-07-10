@@ -3845,6 +3845,24 @@ SGS.GameEngine = (function() {
                         }
                     }
                     break;
+                case '英魂':
+                    // 手动发动（UI：openYinghun）：弃置一张红色牌，对目标造成1点伤害。
+                    // 注意：回合开始阶段的"摸X弃Y"版英魂由 doBeginInstantSkills 自动处理，二者互不冲突。
+                    if (player.skillStates && player.skillStates['英魂Used']) return false;
+                    if (params.targetId !== undefined && params.card) {
+                        const target = this.players[params.targetId];
+                        const card = params.card;
+                        if (target && (card.suit === 'heart' || card.suit === 'diamond')) {
+                            this.discardCard(player, card);
+                            await this.dealDamage(target, 1, { source: player, card: null });
+                            this.log(`${player.name}英魂：弃红牌对${target.name}造成1点伤害`, 'highlight');
+                            player.skillStates = player.skillStates || {};
+                            player.skillStates['英魂Used'] = true;
+                        } else if (target) {
+                            this.log(`${player.name}英魂需要弃置红色牌`, 'normal');
+                        }
+                    }
+                    break;
                 case '好施':
                     // 摸牌阶段多摸2张，然后交给手牌最少者
                     player.skillStates = player.skillStates || {};

@@ -219,8 +219,9 @@ SGS.GameEngine = (function() {
                 log: this.matchLog
             };
 
-            // 保存到localStorage
+            // 保存到localStorage（非浏览器环境可能不存在，做防御性判断）
             try {
+                if (typeof localStorage === 'undefined' || !localStorage) return;
                 let history = JSON.parse(localStorage.getItem('sgsMatchHistory') || '[]');
                 history.unshift(matchRecord); // 最新的在前面
                 // 只保留最近50场对局
@@ -1809,7 +1810,6 @@ SGS.GameEngine = (function() {
                     if (targetIds.length === 0) return false;
                     const gt = this.players[targetIds[0]];
                     if (!gt || !gt.isAlive) return false;
-                    if (gt.skills.some(s => s.name === '谦逊')) return false; // 谦逊：不能被过河拆桥
                     if (gt.skills.some(s => s.name === '帷幕') && (card.suit === 'spade' || card.suit === 'club')) return false; // 帷幕：黑色锦囊无效
                     if (!player.skills.some(s => s.name === '奇才') && this.getDistance(player, gt) > 1) return false;
                     break;
@@ -2256,11 +2256,6 @@ SGS.GameEngine = (function() {
 
                 case 'guohe': // 过河拆桥
                     const t1 = targets[0];
-                    // 谦逊 (陆逊): 不能被顺手/过河
-                    if (t1.skills.some(s => s.name === '谦逊')) {
-                        this.log(`${t1.name}谦逊：不能被过河拆桥`, 'normal');
-                        break;
-                    }
                     // 帷幕 (贾诩): 不能成为黑色锦囊的目标
                     if (t1.skills.some(s => s.name === '帷幕') && (card.suit === 'spade' || card.suit === 'club')) {
                         this.log(`${t1.name}帷幕：不能被黑色锦囊选中`, 'normal');
@@ -2476,6 +2471,12 @@ SGS.GameEngine = (function() {
         // ========== 延时锦囊 ==========
         async resolveDelayCard(player, card, targetIds) {
             const target = targetIds.length > 0 ? this.players[targetIds[0]] : player;
+            // 谦逊 (陆逊): 锁定技，不能成为【乐不思蜀】的目标
+            if (card.subtype === 'lebusi' && target.skills.some(s => s.name === '谦逊')) {
+                this.discardPile.push(card);
+                this.log(`${target.name}谦逊：不能被乐不思蜀选中`, 'normal');
+                return;
+            }
             // 检查目标判定区是否已有同名锦囊
             const hasSame = target.judgmentCards.some(c => c.subtype === card.subtype);
             if (!hasSame) {
@@ -3516,10 +3517,8 @@ SGS.GameEngine = (function() {
                         if (blackCard && idx >= 0 && (blackCard.suit === 'spade' || blackCard.suit === 'club')) {
                             player.handCards.splice(idx, 1);
                             this.discardPile.push(blackCard);
-                            // 谦逊(陆逊)：不能被过河拆桥选中
-                            if (target.skills.some(s => s.name === '谦逊')) {
-                                this.log(`${target.name}谦逊：不能被奇袭(过河拆桥)选中`, 'normal');
-                            } else if (target.skills.some(s => s.name === '帷幕') && (blackCard.suit === 'spade' || blackCard.suit === 'club')) {
+                            // 帷幕 (贾诩): 黑色锦囊无效
+                            if (target.skills.some(s => s.name === '帷幕') && (blackCard.suit === 'spade' || blackCard.suit === 'club')) {
                                 this.log(`${target.name}帷幕：不能被黑色锦囊选中`, 'normal');
                             } else {
                                 // 收集目标所有可弃置的牌（手牌+装备+判定区），由使用者选择拆哪一张
@@ -4088,12 +4087,12 @@ SGS.GameEngine = (function() {
         // ========== 吴国技能实现 ==========
         // 国色 (大乔): 红牌当乐不思蜀
         // 流离 (大乔): 被杀时转移给攻击范围内角色
-        // 谦逊 (陆逊): 不能被顺手/过河
+        // 谦逊 (陆逊): 锁定技，不能成为【顺手牵羊】和【乐不思蜀】的目标（不防【过河拆桥】）
         // 红颜 (小乔): 黑桃当红桃
 
         // 在useSkill中添加国色
         // 在resolveSha中添加流离
-        // 在guohe/shunshou中添加谦逊检查
+        // 谦逊检查已加入 shunshou（目标校验+结算）与 resolveDelayCard（乐不思蜀）
         // 在card checks中添加红颜
 
         // ========== 通知状态 ==========

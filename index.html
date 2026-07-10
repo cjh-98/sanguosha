@@ -3827,6 +3827,42 @@ function selectDlCard(el){
 
 let _dlTargetId = null;
 
+// ---- 反间弹窗（周瑜）----
+function openFanjian(){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    // 反间的结算要求目标必须有手牌（引擎 useSkill('反间') 中先校验 target.handCards.length>0），
+    // 因此这里只把「有手牌的存活其他角色」列为可选目标，避免点击后空转并白白标记 fanjianUsed。
+    const targets = engine.getAlivePlayers().filter(p => p.id !== human.id && p.isAlive && p.handCards.length > 0);
+    if(targets.length === 0){return;}
+    const ov=document.createElement('div');
+    ov.id='fjOverlay';
+    ov.className='overlay';
+    ov.onclick=function(e){if(e.target===this)ov.remove();};
+    ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h4>反间：选择反间的目标</h4>
+        <p style="color:#a0a0b0;font-size:12px;margin-bottom:10px;">令一名有手牌的角色猜花色，猜错则受1点伤害，你获得其展示的牌</p>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px">
+            ${targets.map(p=>`<div class="player-card ${p.id===human.id?'self':''}" data-id="${p.id}" onclick="selectFanjianTarget(this)">
+                <div class="pinfo">${p.name}</div>
+                <div class="phpl">${p.hp}/${p.maxHp}</div>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('fjOverlay')?.remove()">取消</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+}
+
+function selectFanjianTarget(el){
+    const human=engine.getHumanPlayer(); if(!human)return;
+    const targetId = parseInt(el.dataset.id);
+    const ov=document.getElementById('fjOverlay');
+    if(ov)ov.remove();
+    // 未传入 suit：引擎按既有逻辑随机指定对方猜测的花色，与 AI 出牌路径行为一致。
+    engine.useSkill(human, '反间', { targetId: targetId });
+    updateBoard(engine.getState());
+}
+
 // ---- 国色弹窗（甄姬）----
 function openGuose(){
     const human=engine.getHumanPlayer(); if(!human)return;

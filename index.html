@@ -3780,7 +3780,7 @@ function openDuanliang(){
     ov.onclick=function(e){if(e.target===this)ov.remove();};
     ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
         <h4>断粮：选择断粮的目标</h4>
-        <p style="color:#a0a0b0;font-size:12px;margin-bottom:10px;">弃一张牌，给目标放一张乐不思蜀</p>
+        <p style="color:#a0a0b0;font-size:12px;margin-bottom:10px;">弃一张黑色非装备牌，给目标放一张兵粮寸断</p>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px">
             ${targets.map(p=>`<div class="player-card ${p.id===human.id?'self':''}" data-id="${p.id}" onclick="selectDlTarget(this)">
                 <div class="pinfo">${p.name}</div>
@@ -3803,14 +3803,21 @@ function selectDlTarget(el){
         alert('没有手牌可以使用断粮');
         return;
     }
+    // 断粮：仅黑色非装备牌可用（与引擎判定一致），避免选到红牌/装备牌导致技能静默空转
+    const eligible = sortedHandCards(human)
+        .filter(({card:c}) => (c.suit === 'spade' || c.suit === 'club') && c.type !== 'equip');
+    if(eligible.length === 0){
+        alert('没有黑色非装备牌可以使用断粮');
+        return;
+    }
     const ov2=document.createElement('div');
     ov2.id='dlCardOverlay';
     ov2.className='overlay';
     ov2.onclick=function(e){if(e.target===this)ov2.remove();};
     ov2.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
-        <h4>断粮：选择要弃置的牌</h4>
+        <h4>断粮：选择要弃置的黑色牌</h4>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px">
-            ${sortedHandCards(human).map(({card:c, idx:i})=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
+            ${eligible.map(({card:c, idx:i})=>`<div class="card ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}"
                 data-i="${i}" onclick="selectDlCard(this)">
                 <span class="cs ${c.suit==='heart'||c.suit==='diamond'?'red':'blk'}">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
                 <span class="cname ${c.suit==='heart'||c.suit==='diamond'?'r':'b'}">${c.name}</span></div>`).join('')}
@@ -3880,7 +3887,7 @@ function openGuose(){
     ov.onclick=function(e){if(e.target===this)ov.remove();};
     ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
         <h4>国色：选择国色的目标</h4>
-        <p style="color:#a0a0b0;font-size:12px;margin-bottom:10px;">弃一张红色牌，给目标放一张乐不思蜀</p>
+        <p style="color:#a0a0b0;font-size:12px;margin-bottom:10px;">弃一张方块牌，给目标放一张乐不思蜀</p>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px">
             ${targets.map(p=>`<div class="player-card ${p.id===human.id?'self':''}" data-id="${p.id}" onclick="selectGsTarget(this)">
                 <div class="pinfo">${p.name}</div>
@@ -3899,9 +3906,9 @@ function selectGsTarget(el){
     _gsTargetId = targetId;
     const ov=document.getElementById('gsOverlay');
     if(ov)ov.remove();
-    const redCards = human.handCards.filter(c => c.suit === 'heart' || c.suit === 'diamond');
-    if(redCards.length === 0){
-        alert('没有红色牌可以使用国色');
+    const diamondCards = human.handCards.filter(c => c.suit === 'diamond');
+    if(diamondCards.length === 0){
+        alert('没有方块牌可以使用国色');
         return;
     }
     const ov2=document.createElement('div');
@@ -3909,9 +3916,9 @@ function selectGsTarget(el){
     ov2.className='overlay';
     ov2.onclick=function(e){if(e.target===this)ov2.remove();};
     ov2.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">
-        <h4>国色：选择一张红色牌</h4>
+        <h4>国色：选择一张方块牌</h4>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px">
-            ${redCards.map((c,i)=>`<div class="card red"
+            ${diamondCards.map((c,i)=>`<div class="card red"
                 data-i="${i}" onclick="selectGsCard(this)">
                 <span class="cs red">${['♠','♥','♣','♦'][['spade','heart','club','diamond'].indexOf(c.suit)]}</span>
                 <span class="cname r">${c.name}</span></div>`).join('')}
@@ -3925,10 +3932,10 @@ function selectGsTarget(el){
 function selectGsCard(el){
     const human=engine.getHumanPlayer(); if(!human)return;
     const idx = parseInt(el.dataset.i);
-    const redCards = human.handCards.filter(c => c.suit === 'heart' || c.suit === 'diamond');
-    const card = redCards[idx];
-    const ov=document.getElementById('gsCardOverlay');
-    if(ov)ov.remove();
+    const diamondCards = human.handCards.filter(c => c.suit === 'diamond');
+    const card = diamondCards[idx];
+    const ov = document.getElementById('gsCardOverlay');
+    if(ov) ov.remove();
     const originalIdx = human.handCards.indexOf(card);
     engine.useSkill(human, '国色', { targetId: _gsTargetId, card: human.handCards[originalIdx] });
     updateBoard(engine.getState());

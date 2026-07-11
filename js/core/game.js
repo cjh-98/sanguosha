@@ -3834,6 +3834,12 @@ SGS.GameEngine = (function() {
                         const target = this.players[params.targetId];
                         const card = params.card;
                         if (card.suit === 'diamond') {  // 方块牌当乐不思蜀
+                            // 谦逊 (陆逊): 不能成为乐不思蜀的目标 —— 与真实乐不思蜀(resolveDelayCard)一致，
+                            // 避免国色绕过该硬控；判定在弃置方块牌之前，挡下则不消耗手牌。
+                            if (target.skills.some(s => s.name === '谦逊')) {
+                                this.log(`${target.name}谦逊：不能被乐不思蜀选中`, 'normal');
+                                break;
+                            }
                             this.discardCard(player, card);
                             // 放置乐不思蜀
                             const lebu = { name: '乐不思蜀(国色)', subtype: 'lebusi' };

@@ -3560,20 +3560,25 @@ SGS.GameEngine = (function() {
                         const target = this.players[params.targetId];
                         if (target.handCards.length > 0) {
                             const c = target.handCards[Math.floor(Math.random() * target.handCards.length)];
+                            const cIdx = target.handCards.indexOf(c);
                             this.log(`${player.name}对${target.name}发动反间`, 'highlight');
                             // 目标选择花色，展示手牌
                             const declaredSuit = params.suit || ['spade','heart','club','diamond'][Math.floor(Math.random()*4)];
                             this.log(`${target.name}猜测花色为${SGS.CardData.suitName[declaredSuit]}`, 'normal');
                             this.log(`反间牌为${SGS.CardData.suitName[c.suit]}${c.name}`, 'normal');
-                            target.handCards.splice(target.handCards.indexOf(c), 1);
                             if (c.suit !== declaredSuit) {
-                                // 注意：反间会把展示牌 c 交给周瑜；此处故意不把 c 作为伤害来源牌传入，
+                                // 猜错：受1点伤害，该牌交付周瑜
+                                // 注意：故意不把 c 作为伤害来源牌传入（card:null），
                                 // 否则若目标持有【奸雄】，奸雄会把 c 也收入目标手牌，导致同一张牌同时出现在周瑜与目标手中。
+                                target.handCards.splice(cIdx, 1);
                                 await this.dealDamage(target, 1, { source: player, card: null });
+                                player.handCards.push(c);
                                 this.log(`${target.name}猜错花色，受到1点伤害`, 'danger');
+                                this.log(`${player.name}获得了${c.name}`, 'normal');
+                            } else {
+                                // 猜对：不受伤害，展示牌仍留在目标手中，周瑜不得牌
+                                this.log(`${target.name}猜对花色，保留手牌`, 'normal');
                             }
-                            player.handCards.push(c);
-                            this.log(`${player.name}获得了${c.name}`, 'normal');
                         }
                     }
                     player.skillStates = player.skillStates || {};

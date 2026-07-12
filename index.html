@@ -1869,8 +1869,8 @@ function assignAIHeroes(){
             // 国战：随机选一个势力
             const factions=['wei','shu','wu','qun'];
             const fac=factions[Math.floor(Math.random()*factions.length)];
-            let pool=SGS.HeroData.getByFaction(fac).filter(h=>!exclude.includes(h.id));
-            if(pool.length<2) pool=SGS.HeroData.getAll().filter(h=>!exclude.includes(h.id));
+            let pool=SGS.HeroData.getByFaction(fac).filter(h=>!exclude.includes(h.id) && !h.unimplemented);
+            if(pool.length<2) pool=SGS.HeroData.getAll().filter(h=>!exclude.includes(h.id) && !h.unimplemented);
             if(pool.length>=2){
                 let h1=pool[Math.floor(Math.random()*pool.length)];
                 let h2=pool[Math.floor(Math.random()*pool.length)];
@@ -1882,6 +1882,7 @@ function assignAIHeroes(){
         }else{
             let pool=SGS.HeroData.randomPick(5,exclude);
             if(!pool||pool.length===0) pool=SGS.HeroData.getAll().filter(h=>!exclude.includes(h.id));
+            pool=pool.filter(h=>!h.unimplemented);
             const chosen=aiPlayer.chooseHero(pool,engine,i);
             if(chosen){engine.setPlayerHero(i,chosen); exclude.push(chosen.id);}
         }

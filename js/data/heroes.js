@@ -29,6 +29,8 @@ SGS.HeroData = (function() {
             desc: opts.desc || '',
             pack: opts.pack || 'standard',
             title: opts.title || '',
+            unimplemented: opts.unimplemented || false,
+            note: opts.note || '',
         };
     }
 
@@ -290,7 +292,7 @@ SGS.HeroData = (function() {
             { name:'激昂', type:SKILL_TYPE.LOCKED, trigger:'any', desc:'锁定技，你使用红【杀】或红色【决斗】伤害+1', pack:'mountain' },
             { name:'魂姿', type:SKILL_TYPE.AWAKENING, trigger:'turnBegin', desc:'觉醒技，当体力为1时，减1点体力上限，获得"英姿"和"英魂"', pack:'mountain' },
             { name:'制霸', type:SKILL_TYPE.LORD, trigger:'playPhase', desc:'主公技，其他吴势力角色可与孙策拼点', pack:'mountain' },
-        ], { pack:'mountain' }),
+        ], { pack:'mountain', note:'主公技制霸(吴势力角色与孙策拼点)引擎尚未实现；其余技能正常，故仍保留于武将池' }),
 
         hero('zhangzhaozhanghong', '张昭张纮', FACTION.WU, 3, [
             { name:'直谏', type:SKILL_TYPE.ACTIVE, trigger:'playPhase', desc:'出牌阶段，你可以将手牌中的装备牌交给一名其他角色，然后摸一张牌', pack:'mountain' },
@@ -321,7 +323,7 @@ SGS.HeroData = (function() {
             { name:'七星', type:SKILL_TYPE.ACTIVE, trigger:'gameStart', desc:'游戏开始时，你从11张牌中选4张手牌，其余作为"星"标记' },
             { name:'狂风', type:SKILL_TYPE.ACTIVE, trigger:'turnEnd', desc:'结束阶段，你可以弃1枚"星"标记，令一名角色受到火焰伤害+1' },
             { name:'大雾', type:SKILL_TYPE.ACTIVE, trigger:'turnEnd', desc:'结束阶段，你可以弃1枚"星"标记，令一名角色本回合免疫非火焰伤害' },
-        ]),
+        ], { unimplemented: true, note:'技能七星/狂风/大雾 引擎尚未实现，暂不进入随机武将池（避免无技能武将上线）' }),
     ];
 
     return {

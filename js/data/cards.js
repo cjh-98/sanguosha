@@ -30,7 +30,7 @@ SGS.CardData = (function() {
 
     // ===== 标准版卡牌 (118张) =====
     const standardCards = [
-        // === 杀 (30张) ===
+        // === 杀 (32张) ===
         card('杀', SUIT.SPADE, 7, TYPE.BASIC, 'sha'),
         card('杀', SUIT.SPADE, 8, TYPE.BASIC, 'sha'),
         card('杀', SUIT.SPADE, 9, TYPE.BASIC, 'sha'),
@@ -81,7 +81,7 @@ SGS.CardData = (function() {
         card('闪', SUIT.DIAMOND, 11, TYPE.BASIC, 'shan'),
         card('闪', SUIT.DIAMOND, 11, TYPE.BASIC, 'shan'),
 
-        // === 桃 (8张) ===
+        // === 桃 (16张) ===
         card('桃', SUIT.HEART, 3, TYPE.BASIC, 'tao'),
         card('桃', SUIT.HEART, 4, TYPE.BASIC, 'tao'),
         card('桃', SUIT.HEART, 5, TYPE.BASIC, 'tao'),

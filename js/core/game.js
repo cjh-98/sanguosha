@@ -1160,8 +1160,8 @@ SGS.GameEngine = (function() {
             try {
                 this.emit('discardPhase', { player, engine: this });
                 let handLimit = player.hp;
-                // 血裔 (袁绍 主公技): 手牌上限+X (X为群势力角色数*2)
-                if (player.skills.some(s => s.name === '血裔')) {
+                // 血裔 (袁绍 主公技): 手牌上限+X (X为群势力角色数*2) — 仅袁绍为主公时生效
+                if (player.isLord && player.skills.some(s => s.name === '血裔')) {
                     const qunCount = this.getAlivePlayers().filter(p => p.faction === 'qun').length;
                     handLimit += qunCount * 2;
                 }
@@ -2772,8 +2772,8 @@ SGS.GameEngine = (function() {
             if (source && source.skills.some(s => s.name === '肉林') && source.gender !== player.gender) {
                 damage += 1;
             }
-            // 暴凌 (董卓 主公技): 其他群势力角色对董卓造成伤害+1
-            if (source && player.skills.some(s => s.name === '暴凌') && source.faction === 'qun') {
+            // 暴凌 (董卓 主公技): 其他群势力角色对董卓造成伤害+1 — 仅董卓为主公时生效
+            if (source && player.isLord && player.skills.some(s => s.name === '暴凌') && source.faction === 'qun') {
                 damage += 1;
                 this.log(`暴凌：群势力对${player.name}伤害+1`, 'danger');
             }
@@ -3153,7 +3153,7 @@ SGS.GameEngine = (function() {
                                 this.discardCard(p, tao);
                                 let extraHeal = 1;
                                 // 救援 (孙权 主公技): 吴势力角色濒死用桃额外回复1点
-                                if (player.faction === 'wu' && this.getAlivePlayers().some(l => l.skills.some(s => s.name === '救援'))) {
+                                if (player.faction === 'wu' && this.getAlivePlayers().some(l => l.isLord && l.skills.some(s => s.name === '救援'))) {
                                     extraHeal += 1;
                                     this.log(`救援：${player.name}额外回复1点体力`, 'success');
                                 }
@@ -3171,7 +3171,7 @@ SGS.GameEngine = (function() {
                                 this.discardCard(p, tao);
                                 let extraHeal = 1;
                                 // 救援 (孙权 主公技): 吴势力角色濒死用桃额外回复1点
-                                if (player.faction === 'wu' && this.getAlivePlayers().some(l => l.skills.some(s => s.name === '救援'))) {
+                                if (player.faction === 'wu' && this.getAlivePlayers().some(l => l.isLord && l.skills.some(s => s.name === '救援'))) {
                                     extraHeal += 1;
                                     this.log(`救援：${player.name}额外回复1点体力`, 'success');
                                 }

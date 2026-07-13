@@ -1713,9 +1713,11 @@ SGS.GameEngine = (function() {
                 }
             }
 
-            // 集智 (黄月英)：使用非基本牌后摸1张
+            // 集智 (黄月英)：使用非延时锦囊后摸1张。
+            // 必须用 card.type === 'trick' 判定，而非排除 sha/shan/tao 这几个基本牌子类型——
+            // 此前【酒】(jiu, 基本牌) 未被排除，导致黄月英用酒也会误触发集智摸牌。集智仅对“非延时锦囊”生效。
             if (player.skills.some(s => s.name === '集智') && card &&
-                card.subtype !== 'sha' && card.subtype !== 'shan' && card.subtype !== 'tao') {
+                card.type === 'trick' && card.subtype !== 'wuxie') {
                 this.drawCard(player, 1);
                 this.log(`${player.name}发动【集智】，摸了1张牌`, 'highlight');
             }

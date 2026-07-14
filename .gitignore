@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+*.swp
+*.swo
+
+# Logs
+game.log
+*.log
+
+# Dependencies
+node_modules/
+package-lock.json
+package.json
+
+# Temp files
+test.html
+test_button.html
+卡牌效果审查报告.md
+
+# WorkBuddy
+.workbuddy/
+
+# Build
+dist/
+build/

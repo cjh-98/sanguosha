@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>提交对局记录 - 三国杀</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .submit-container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 8px;
+            color: #fff;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #ffd700;
+        }
+        .form-group textarea, .form-group input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid #8B4513;
+            border-radius: 4px;
+            color: #fff;
+            font-family: inherit;
+        }
+        .btn-submit {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .btn-submit:hover { background: #218838; }
+        .btn-sm { padding: 6px 12px; font-size: 14px; }
+        .status-message {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .status-success { background: rgba(40, 167, 69, 0.3); color: #28a745; }
+        .status-error { background: rgba(220, 53, 69, 0.3); color: #dc3545; }
+        .status-info { background: rgba(0, 123, 255, 0.3); color: #007bff; }
+        .log-preview {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .tip-box {
+            background: rgba(255, 193, 7, 0.15);
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 15px;
+            color: #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="submit-container">
+        <h2 style="text-align: center; margin-bottom: 20px;">📜 提交对局记录</h2>
+
+        <div class="tip-box">
+            💡 提交对局记录有助于开发者发现和修复问题。你的对局数据将被匿名收集到 sanguosha-data 仓库。
+        </div>
+
+        <div class="form-group">
+            <label>GitHub Token (必填):</label>
+            <input type="text" id="githubToken" placeholder="输入你的GitHub Personal Access Token">
+            <small style="color: #888;">在 GitHub Settings → Developer settings → Personal access tokens 中创建</small>
+        </div>
+
+        <div class="form-group">
+            <label>反馈类型:</label>
+            <select id="feedbackType" style="width: 100%; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid #8B4513; border-radius: 4px; color: #fff;">
+                <option value="game-data">对局记录</option>
+                <option value="bug-report">Bug报告</option>
+                <option value="feedback">功能建议</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>补充说明 (可选):</label>
+            <textarea id="feedbackText" placeholder="描述你遇到的问题或建议..." style="min-height: 80px;"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="includeLog" checked> 包含对局日志
+            </label>
+        </div>
+
+        <div class="form-group">
+            <button class="btn-submit" onclick="submitLog()">提交记录</button>
+            <button class="btn-sm" onclick="downloadLog()" style="margin-left: 10px; background: #6c757d; border: none;">下载日志</button>
+            <button class="btn-sm" onclick="window.close()" style="margin-left: 10px; background: #6c757d; border: none;">取消</button>
+        </div>
+
+        <div id="statusMessage" class="status-message"></div>
+
+        <div class="form-group" style="margin-top: 20px;">
+            <label>对局日志预览:</label>
+            <div class="log-preview" id="logPreview">加载中...</div>
+        </div>
+    </div>
+
+    <script>
+        // 从localStorage加载对局记录
+        let matchHistory = [];
+        
+        function loadMatchHistory() {
+            try {
+                matchHistory = JSON.parse(localStorage.getItem('sgsMatchHistory') || '[]');
+                updatePreview();
+            } catch(e) {
+                document.getElementById('logPreview').textContent = '加载失败: ' + e.message;
+            }
+        }
+
+        function updatePreview() {
+            const preview = document.getElementById('logPreview');
+            if (matchHistory.length === 0) {
+                preview.textContent = '暂无对局记录';
+                return;
+            }
+
+            // 显示最近一场对局的摘要
+            const latest = matchHistory[0];
+            const date = new Date(latest.startTime);
+            let text = `对局时间: ${date.toLocaleString('zh-CN')}\n`;
+            text += `结果: ${latest.result === 'win' ? '胜利' : '失败'}\n`;
+            text += `持续时间: ${Math.floor(latest.duration / 60000)}分${Math.floor((latest.duration % 60000) / 1000)}秒\n\n`;
+            text += `玩家信息:\n`;
+            latest.players.forEach(p => {
+                text += `  ${p.name} - ${p.hero}${p.identity ? ' - ' + p.identity : ''}\n`;
+            });
+            text += `\n详细日志事件数: ${latest.log ? latest.log.length : 0}\n`;
+            text += `\n(完整日志将在提交时发送)`;
+
+            preview.textContent = text;
+        }
+
+        // 提交日志到 sanguosha-data 仓库
+        async function submitLog() {
+            const token = document.getElementById('githubToken').value.trim();
+            const feedbackType = document.getElementById('feedbackType').value;
+            const feedbackText = document.getElementById('feedbackText').value.trim();
+            const includeLog = document.getElementById('includeLog').checked;
+
+            if (!token) {
+                showStatus('请输入GitHub Token', 'error');
+                return;
+            }
+
+            if (matchHistory.length === 0) {
+                showStatus('没有可提交的对局记录', 'error');
+                return;
+            }
+
+            // 构建Issue内容 (参考texas-poker格式)
+            const latest = matchHistory[0];
+            const date = new Date(latest.startTime);
+            
+            // 生成用户ID
+            const userId = 'user_' + Math.random().toString(36).substr(2, 9);
+            const userName = '玩家_' + userId.split('_')[1].substr(0, 4).toUpperCase();
+            
+            // 构建数据JSON
+            const matchData = {
+                u: {
+                    userId: userId,
+                    userName: userName,
+                    platform: navigator.platform || 'unknown',
+                    language: navigator.language,
+                    screenSize: `${window.screen.width}x${window.screen.height}`
+                },
+                ts: new Date().toISOString(),
+                hc: latest.players.length,
+                ps: {
+                    hero: latest.players.find(p => !p.isAI)?.hero || 'unknown',
+                    result: latest.result,
+                    duration: latest.duration,
+                    players: latest.players.map(p => p.hero)
+                },
+                bs: latest.players.map(p => ({
+                    name: p.name,
+                    hero: p.hero,
+                    isAI: p.isAI,
+                    identity: p.identity,
+                    faction: p.faction
+                })),
+                cr: {
+                    // 最后一回合的状态
+                    phase: latest.log?.[latest.log.length - 1]?.phase || 'unknown',
+                    currentPlayer: latest.log?.[latest.log.length - 1]?.currentPlayer || 'unknown'
+                }
+            };
+
+            let body = `**用户**: ${userName}\n**ID**: \`${userId}\`\n\n`;
+            body += `\`\`\`json\n${JSON.stringify(matchData, null, 2)}\n\`\`\`\n`;
+
+            if (includeLog && latest.log) {
+                // 限制日志数量
+                const maxEvents = 50;
+                const events = latest.log.slice(0, maxEvents);
+                body += `\n### 对局事件 (前${events.length}个)\n<details><summary>点击展开</summary>\n\n`;
+                events.forEach(evt => {
+                    const time = new Date(evt.time).toLocaleTimeString('zh-CN');
+                    body += `**[${time}]** ${evt.eventType}: ${JSON.stringify(evt.data)}\n\n`;
+                });
+                body += `</details>\n`;
+            }
+
+            if (feedbackText) {
+                body += `\n### 用户反馈\n${feedbackText}\n`;
+            }
+
+            // 提交到 sanguosha-data 仓库
+            const issueData = {
+                title: `📊 ${userName} - 对局#${date.toLocaleDateString('zh-CN')} ${date.toLocaleTimeString('zh-CN')}`,
+                body: body,
+                labels: ['game-data', feedbackType]
+            };
+
+            try {
+                showStatus('正在提交到 sanguosha-data...', 'info');
+                
+                const response = await fetch('https://api.github.com/repos/cjh-98/sanguosha-data/issues', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(issueData)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || '提交失败: ' + response.status);
+                }
+
+                const result = await response.json();
+                showStatus(`✅ 提交成功！Issue已创建: <a href="${result.html_url}" target="_blank" style="color:#28a745">查看Issue</a>`, 'success');
+                
+                // 保存token到localStorage
+                localStorage.setItem('sgsGitHubToken', token);
+
+            } catch(e) {
+                console.error('Submit error:', e);
+                showStatus('❌ 提交失败: ' + e.message + '<br>请检查Token是否正确', 'error');
+            }
+        }
+
+        // 下载日志
+        function downloadLog() {
+            if (matchHistory.length === 0) {
+                alert('没有可下载的对局记录');
+                return;
+            }
+
+            const latest = matchHistory[0];
+            const blob = new Blob([JSON.stringify(latest, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sanguosha_match_${latest.matchId}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // 显示状态消息
+        function showStatus(message, type) {
+            const status = document.getElementById('statusMessage');
+            status.innerHTML = message;
+            status.className = `status-message status-${type}`;
+            status.style.display = 'block';
+        }
+
+        // 页面加载时恢复
+        window.onload = function() {
+            const savedToken = localStorage.getItem('sgsGitHubToken');
+            if (savedToken) {
+                document.getElementById('githubToken').value = savedToken;
+            }
+            loadMatchHistory();
+        };
+    </script>
+</body>
+</html>

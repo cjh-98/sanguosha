@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三国杀 - 对局历史</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .history-container {
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .match-card {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #8B4513;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+        .match-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #8B4513;
+        }
+        .match-result {
+            font-size: 18px;
+            font-weight: bold;
+            padding: 5px 15px;
+            border-radius: 4px;
+        }
+        .result-win {
+            background: #28a745;
+            color: white;
+        }
+        .match-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .player-info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .btn-view-log {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .btn-view-log:hover {
+            background: #0056b3;
+        }
+        .empty-history {
+            text-align: center;
+            color: #aaa;
+            font-size: 18px;
+            margin-top: 50px;
+        }
+        .btn-clear {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            float: right;
+        }
+        .btn-clear:hover {
+            background: #c82333;
+        }
+        .btn-back {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-back:hover {
+            background: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <div class="history-container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="color: #ffd700; margin: 0;">对局历史记录</h2>
+            <div>
+                <a href="index.html" class="btn-back">返回游戏</a>
+                <button class="btn-clear" onclick="clearHistory()">清除记录</button>
+            </div>
+        </div>
+        <div id="historyList"></div>
+    </div>
+
+    <!-- 对局详情弹窗 -->
+    <div id="matchDetailOverlay" class="overlay" style="display: none;">
+        <div class="modal" style="max-width: 800px; max-height: 80vh; overflow-y: auto;">
+            <h3 id="detailTitle">对局详情</h3>
+            <div id="detailContent"></div>
+            <button class="btn-sm" onclick="closeDetail()" style="margin-top: 15px;">关闭</button>
+        </div>
+    </div>
+
+    <script>
+        // 加载历史记录
+        function loadHistory() {
+            const history = JSON.parse(localStorage.getItem('sgsMatchHistory') || '[]');
+            const container = document.getElementById('historyList');
+            
+            if (history.length === 0) {
+                container.innerHTML = '<div class="empty-history">暂无对局记录</div>';
+                return;
+            }
+
+            container.innerHTML = history.map((match, idx) => {
+                const date = new Date(match.startTime);
+                const duration = Math.floor(match.duration / 1000);
+                const minutes = Math.floor(duration / 60);
+                const seconds = duration % 60;
+                
+                return `
+                    <div class="match-card">
+                        <div class="match-header">
+                            <div>
+                                <div style="color: #aaa; font-size: 14px;">${date.toLocaleString('zh-CN')}</div>
+                                <div style="color: #ffd700; margin-top: 5px;">持续时间: ${minutes}分${seconds}秒</div>
+                            </div>
+                            <div class="match-result ${match.result === 'win' ? 'result-win' : 'result-lose'}">
+                                ${match.result === 'win' ? '胜利' : '失败'}
+                            </div>
+                        </div>
+                        <div class="match-info">
+                            ${match.players.map(p => `
+                                <div class="player-info">
+                                    <span style="color: #ffd700;">${p.name}</span> - 
+                                    <span>${p.hero}</span>
+                                    ${p.identity ? ` - <span style="color: ${p.identity === 'lord' ? '#ffd700' : p.identity === 'loyal' ? '#00ff00' : p.identity === 'rebel' ? '#ff0000' : '#800080'};">${p.identity}</span>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                        <button class="btn-view-log" onclick="viewMatchDetail(${idx})">查看详情</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 查看对局详情
+        function viewMatchDetail(idx) {
+            const history = JSON.parse(localStorage.getItem('sgsMatchHistory') || '[]');
+            const match = history[idx];
+            if (!match) return;
+
+            const date = new Date(match.startTime);
+            document.getElementById('detailTitle').textContent = `对局详情 - ${date.toLocaleString('zh-CN')}`;
+            
+            let html = `
+                <div style="margin-bottom: 15px;">
+                    <strong>结果:</strong> <span style="color: ${match.result === 'win' ? '#28a745' : '#dc3545'}; font-weight: bold;">${match.result === 'win' ? '胜利' : '失败'}</span><br>
+                    <strong>持续时间:</strong> ${Math.floor(match.duration / 60000)}分${Math.floor((match.duration % 60000) / 1000)}秒
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <strong>玩家信息:</strong>
+                    <ul style="margin-top: 5px;">
+                        ${match.players.map(p => `<li>${p.name} - ${p.hero}${p.identity ? ' - ' + p.identity : ''}</li>`).join('')}
+                    </ul>
+                </div>
+                <div>
+                    <strong>对局日志:</strong>
+                    <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; margin-top: 10px; max-height: 400px; overflow-y: auto;">
+            `;
+            
+            if (match.log && match.log.length > 0) {
+                html += match.log.map(event => {
+                    const time = new Date(event.time);
+                    const timeStr = time.toLocaleTimeString('zh-CN');
+                    return `<div style="margin-bottom: 5px; font-size: 13px;">
+                        <span style="color: #aaa;">[${timeStr}]</span> 
+                        <span style="color: #ffd700;">[${event.phase || 'none'}]</span>
+                        ${event.data.msg || JSON.stringify(event.data)}
+                    </div>`;
+                }).join('');
+            } else {
+                html += '<div style="color: #aaa;">暂无详细日志</div>';
+            }
+            
+            html += '</div></div>';
+            document.getElementById('detailContent').innerHTML = html;
+            document.getElementById('matchDetailOverlay').style.display = 'flex';
+        }
+
+        // 关闭详情弹窗
+        function closeDetail() {
+            document.getElementById('matchDetailOverlay').style.display = 'none';
+        }
+
+        // 清除历史记录
+        function clearHistory() {
+            if (confirm('确定要清除所有对局记录吗？')) {
+                localStorage.removeItem('sgsMatchHistory');
+                loadHistory();
+            }
+        }
+
+        // 页面加载时加载历史记录
+        window.onload = loadHistory;
+    </script>
+</body>
+</html>

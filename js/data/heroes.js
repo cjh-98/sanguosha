@@ -346,7 +346,7 @@ SGS.HeroData = (function() {
         },
         // 随机抽取N个武将
         randomPick(count, exclude = []) {
-            const available = heroes.filter(h => !exclude.includes(h.id));
+            const available = heroes.filter(h => !exclude.includes(h.id) && !h.unimplemented);
             const picked = [];
             const pool = [...available];
             for (let i = 0; i < count && pool.length > 0; i++) {

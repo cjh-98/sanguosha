@@ -1746,7 +1746,7 @@ function goHeroSelect(){
         if(Cfg.pickMode==='random'){
             pool = SGS.HeroData.randomPick(isNat?12:10,Cfg.bannedHeroes);
         }else{
-            pool = SGS.HeroData.getAll().filter(h=>!Cfg.bannedHeroes.includes(h.id));
+            pool = SGS.HeroData.getAll().filter(h=>!Cfg.bannedHeroes.includes(h.id) && !h.unimplemented);
         }
         if(!pool || pool.length===0){
             throw new Error('武将池为空！bannedHeroes=' + Cfg.bannedHeroes.length);

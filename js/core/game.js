@@ -1257,7 +1257,7 @@ SGS.GameEngine = (function() {
                 }
             }
 
-            if (this.checkGameOver()) { this.endGame(); return; }
+            if (this.checkGameOver(true)) { this.endGame(); return; }
             this.notifyState();
             this.nextTurn();
         }
@@ -2068,7 +2068,10 @@ SGS.GameEngine = (function() {
                                 source.handCards.splice(source.handCards.indexOf(ns), 1);
                                 this.log(`${source.name}发动青龙偃月刀，再出一张杀`, 'highlight');
                                 await this.resolveSha(source, target, ns, baseDamage, depth + 1);
-                                this.discardPile.push(ns);
+                                // ns 已在上面从手牌移除，此处入弃牌堆；若仍残留则兜底丢弃，
+                                // 避免“同名牌同时在手牌与弃牌堆”破坏卡牌守恒（170 张牌不丢不重）。
+                                if (source.handCards.indexOf(ns) >= 0) this.discardCard(source, ns);
+                                else this.discardPile.push(ns);
                                 return;
                             }
                         }
@@ -2191,11 +2194,13 @@ SGS.GameEngine = (function() {
 
                 case 'nanman': // 南蛮入侵
                     this.log(`${player.name}使用了南蛮入侵！`, 'highlight');
-                    const others = this.getAlivePlayers().filter(p => p.id !== player.id);
-                    for (const p of others) {
-                        if (!p.isAlive) continue;
-                        // 祸首 (孟获)：被【南蛮入侵】造成伤害时，伤害来源视为孟获本人
-                        const src = (p.skills.some(s => s.name === '祸首') && player.id !== p.id) ? p : player;
+                const others = this.getAlivePlayers().filter(p => p.id !== player.id);
+                for (const p of others) {
+                    if (!p.isAlive) continue;
+                    // 祸首 (孟获 锁定技)：【南蛮入侵】对孟获无效——既不要求响应也不会受到伤害
+                    if (p.skills.some(s => s.name === '祸首')) continue;
+                    // 祸首：被【南蛮入侵】造成伤害时，伤害来源视为孟获本人
+                    const src = (p.skills.some(s => s.name === '祸首') && player.id !== p.id) ? p : player;
                         const sha = await this.requestResponse(p, 'sha', src);
                         if (!sha) {
                             this.log(`${p.name}受到1点伤害`, 'danger');
@@ -2206,10 +2211,12 @@ SGS.GameEngine = (function() {
 
                 case 'wanjian': // 万箭齐发
                     this.log(`${player.name}使用了万箭齐发！`, 'highlight');
-                    const targets2 = this.getAlivePlayers().filter(p => p.id !== player.id);
-                    for (const p of targets2) {
-                        if (!p.isAlive) continue;
-                        const shan = await this.requestResponse(p, 'shan', player);
+                const targets2 = this.getAlivePlayers().filter(p => p.id !== player.id);
+                for (const p of targets2) {
+                    if (!p.isAlive) continue;
+                    // 祸首 (孟获 锁定技)：【万箭齐发】对孟获无效——既不要求出闪也不会受到伤害
+                    if (p.skills.some(s => s.name === '祸首')) continue;
+                    const shan = await this.requestResponse(p, 'shan', player);
                         if (!shan) {
                             await this.dealDamage(p, 1, { source: player, card });
                         }
@@ -3368,9 +3375,9 @@ SGS.GameEngine = (function() {
         }
 
         // ========== 胜利条件 ==========
-        checkGameOver() {
+        checkGameOver(safeBoundary = false) {
             if (this.gameMode === 'national') {
-                return this.checkNationalGameOver();
+                return this.checkNationalGameOver(safeBoundary);
             }
             return this.checkStandardGameOver();
         }
@@ -3402,8 +3409,32 @@ SGS.GameEngine = (function() {
             return false;
         }
 
-        checkNationalGameOver() {
+        checkNationalGameOver(safeBoundary = false) {
             const alive = this.getAlivePlayers();
+            // 国战结束判定只在“回合边界/安全地”(safeBoundary=true) 做决定：
+            // 结算中途一律返回 false，把结束推迟到回合边界(见 stepTurn 末尾的 this.checkGameOver(true))。
+            // 严禁在伤害/出牌结算中途 endGame —— 否则已离手尚未入弃牌堆的“在途卡牌”会被丢弃，破坏卡牌守恒。
+            if (!safeBoundary) return false;
+            // 仅剩一名（或更少）存活角色时游戏立即结束，避免结算中卡住或误判胜负：
+            //  - 0 人存活 → 平局
+            //  - 1 人存活 → 该角色所在势力获胜（强制亮明身份）
+            if (alive.length <= 1) {
+                if (alive.length === 0) {
+                    this.winner = [];
+                    this.log(`全场阵亡，平局！`, 'highlight');
+                } else {
+                    const p = alive[0];
+                    if (p.isAmbitious) {
+                        this.winner = [p.id];
+                        this.log(`野心家获胜！`, 'highlight');
+                    } else {
+                        p.heroRevealed = true;
+                        this.winner = [p.faction];
+                        this.log(`${SGS.HeroData.factionName[p.faction]}势力获胜！`, 'highlight');
+                    }
+                }
+                return true;
+            }
             const revealedAlive = alive.filter(p => p.heroRevealed);
             if (revealedAlive.length < alive.length) return false;
 
